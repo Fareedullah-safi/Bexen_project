@@ -1,4 +1,15 @@
 @import "tailwindcss";
+@import "animate.css";
+
+@keyframes logoScroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
 
 :root {
   --background: #ffffff;
@@ -12,15 +23,31 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
+  @apply bg-[#ECF0F0];
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.scrollbar-cyan {
+  scrollbar-width: thin;
+  scrollbar-color: #1e8a8a #0c2426;
+}
+
+.scrollbar-cyan::-webkit-scrollbar {
+  width: 7px;
+}
+
+.scrollbar-cyan::-webkit-scrollbar-track {
+  background: #0c2426;
+  border-radius: 10px;
+}
+
+.scrollbar-cyan::-webkit-scrollbar-thumb {
+  background: #1e8a8a;
+  border-radius: 10px;
+}
+
+.scrollbar-cyan::-webkit-scrollbar-thumb:hover {
+  background: #2bbaba;
 }
