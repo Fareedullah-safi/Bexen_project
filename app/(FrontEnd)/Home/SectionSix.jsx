@@ -75,22 +75,35 @@ export default function SectionSix() {
         <div className="mt-10 w-full bg-[#102326]/10" />
       </div>
       {/* Image Section */}
-      <div className="mt-10 flex px-14 w-full h-80">
-        <div className="flex gap-6">
-          <Image
-            src="https://themejunction.net/html/bexon/demo/assets/images/project/project-1.webp"
-            alt="company image"
-            width={999}
-            height={666}
-            className="w-185 h-115 rounded-2xl"
-          />
-          <Image
-            src="https://themejunction.net/html/bexon/demo/assets/images/project/project-2.webp"
-            alt="company image"
-            width={999}
-            height={666}
-            className="w-105 h-115 rounded-2xl"
-          />
+      <div className="mt-10 flex w-full px-14">
+        <div className="flex w-full gap-6">
+          <div className="relative w-185 h-120 overflow-hidden rounded-2xl">
+            <Image
+              src="https://themejunction.net/html/bexon/demo/assets/images/project/project-1.webp"
+              alt="company image"
+              width={999}
+              height={666}
+              className="h-full w-full object-cover"
+            />
+
+            <p className="absolute bottom-5 left-5 z-10 text-lg font-medium text-white">
+              Project Description 1
+            </p>
+          </div>
+
+          <div className="relative w-105 h-115 overflow-hidden rounded-2xl">
+            <Image
+              src="https://themejunction.net/html/bexon/demo/assets/images/project/project-2.webp"
+              alt="company image"
+              width={999}
+              height={666}
+              className="h-full w-full object-cover"
+            />
+
+            <p className="absolute bottom-5 left-5 z-10 text-lg font-medium text-white">
+              Project Description 2
+            </p>
+          </div>
         </div>
       </div>
       {/* Image Section closed */}
