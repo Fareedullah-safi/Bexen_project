@@ -1,8 +1,9 @@
 import { ArrowRight, GlobeIcon } from "lucide-react";
+import Image from "next/image";
 
 export default function SectionSix() {
   return (
-    <section className="w-full bg-[#ECF0F0] px-6 py-16">
+    <section className="w-full h-[200vh] bg-[#ECF0F0] px-6 py-16">
       <div className="w-full px-4 sm:px-6 md:px-8 lg:px-15">
         {/* Badge */}
         <span
@@ -71,8 +72,48 @@ export default function SectionSix() {
         </div>
 
         {/* Bottom Line */}
-        <div className="mt-10 h-px w-full bg-[#102326]/10" />
+        <div className="mt-10 w-full bg-[#102326]/10" />
       </div>
+      {/* Image Section */}
+      <div className="mt-10 flex px-14 w-full h-80">
+        <div className="flex gap-6">
+          <Image
+            src="https://themejunction.net/html/bexon/demo/assets/images/project/project-1.webp"
+            alt="company image"
+            width={999}
+            height={666}
+            className="w-185 h-115 rounded-2xl"
+          />
+          <Image
+            src="https://themejunction.net/html/bexon/demo/assets/images/project/project-2.webp"
+            alt="company image"
+            width={999}
+            height={666}
+            className="w-105 h-115 rounded-2xl"
+          />
+        </div>
+      </div>
+      {/* Image Section closed */}
+      {/* Image Section */}
+      <div className="mt-10 pt-30 flex px-14 w-full h-80">
+        <div className="flex gap-6">
+          <Image
+            src="https://themejunction.net/html/bexon/demo/assets/images/project/project-3.webp"
+            alt="company image"
+            width={999}
+            height={666}
+            className="w-105 h-115 rounded-2xl"
+          />
+          <Image
+            src="https://themejunction.net/html/bexon/demo/assets/images/project/project-4.webp"
+            alt="company image"
+            width={999}
+            height={666}
+            className="w-185 h-115 rounded-2xl"
+          />
+        </div>
+      </div>
+      {/* Image Section closed */}
     </section>
   );
 }
