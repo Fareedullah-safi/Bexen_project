@@ -78,20 +78,33 @@ export default function SectionSix() {
       <div className="mt-10 flex w-full px-14">
         <div className="flex w-full gap-6">
           <div className="relative w-185 h-120 overflow-hidden rounded-2xl">
-            <Image
-              src="https://themejunction.net/html/bexon/demo/assets/images/project/project-1.webp"
-              alt="company image"
-              width={999}
-              height={666}
-              className="h-full w-full object-cover"
-            />
+            <div className="relative group overflow-hidden rounded-2xl">
+  <Image
+    src="https://themejunction.net/html/bexon/demo/assets/images/project/project-1.webp"
+    alt="company image"
+    width={999}
+    height={666}
+    className="h-full w-full object-cover group-hover:scale-110 transition-all duration-300"
+  />
 
-            <p className="absolute bottom-5 left-5 z-10 text-lg font-medium text-white">
-              Project Description 1
-            </p>
+  <button-name className="absolute bottom-20 left-5 z-10 px-4 py-2 text-sm font-medium text-white bg-white/10 backdrop-blur-md border border-white/20 rounded-full shadow-lg">
+    Connect
+  </button-name>
+
+  <div className="absolute bottom-3 left-5 pr-10 z-10 flex items-center justify-between w-full">
+    <p className="text-2xl font-semibold text-white">
+      Event Management <br /> <span>Platform</span>
+    </p>
+
+    <button className="flex items-center justify-center w-15 h-15 rounded-full text-white bg-white/10 backdrop-blur-md border border-white/20 shadow-lg opacity-0 translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">
+      <ArrowRight size={24} className="text-white" />
+    </button>
+  </div>
+</div>
+            </div>
           </div>
 
-          <div className="relative w-105 h-115 overflow-hidden rounded-2xl">
+          <div className="relative w-105 h-120 overflow-hidden rounded-2xl">
             <Image
               src="https://themejunction.net/html/bexon/demo/assets/images/project/project-2.webp"
               alt="company image"
@@ -108,7 +121,7 @@ export default function SectionSix() {
       </div>
       {/* Image Section closed */}
       {/* Image Section */}
-      <div className="mt-10 pt-30 flex px-14 w-full h-80">
+      <div className="pt-5 flex px-14 w-full h-80">
         <div className="flex gap-6">
           <Image
             src="https://themejunction.net/html/bexon/demo/assets/images/project/project-3.webp"
