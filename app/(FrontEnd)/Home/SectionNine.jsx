@@ -41,7 +41,7 @@ export default function SectionNine() {
         {/* Image */}
         <div className="relative w-full self-start lg:w-1/2">
           <div
-            className="wow animate__animated animate__fadeInLeft relative h-130 w-full overflow-hidden rounded-2xl"
+            className="wow animate__animated animate__fadeInLeft relative h-140 w-full overflow-hidden rounded-2xl"
             data-wow-duration="1s"
           >
             <Image
