@@ -157,7 +157,7 @@ export default function SectionFive() {
                 <div key={`${solution.title}-${index}`} className="w-full shrink-0 px-2 lg:w-1/3">
                   {/* Card */}
                   <div
-                    className="wow animate__animated animate__fadeInUp group relative h-[420px] overflow-hidden rounded-2xl border border-white/10 bg-[#102326] shadow-lg transition-all duration-500 hover:-translate-y-2 hover:border-[#1E8A8A]/40 hover:shadow-2xl hover:shadow-[#1E8A8A]/10"
+                    className="wow animate__animated animate__fadeInUp group relative h-105 overflow-hidden rounded-2xl border border-white/10 bg-[#102326] shadow-lg transition-all duration-500 hover:-translate-y-2 hover:border-[#1E8A8A]/40 hover:shadow-2xl hover:shadow-[#1E8A8A]/10"
                     data-wow-duration="0.8s"
                     data-wow-delay={`${0.1 + (index % 3) * 0.15}s`}
                   >
@@ -204,7 +204,7 @@ export default function SectionFive() {
                           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1E8A8A]">
                             <ArrowRight
                               size={16}
-                              className="rotate-[-45deg] text-white transition-transform duration-300 group-hover/button:rotate-0"
+                              className="-rotate-45 text-white transition-transform duration-300 group-hover/button:rotate-0"
                             />
                           </span>
                         </button>
