@@ -41,7 +41,7 @@ export default function SectionNine() {
         {/* Image */}
         <div className="relative w-full self-start lg:w-1/2">
           <div
-            className="wow animate__animated animate__fadeInLeft relative h-[520px] w-full overflow-hidden rounded-2xl"
+            className="wow animate__animated animate__fadeInLeft relative h-130 w-full overflow-hidden rounded-2xl"
             data-wow-duration="1s"
           >
             <Image
@@ -51,7 +51,7 @@ export default function SectionNine() {
               className="object-cover transition-transform duration-700 hover:scale-105"
             />
 
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0C1E21]/60 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-[#0C1E21]/60 via-transparent to-transparent" />
 
             <h2
               className="wow animate__animated animate__fadeInUp absolute top-8 left-8 z-10 text-4xl leading-tight font-medium text-white md:text-5xl"
@@ -85,7 +85,7 @@ export default function SectionNine() {
                   className="group/phone relative w-fit text-xl font-semibold text-white"
                 >
                   1-888-452-1505
-                  <span className="absolute -bottom-1 left-0 h-[2px] w-0 bg-cyan-500 transition-all duration-300 group-hover/phone:w-full" />
+                  <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-cyan-500 transition-all duration-300 group-hover/phone:w-full" />
                 </a>
               </div>
             </div>
