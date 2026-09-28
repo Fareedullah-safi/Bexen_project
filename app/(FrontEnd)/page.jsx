@@ -9,6 +9,7 @@ import SectionSix from "./Home/SectionSix";
 import SectionSeven from "./Home/SectionSeven";
 import SectionEight from "./Home/SectionEight";
 import SectionNine from "./Home/SectionNine";
+import SectionTen from "./Home/SectionTen";
 
 export default function HomePage() {
   return (
@@ -23,6 +24,7 @@ export default function HomePage() {
       <SectionSeven />
       <SectionEight />
       <SectionNine />
+      <SectionTen />
     </>
   );
 }
