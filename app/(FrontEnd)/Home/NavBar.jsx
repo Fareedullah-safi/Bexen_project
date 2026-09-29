@@ -16,7 +16,7 @@ export const NavBar = () => {
   return (
     <>
       <nav className="relative w-full">
-        <div className="relative mx-4 flex h-25 items-center  rounded-b-xl bg-white">
+        <div className="relative mx-4 flex h-25 items-center rounded-b-xl bg-white">
           <main className="flex h-15 w-full items-center justify-between px-5">
             {/* Logo */}
             <div>
@@ -34,7 +34,7 @@ export const NavBar = () => {
               <ul className="flex h-full items-center gap-6">
                 {/* Home */}
                 <li className="group relative">
-                  <div className="flex cursor-pointer items-center gap-2 text-md font-medium text-[#0C1E21] transition-colors duration-300 group-hover:text-[#1E8A8A]">
+                  <div className="text-md flex cursor-pointer items-center gap-2 font-medium text-[#0C1E21] transition-colors duration-300 group-hover:text-[#1E8A8A]">
                     Home
                     <ChevronDown
                       size={18}
@@ -48,7 +48,7 @@ export const NavBar = () => {
 
                 {/* Pages */}
                 <li className="group relative">
-                  <div className="flex cursor-pointer items-center gap-2 text-md font-medium text-[#0C1E21] transition-colors duration-300 group-hover:text-[#1E8A8A]">
+                  <div className="text-md flex cursor-pointer items-center gap-2 font-medium text-[#0C1E21] transition-colors duration-300 group-hover:text-[#1E8A8A]">
                     Pages
                     <ChevronDown
                       size={18}
@@ -61,7 +61,7 @@ export const NavBar = () => {
                 </li>
 
                 {/* Services */}
-                <li className="group flex cursor-pointer items-center gap-2 text-md font-medium text-[#0C1E21] transition-colors duration-300 hover:text-[#1E8A8A]">
+                <li className="group text-md flex cursor-pointer items-center gap-2 font-medium text-[#0C1E21] transition-colors duration-300 hover:text-[#1E8A8A]">
                   Services
                   <ChevronDown
                     size={18}
@@ -71,7 +71,7 @@ export const NavBar = () => {
 
                 {/* Portfolio */}
                 <li className="group relative cursor-pointer">
-                  <div className="flex items-center gap-2 text-md font-medium text-[#0C1E21] transition-colors duration-300 group-hover:text-[#1E8A8A]">
+                  <div className="text-md flex items-center gap-2 font-medium text-[#0C1E21] transition-colors duration-300 group-hover:text-[#1E8A8A]">
                     Portfolio
                     <ChevronDown
                       size={18}
@@ -80,7 +80,7 @@ export const NavBar = () => {
                   </div>
 
                   {/* Portfolio Dropdown */}
-                  <div className="invisible absolute left-0 top-full z-50 mt-9 h-22 w-52 translate-y-2 rounded-lg bg-[#FFFFFF] p-4 font-semibold text-[#0C1E21] opacity-0 shadow-lg shadow-gray-400 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                  <div className="invisible absolute top-full left-0 z-50 mt-9 h-22 w-52 translate-y-2 rounded-lg bg-[#FFFFFF] p-4 font-semibold text-[#0C1E21] opacity-0 shadow-lg shadow-gray-400 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
                     <div className="flex flex-col gap-3">
                       <h1 className="cursor-pointer text-[15px] tracking-[0.2px] text-[#596366] transition-all duration-300 hover:translate-x-1 hover:text-[#1E8A8A]">
                         Portfolio
@@ -95,7 +95,7 @@ export const NavBar = () => {
 
                 {/* Blog */}
                 <li className="group relative cursor-pointer">
-                  <div className="flex items-center gap-2 text-md font-medium text-[#0C1E21] transition-colors duration-300 group-hover:text-[#1E8A8A]">
+                  <div className="text-md flex items-center gap-2 font-medium text-[#0C1E21] transition-colors duration-300 group-hover:text-[#1E8A8A]">
                     Blog
                     <ChevronDown
                       size={18}
@@ -108,7 +108,7 @@ export const NavBar = () => {
                 </li>
 
                 {/* Contact */}
-                <li className="group flex cursor-pointer items-center gap-2 text-md font-medium text-[#0C1E21] transition-colors duration-300 hover:text-[#1E8A8A]">
+                <li className="group text-md flex cursor-pointer items-center gap-2 font-medium text-[#0C1E21] transition-colors duration-300 hover:text-[#1E8A8A]">
                   Contact
                 </li>
               </ul>
@@ -129,12 +129,12 @@ export const NavBar = () => {
                 </div>
 
                 {/* Search box Drop Down */}
-                <div className="invisible absolute right-0 top-14 z-50 w-96 translate-y-2 rounded-md border bg-white p-5 opacity-0 shadow-lg shadow-gray-400 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                <div className="invisible absolute top-14 right-0 z-50 w-96 translate-y-2 rounded-md border bg-white p-5 opacity-0 shadow-lg shadow-gray-400 transition-all duration-300 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
                       placeholder="Search..."
-                      className="h-11 w-full rounded-full border border-gray-300 px-5 text-sm text-gray-700 outline-none transition-all duration-300 focus:border-[#1E8A8A]"
+                      className="h-11 w-full rounded-full border border-gray-300 px-5 text-sm text-gray-700 transition-all duration-300 outline-none focus:border-[#1E8A8A]"
                     />
 
                     <button className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#1E8A8A] text-white transition-all duration-300 hover:scale-105 hover:bg-[#167272]">
@@ -151,14 +151,25 @@ export const NavBar = () => {
               </div>
 
               {/* Let's Talk */}
-              <button className="group hidden cursor-pointer items-center gap-2 rounded-full bg-[#1E8A8A] px-4 py-2 text-md font-semibold text-white lg:flex lg:block">
-                Let&apos;s Talk
-                <div className="flex h-3 w-3 items-center justify-center rounded-full bg-black sm:h-9 sm:w-9">
+              {/* BUTTON */}
+
+              {/* Let's Talk Button */}
+              <button
+                type="submit"
+                className="group/button hidden h-11 w-fit min-w-[150px] cursor-pointer items-center justify-between gap-1.5 overflow-hidden rounded-full bg-[#1E8A8A] py-1 pr-1 pl-5 text-xs font-semibold text-white transition-all duration-300 hover:-translate-y-1 hover:bg-[#167575] hover:shadow-xl hover:shadow-[#1E8A8A]/20 sm:h-12 sm:text-sm lg:flex"
+              >
+                <span className="overflow-hidden leading-none">
+                  <span className="block transition-transform duration-400 [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5">
+                    Let&apos;s Talk
+                  </span>
+                </span>
+
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0C1E21] sm:h-10 sm:w-10">
                   <ArrowRight
-                    size={20}
-                    className="w-10 rotate-320 transition-transform duration-300 group-hover:rotate-360"
+                    size={16}
+                    className="-rotate-45 transition-transform duration-300 group-hover/button:rotate-0 sm:size-[18px]"
                   />
-                </div>
+                </span>
               </button>
 
               {/* Hamburger */}

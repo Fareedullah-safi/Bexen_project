@@ -52,7 +52,11 @@ export default function Footer() {
           {/* 4 Boxes Grid/Flex Container */}
           <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-12 lg:flex lg:grid-cols-none lg:flex-row lg:justify-between lg:gap-10">
             {/* Box 1 - Logo, Description, Awards */}
-            <div className="flex flex-col gap-5 sm:col-span-2 sm:gap-6 lg:max-w-sm lg:flex-1">
+            <div
+              className="wow animate__animated animate__fadeInUp flex flex-col gap-5 sm:col-span-2 sm:gap-6 lg:max-w-sm lg:flex-1"
+              data-wow-duration="0.8s"
+              data-wow-delay="0.1s"
+            >
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#1D8B8A] shadow-md shadow-[#1D8B8A]/20 sm:h-13 sm:w-13">
                   <Box
@@ -90,7 +94,11 @@ export default function Footer() {
             </div>
 
             {/* Box 2 - Services */}
-            <div className="flex flex-col lg:flex-1">
+            <div
+              className="wow animate__animated animate__fadeInUp flex flex-col lg:flex-1"
+              data-wow-duration="0.8s"
+              data-wow-delay="0.25s"
+            >
               <h3 className="mb-5 text-xl font-bold text-[#0C1E21] sm:mb-7 sm:text-2xl">
                 Services
               </h3>
@@ -109,7 +117,11 @@ export default function Footer() {
             </div>
 
             {/* Box 3 - Resources */}
-            <div className="flex flex-col lg:flex-1">
+            <div
+              className="wow animate__animated animate__fadeInUp flex flex-col lg:flex-1"
+              data-wow-duration="0.8s"
+              data-wow-delay="0.4s"
+            >
               <h3 className="mb-5 text-xl font-bold text-[#0C1E21] sm:mb-7 sm:text-2xl">
                 Resources
               </h3>
@@ -133,7 +145,11 @@ export default function Footer() {
             </div>
 
             {/* Box 4 - Newsletter */}
-            <div className="flex flex-col gap-4 sm:col-span-2 sm:gap-5 lg:max-w-sm lg:flex-1">
+            <div
+              className="wow animate__animated animate__fadeInUp flex flex-col gap-4 sm:col-span-2 sm:gap-5 lg:max-w-sm lg:flex-1"
+              data-wow-duration="0.8s"
+              data-wow-delay="0.55s"
+            >
               <h3 className="text-2xl leading-tight font-semibold text-[#0C1E21] sm:text-3xl">
                 Subscribe to Our Newsletter.
               </h3>
@@ -170,10 +186,18 @@ export default function Footer() {
           </div>
 
           {/* Divider */}
-          <div className="mx-auto mt-12 max-w-7xl border-t border-black/10 sm:mt-16" />
+          <div
+            className="wow animate__animated animate__fadeIn mx-auto mt-12 max-w-7xl border-t border-black/10 sm:mt-16"
+            data-wow-duration="1s"
+            data-wow-delay="0.7s"
+          />
 
           {/* Bottom Bar */}
-          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 pt-8 lg:flex-row">
+          <div
+            className="wow animate__animated animate__fadeInUp mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 pt-8 lg:flex-row"
+            data-wow-duration="0.8s"
+            data-wow-delay="0.8s"
+          >
             {/* Contact Info */}
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-6">
               <a
