@@ -1,8 +1,21 @@
 "use client";
 
 import { ArrowRight, Box, ChevronDown } from "lucide-react";
+import { useState } from "react";
 
 export default function SectionTen() {
+  const [serviceOpen, setServiceOpen] = useState(false);
+  const [service, setService] = useState("Choose an option");
+
+  const services = [
+    "Business Strategy",
+    "Customer Experience",
+    "Sustainability and ESG",
+    "Training and Development",
+    "IT Support & Maintenance",
+    "Marketing Strategy",
+  ];
+
   const regions = [
     {
       id: 1,
@@ -36,29 +49,24 @@ export default function SectionTen() {
   return (
     <section className="w-full bg-[#e7eded] px-4 py-6 sm:py-10 md:py-12 lg:py-16">
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#081f22] [background-image:url('https://themejunction.net/html/bexon/demo/assets/images/bg/map.svg')] [background-size:170%_auto] [background-position:center_8%] bg-no-repeat sm:rounded-[28px] sm:[background-size:130%_auto] sm:[background-position:center_5%] md:[background-size:110%_auto] md:[background-position:center_8%] lg:rounded-[30px] lg:[background-size:64%_auto] lg:[background-position:left_center]">
-        {/* Dark atmosphere */}
         <div className="absolute inset-0 bg-[#081f22]/90" />
 
-        {/* Teal glow */}
         <div className="pointer-events-none absolute top-10 -left-40 h-87.5 w-87.5 rounded-full bg-[#1E8A8A]/14 blur-[120px] sm:h-[420px] sm:w-[420px] md:h-[450px] md:w-[450px] md:blur-[150px]" />
 
-        {/* Secondary glow */}
         <div className="pointer-events-none absolute bottom-[-160px] left-[30%] h-[350px] w-[350px] rounded-full bg-[#1E8A8A]/10 blur-[120px] sm:h-[400px] sm:w-[400px] md:h-[420px] md:w-[420px] md:blur-[140px]" />
 
-        {/* Soft top light */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-60 bg-gradient-to-b from-white/[0.025] to-transparent sm:h-72 md:h-80" />
 
-        {/* Diagonal texture */}
         <div className="pointer-events-none absolute inset-0 opacity-[0.16]">
           <div className="absolute -top-72 -left-60 h-[800px] w-[650px] -rotate-[28deg] bg-[repeating-linear-gradient(100deg,transparent_0,transparent_25px,rgba(125,211,211,0.12)_26px,transparent_27px)]" />
 
           <div className="absolute -right-60 -bottom-72 h-[800px] w-[650px] rotate-[28deg] bg-[repeating-linear-gradient(100deg,transparent_0,transparent_25px,rgba(125,211,211,0.08)_26px,transparent_27px)]" />
         </div>
 
-        {/* Main layout */}
         <div className="relative z-10 flex flex-col lg:grid lg:grid-cols-[1fr_1fr]">
-          {/* ================= MAP ================= */}
-          <div className="relative min-h-97.5 sm:min-h-[470px] md:min-h-[540px] lg:min-h-[760px]">
+          {/* MAP */}
+
+          <div className="relative min-h-97.5 sm:min-h-117.5 md:min-h-135 lg:min-h-200">
             {regions.map((region, index) => (
               <div
                 key={region.id}
@@ -66,13 +74,10 @@ export default function SectionTen() {
                 data-wow-delay={`${0.2 + index * 0.15}s`}
                 className={`wow animate__animated animate__fadeIn group absolute ${region.position} z-30`}
               >
-                {/* Glow */}
                 <span className="absolute -inset-2.5 rounded-full bg-[#1E8A8A]/20 blur-md sm:-inset-3 md:-inset-4" />
 
-                {/* Pulse */}
                 <span className="absolute -inset-2 animate-ping rounded-full bg-[#1E8A8A]/25 sm:-inset-2.5 md:-inset-3" />
 
-                {/* Dot */}
                 <button
                   type="button"
                   aria-label={region.title}
@@ -81,7 +86,6 @@ export default function SectionTen() {
                   <span className="absolute inset-0.5 rounded-full bg-[#1E8A8A] opacity-0 transition-opacity duration-300 group-hover:opacity-100 sm:inset-1 lg:inset-1.5" />
                 </button>
 
-                {/* Hover information */}
                 <div className="pointer-events-none absolute bottom-7 left-1/2 w-[220px] -translate-x-1/2 translate-y-3 bg-[#249596] px-3 py-3 text-left opacity-0 shadow-2xl transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 sm:bottom-8 sm:w-[250px] sm:px-4 sm:py-4 md:bottom-9 md:w-[280px] md:px-5 lg:bottom-11 lg:w-[330px] lg:px-6 lg:py-5">
                   <p className="text-xs leading-5 font-medium text-white sm:text-sm sm:leading-6 lg:text-lg lg:leading-7">
                     {region.title}
@@ -99,13 +103,11 @@ export default function SectionTen() {
                     {region.email}
                   </p>
 
-                  {/* Pointer */}
                   <div className="absolute -bottom-2 left-1/2 h-0 w-0 -translate-x-1/2 border-t-[9px] border-r-[9px] border-l-[9px] border-t-[#249596] border-r-transparent border-l-transparent sm:-bottom-2.5 sm:border-t-[11px] sm:border-r-[11px] sm:border-l-[11px] lg:-bottom-3 lg:border-t-[14px] lg:border-r-[14px] lg:border-l-[14px]" />
                 </div>
               </div>
             ))}
 
-            {/* Map label */}
             <div
               data-wow-duration="0.8s"
               className="wow animate__animated animate__fadeIn absolute bottom-6 left-5 hidden items-center gap-2 text-[10px] font-medium tracking-[0.18em] text-white/35 sm:flex md:bottom-8 md:left-8 md:text-xs lg:bottom-8 lg:left-10"
@@ -115,10 +117,12 @@ export default function SectionTen() {
             </div>
           </div>
 
-          {/* ================= CONTACT FORM ================= */}
+          {/* CONTACT FORM */}
+
           <div className="relative z-40 flex w-full items-center justify-center px-3 pb-5 sm:px-6 sm:pb-8 md:px-8 md:pb-10 lg:px-10 lg:py-10 xl:px-12">
             <div className="w-full max-w-[650px] rounded-[22px] border border-white/10 bg-black/[0.04] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.3)] backdrop-blur-2xl sm:rounded-[26px] sm:p-7 md:p-9 lg:p-10 xl:p-11">
-              {/* Badge */}
+              {/* BADGE */}
+
               <span
                 data-wow-duration="0.8s"
                 className="wow animate__animated animate__fadeInDown inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-bold tracking-wide text-white sm:px-4 sm:py-2 sm:text-xs md:text-sm"
@@ -127,7 +131,8 @@ export default function SectionTen() {
                 GET IN TOUCH
               </span>
 
-              {/* Heading */}
+              {/* HEADING */}
+
               <h1
                 data-wow-duration="0.9s"
                 data-wow-delay="0.1s"
@@ -136,10 +141,12 @@ export default function SectionTen() {
                 Drop Us a <span className="text-[#1E8A8A]">Line.</span>
               </h1>
 
-              {/* Form */}
+              {/* FORM */}
+
               <form className="mt-7 sm:mt-9 md:mt-10">
                 <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2 sm:gap-x-7 sm:gap-y-7 md:gap-y-8">
-                  {/* Name */}
+                  {/* NAME */}
+
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.15s"
@@ -159,7 +166,8 @@ export default function SectionTen() {
                     />
                   </div>
 
-                  {/* Email */}
+                  {/* EMAIL */}
+
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.2s"
@@ -179,7 +187,8 @@ export default function SectionTen() {
                     />
                   </div>
 
-                  {/* Phone */}
+                  {/* PHONE */}
+
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.25s"
@@ -199,52 +208,83 @@ export default function SectionTen() {
                     />
                   </div>
 
-                  {/* Service */}
-                  <div
-                    data-wow-duration="0.8s"
-                    data-wow-delay="0.3s"
-                    className="wow animate__animated animate__fadeInUp group relative"
-                  >
-                    <label
-                      htmlFor="service"
-                      className="block text-xs text-white/60 transition-colors duration-300 group-focus-within:text-[#58eee0] sm:text-sm md:text-base"
-                    >
+                  {/* SERVICE */}
+                  <div className="group relative">
+                    <label className="block text-xs text-white/60 transition-colors duration-300 group-focus-within:text-[#58eee0] sm:text-sm md:text-base">
                       Choose a service
                     </label>
 
-                    <select
-                      id="service"
-                      defaultValue=""
-                      className="mt-2 w-full appearance-none border-b border-white/10 bg-transparent pr-7 pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
+                    <button
+                      type="button"
+                      onClick={() => setServiceOpen(!serviceOpen)}
+                      className="mt-1 flex w-full items-center justify-between border-b border-white/10 bg-transparent pb-2.5 text-left text-sm text-white transition-all duration-300 focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     >
-                      <option
-                        value=""
-                        disabled
-                        className="bg-[#22363a] text-white"
+                      <span
+                        className={
+                          service === "Choose an option"
+                            ? "text-white/60"
+                            : "text-white"
+                        }
+                      >
+                        {service}
+                      </span>
+
+                      <ChevronDown
+                        size={18}
+                        className={`shrink-0 transition-transform duration-300 ${
+                          serviceOpen
+                            ? "rotate-180 text-[#1E8A8A]"
+                            : "text-white"
+                        }`}
+                      />
+                    </button>
+
+                    {/* DROPDOWN */}
+                    <div
+                      className={`absolute top-full left-0 z-50 mt-2 w-full origin-top overflow-hidden rounded-xl bg-white shadow-2xl transition-all duration-300 sm:max-h-[320px] sm:overflow-y-auto ${
+                        serviceOpen
+                          ? "visible scale-y-100 opacity-100"
+                          : "invisible scale-y-95 opacity-0"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setService("Choose an option");
+                          setServiceOpen(false);
+                        }}
+                        className="w-full bg-[#dce8e9] px-4 py-3 text-left text-sm font-semibold text-[#102326] transition hover:bg-[#cfdfe0] sm:px-6 sm:py-4 sm:text-base"
                       >
                         Choose an option
-                      </option>
+                      </button>
 
-                      <option value="web" className="bg-[#22363a]">
-                        Web Development
-                      </option>
-
-                      <option value="design" className="bg-[#22363a]">
-                        UI / UX Design
-                      </option>
-
-                      <option value="marketing" className="bg-[#22363a]">
-                        Digital Marketing
-                      </option>
-                    </select>
-
-                    <ChevronDown
-                      size={17}
-                      className="pointer-events-none absolute right-0 bottom-2.5 text-white sm:bottom-3 md:bottom-4"
-                    />
+                      {services.map((item, index) => (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => {
+                            setService(item);
+                            setServiceOpen(false);
+                          }}
+                          style={{
+                            transitionDelay: serviceOpen
+                              ? `${index * 40}ms`
+                              : "0ms",
+                          }}
+                          className={`cursor-pointer w-full px-4 py-3 text-left text-sm whitespace-normal text-[#102326] transition-all duration-300 hover:bg-[#1E8A8A] hover:text-white sm:px-6 sm:py-3.5 sm:text-base md:text-lg ${
+                            serviceOpen
+                              ? "translate-x-0 opacity-100"
+                              : "-translate-x-3 opacity-0"
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  {/* Message */}
+                  {/* MESSAGE */}
+
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.35s"
@@ -265,7 +305,8 @@ export default function SectionTen() {
                   </div>
                 </div>
 
-                {/* Button */}
+                {/* BUTTON */}
+
                 <button
                   data-wow-duration="0.8s"
                   data-wow-delay="0.45s"
