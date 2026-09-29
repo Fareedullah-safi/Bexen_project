@@ -57,7 +57,7 @@ export default function SectionEleven() {
                 />
 
                 <div className="absolute top-4 left-4 z-10 flex h-20 w-20 items-center justify-center rounded-lg border border-black/10 bg-black/10 px-4 py-3 shadow-lg backdrop-blur-md">
-                  <span className="text-sm font-semibold text-white leading-light">
+                  <span className="leading-light text-sm font-semibold text-white">
                     <span className="text-2xl">28</span>
                     <br />
                     FEB

@@ -11,6 +11,8 @@ import SectionEight from "./Home/SectionEight";
 import SectionNine from "./Home/SectionNine";
 import SectionTen from "./Home/SectionTen";
 import SectionEleven from "./Home/SectionEleven";
+import SectionTwelve from "./Home/SectionTwelve";
+import SectionThirteen from "./Home/SectionThirteen";
 
 export default function HomePage() {
   return (
@@ -27,6 +29,8 @@ export default function HomePage() {
       <SectionNine />
       <SectionTen />
       <SectionEleven />
+      <SectionTwelve />
+      <SectionThirteen />
     </>
   );
 }
