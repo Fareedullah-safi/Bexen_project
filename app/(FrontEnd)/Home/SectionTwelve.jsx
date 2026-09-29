@@ -8,7 +8,7 @@ export default function SectionTwelve() {
         {/* Left Content Section */}
         <div className="flex w-full flex-col justify-center px-8 py-16 lg:w-1/2 lg:px-16 lg:py-24">
           <h1 className="mb-6 text-4xl leading-[1.1] font-bold tracking-tight text-white sm:text-5xl lg:text-5xl">
-            Let's Build Future
+            Let&apos;s Build Future
             <br />
             Together.
           </h1>

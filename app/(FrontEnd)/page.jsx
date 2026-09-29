@@ -12,7 +12,7 @@ import SectionNine from "./Home/SectionNine";
 import SectionTen from "./Home/SectionTen";
 import SectionEleven from "./Home/SectionEleven";
 import SectionTwelve from "./Home/SectionTwelve";
-import SectionThirteen from "./Home/SectionThirteen";
+import Footer from "./Home/Footer";
 
 export default function HomePage() {
   return (
@@ -30,7 +30,7 @@ export default function HomePage() {
       <SectionTen />
       <SectionEleven />
       <SectionTwelve />
-      <SectionThirteen />
+      <Footer />
     </>
   );
 }
