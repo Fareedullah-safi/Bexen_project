@@ -4,7 +4,7 @@ import SectionTwo from "./AboutPages/SectionTwo";
 
 export default function AboutPage() {
   return (
-    <main className="pt-12 bg-green-300 h-900">
+    <main className="pt-12">
       <About />
       <SectionOne />
       <SectionTwo />
