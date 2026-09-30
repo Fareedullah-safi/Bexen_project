@@ -1,11 +1,12 @@
 import ChooseTheBestBtn from "@/app/Components/ChooseTheBestBtn";
 import DedicatedBoxes from "@/app/Components/DeticatedBoxes";
-import { ArrowRight, Box } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export default function SectionOne() {
   return (
     <section className="px-6 py-20 lg:px-18">
       <ChooseTheBestBtn />
+
       <div className="flex flex-col items-start justify-between gap-8 py-6 lg:flex-row lg:items-end">
         <h1
           data-wow-duration="0.9s"
@@ -15,6 +16,7 @@ export default function SectionOne() {
           Empowering Business <br />
           <span className="text-[#1E8A8A]">with Expertise.</span>
         </h1>
+
         <button
           type="button"
           data-wow-duration="0.8s"
@@ -35,7 +37,9 @@ export default function SectionOne() {
           </span>
         </button>
       </div>
-      <div className="h-599">
+
+      {/* DedicatedBoxes - let it size itself naturally */}
+      <div className="mt-8">
         <DedicatedBoxes />
       </div>
     </section>

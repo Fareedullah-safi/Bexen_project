@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function SectionTwelve() {
   return (
-    <section className="relative z-20 flex w-full items-center justify-center px-4  py-12 md:py-20 md:px-6 lg:12">
+    <section className="relative z-20 flex w-full items-center justify-center px-4 py-12 md:px-6 md:py-20 lg:px-12">
       <div className="mx-auto flex h-199 w-full max-w-7xl flex-col items-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a4d4d] to-[#0d3333] shadow-2xl shadow-black/60 sm:flex-col lg:h-70 lg:flex-row">
         {/* Left Content Section */}
         <div className="flex w-full flex-col justify-center px-8 py-16 lg:w-1/2 lg:px-16 lg:py-24">
