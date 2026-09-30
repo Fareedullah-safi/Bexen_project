@@ -1,5 +1,5 @@
 "use client";
-import { NavBar } from "./Home/NavBar";
+import { NavBar } from "../Components/NavBar";
 import Section from "./Home/Section";
 import SectionTwo from "./Home/SectionTwo";
 import SectionThree from "./Home/SectionThree";
@@ -11,13 +11,9 @@ import SectionEight from "./Home/SectionEight";
 import SectionNine from "./Home/SectionNine";
 import SectionTen from "./Home/SectionTen";
 import SectionEleven from "./Home/SectionEleven";
-import SectionTwelve from "./Home/SectionTwelve";
-import Footer from "./Home/Footer";
-
 export default function HomePage() {
   return (
-    <>
-      <NavBar />
+    <main className="overflow-x-hidden">
       <Section />
       <SectionTwo />
       <SectionThree />
@@ -29,8 +25,6 @@ export default function HomePage() {
       <SectionNine />
       <SectionTen />
       <SectionEleven />
-      <SectionTwelve />
-      <Footer />
-    </>
+    </main>
   );
 }

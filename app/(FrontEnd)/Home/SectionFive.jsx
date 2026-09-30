@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, ArrowUpRight, GlobeIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Box } from "lucide-react";
 import Image from "next/image";
 
 export default function SectionFive() {
@@ -116,7 +116,7 @@ export default function SectionFive() {
               className="wow animate__animated animate__fadeInDown group inline-flex items-center gap-2 rounded-full border border-white/20 bg-zinc-900 px-3 py-1.5 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-[#1E8A8A]/50 hover:bg-cyan-950 sm:px-4"
               data-wow-duration="0.8s"
             >
-              <GlobeIcon
+              <Box
                 size={16}
                 className="text-[#1E8A8A] transition-transform duration-500 group-hover:rotate-180"
               />

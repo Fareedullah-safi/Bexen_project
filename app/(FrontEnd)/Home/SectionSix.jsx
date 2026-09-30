@@ -1,4 +1,4 @@
-import { ArrowRight, GlobeIcon } from "lucide-react";
+import { ArrowRight, Box } from "lucide-react";
 import Image from "next/image";
 
 export default function SectionSix() {
@@ -10,7 +10,7 @@ export default function SectionSix() {
           data-wow-duration="0.8s"
           className="wow animate__animated animate__fadeInDown group inline-flex items-center gap-2 border border-cyan-100 bg-[#ECF0F0] px-4 py-2"
         >
-          <GlobeIcon
+          <Box
             size={18}
             className="text-[#1E8A8A] transition-transform duration-500 group-hover:rotate-180"
           />

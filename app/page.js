@@ -1,3 +1,4 @@
+import AboutPage from "./(FrontEnd)/about/page";
 import Section from "./(FrontEnd)/Home/Section";
 import HomePage from "./(FrontEnd)/page";
 
