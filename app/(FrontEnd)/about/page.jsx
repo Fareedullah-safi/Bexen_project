@@ -4,6 +4,7 @@ import About from "./AboutPages/About";
 import SectionOne from "./AboutPages/SectionOne";
 import SectionTwo from "./AboutPages/SectionTwo";
 import SectionFive from "./AboutPages/SectionFive";
+import SectionSix from "./AboutPages/SectionSix";
 
 export default function AboutPage() {
   return (
@@ -14,6 +15,7 @@ export default function AboutPage() {
       <SectionThree />
       <SectionFour />
       <SectionFive />
+      <SectionSix />
     </main>
   );
 }
