@@ -29,7 +29,12 @@ export default function SectionTwo() {
         />
 
         <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:gap-10 sm:px-8 sm:py-16 md:px-12 lg:flex-row lg:items-stretch lg:gap-10 lg:py-24">
-          <div className="relative w-full shrink-0 lg:w-1/2">
+          <div
+            data-wow-duration="1s"
+            data-wow-delay="0.1s"
+            data-wow-offset="100"
+            className="wow animate__animated animate__fadeInLeft relative w-full shrink-0 lg:w-1/2"
+          >
             <Image
               alt="Team at work"
               width={999}
@@ -38,28 +43,53 @@ export default function SectionTwo() {
               src="https://themejunction.net/html/bexon/demo/assets/images/about/about-5.webp"
               className="h-[280px] w-full rounded-2xl object-cover sm:h-[400px] md:h-[480px] lg:h-full lg:min-h-[500px]"
             />
-            <ProgressBox />
+
+            <div
+              data-wow-duration="0.9s"
+              data-wow-delay="0.35s"
+              data-wow-offset="80"
+              className="wow animate__animated animate__fadeInUp"
+            >
+              <ProgressBox />
+            </div>
           </div>
 
           <div className="flex w-full min-w-0 flex-col gap-5 sm:gap-6 lg:w-1/2">
-            <span className="group inline-flex w-fit items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50/30 px-3 py-1.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:bg-cyan-100 hover:shadow-md sm:px-4">
-              <Box
-                size={18}
-                className="shrink-0 text-[#1E8A8A] transition-transform duration-300 group-hover:rotate-180"
-              />
+            <div
+              data-wow-duration="0.8s"
+              data-wow-delay="0.1s"
+              data-wow-offset="100"
+              className="wow animate__animated animate__fadeInDown"
+            >
+              <span className="group inline-flex w-fit items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50/30 px-3 py-1.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:bg-cyan-100 hover:shadow-md sm:px-4">
+                <Box
+                  size={18}
+                  className="shrink-0 text-[#1E8A8A] transition-transform duration-300 group-hover:rotate-180"
+                />
 
-              <span className="text-xs font-bold tracking-wide text-zinc-950 sm:text-sm md:text-base">
-                CHOOSE THE BEST
+                <span className="text-xs font-bold tracking-wide text-zinc-950 sm:text-sm md:text-base">
+                  CHOOSE THE BEST
+                </span>
               </span>
-            </span>
+            </div>
 
-            <h2 className="text-2xl leading-tight font-medium text-[#102326] sm:text-3xl md:text-4xl xl:text-5xl">
+            <h2
+              data-wow-duration="0.9s"
+              data-wow-delay="0.2s"
+              data-wow-offset="100"
+              className="wow animate__animated animate__fadeInRight text-2xl leading-tight font-medium text-[#102326] sm:text-3xl md:text-4xl xl:text-5xl"
+            >
               Driving Innovation and Excellence for Sustainable Corporate
               Success <span className="text-[#1E8A8A]">Worldwide.</span>
             </h2>
 
             <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-4 rounded-2xl bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:p-6">
+              <div
+                data-wow-duration="0.8s"
+                data-wow-delay="0.3s"
+                data-wow-offset="100"
+                className="wow animate__animated animate__fadeInUp flex flex-col gap-4 rounded-2xl bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:p-6"
+              >
                 <h3 className="text-lg font-bold text-[#0C1E21] sm:text-xl">
                   Our Mission
                 </h3>
@@ -96,7 +126,12 @@ export default function SectionTwo() {
                 </ul>
               </div>
 
-              <div className="flex flex-col gap-4 rounded-2xl bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:p-6">
+              <div
+                data-wow-duration="0.8s"
+                data-wow-delay="0.42s"
+                data-wow-offset="100"
+                className="wow animate__animated animate__fadeInUp flex flex-col gap-4 rounded-2xl bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:p-6"
+              >
                 <h3 className="text-lg font-bold text-[#0C1E21] sm:text-xl">
                   Our Vision
                 </h3>
@@ -134,7 +169,12 @@ export default function SectionTwo() {
               </div>
             </div>
 
-            <div className="w-full">
+            <div
+              data-wow-duration="0.9s"
+              data-wow-delay="0.52s"
+              data-wow-offset="80"
+              className="wow animate__animated animate__fadeInUp w-full"
+            >
               <button
                 type="button"
                 className="group/button flex h-12 w-full cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#1D8B8A] py-1.5 pr-1.5 pl-5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-1 hover:bg-[#167575] hover:shadow-xl hover:shadow-[#1D8B8A]/30 sm:h-14 sm:pl-6 sm:text-base"

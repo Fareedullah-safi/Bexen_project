@@ -117,8 +117,8 @@ export default function SectionFive() {
             <div
               key={member.id}
               data-wow-duration="0.9s"
-              data-wow-delay={`${0.15 + index * 0.12}s`}
-              data-wow-offset="100"
+              data-wow-delay={`${0.2 + index * 0.12}s`}
+              data-wow-offset="120"
               className="wow animate__animated animate__fadeInUp group"
             >
               <div className="relative">

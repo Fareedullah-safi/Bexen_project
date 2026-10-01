@@ -37,25 +37,30 @@ export default function SectionSix() {
   return (
     <section className="relative w-full overflow-hidden bg-[#ECF0F0] px-4 py-16 sm:px-6 sm:py-20 md:px-8 lg:px-10 lg:py-24 xl:px-16">
       <div className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-[#1E8A8A]/5 blur-3xl" />
+
       <div className="pointer-events-none absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-[#1E8A8A]/5 blur-3xl" />
 
       <div className="relative z-10 mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start lg:gap-14 xl:gap-20">
         <div className="flex flex-col">
-          <span
+          <div
             data-wow-duration="0.8s"
+            data-wow-delay="0.05s"
             data-wow-offset="100"
-            className="wow animate__animated animate__fadeInDown group inline-flex w-fit items-center gap-2 rounded-full border border-[#1E8A8A]/15 bg-white/70 px-4 py-2 text-xs font-bold tracking-[0.14em] text-[#1E8A8A] shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#1E8A8A]/30 hover:shadow-md sm:text-sm"
+            className="wow animate__animated animate__fadeInDown"
           >
-            <Box
-              size={17}
-              className="transition-transform duration-500 group-hover:rotate-180"
-            />
-            <span className="text-zinc-900">COMMON QUESTIONS</span>
-          </span>
+            <span className="group inline-flex w-fit items-center gap-2 rounded-full border border-[#1E8A8A]/15 bg-white/70 px-4 py-2 text-xs font-bold tracking-[0.14em] text-[#1E8A8A] shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#1E8A8A]/30 hover:shadow-md sm:text-sm">
+              <Box
+                size={17}
+                className="transition-transform duration-500 group-hover:rotate-180"
+              />
+
+              <span className="text-zinc-900">COMMON QUESTIONS</span>
+            </span>
+          </div>
 
           <h2
             data-wow-duration="0.9s"
-            data-wow-delay="0.1s"
+            data-wow-delay="0.15s"
             data-wow-offset="100"
             className="wow animate__animated animate__fadeInLeft mt-6 max-w-xl text-4xl leading-[1.05] font-medium tracking-tight text-[#102326] sm:text-5xl lg:text-[56px]"
           >
@@ -66,7 +71,7 @@ export default function SectionSix() {
 
           <p
             data-wow-duration="0.9s"
-            data-wow-delay="0.2s"
+            data-wow-delay="0.28s"
             data-wow-offset="100"
             className="wow animate__animated animate__fadeInUp mt-6 max-w-lg text-sm leading-7 text-[#102326]/60 sm:text-base sm:leading-8"
           >
@@ -76,8 +81,8 @@ export default function SectionSix() {
 
           <div
             data-wow-duration="0.9s"
-            data-wow-delay="0.3s"
-            data-wow-offset="100"
+            data-wow-delay="0.4s"
+            data-wow-offset="80"
             className="wow animate__animated animate__fadeInUp mt-8 w-full sm:mt-9"
           >
             <button
@@ -109,9 +114,9 @@ export default function SectionSix() {
                 <div
                   key={faq.question}
                   data-wow-duration="0.8s"
-                  data-wow-delay={`${0.1 + index * 0.08}s`}
-                  data-wow-offset="80"
-                  className="wow animate__animated animate__fadeInRight overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_8px_30px_rgba(12,30,33,0.05)] transition-all duration-300 hover:shadow-[0_14px_38px_rgba(12,30,33,0.08)]"
+                  data-wow-delay={`${0.12 + index * 0.1}s`}
+                  data-wow-offset="100"
+                  className="wow animate__animated animate__fadeInRight overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_8px_30px_rgba(12,30,33,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_38px_rgba(12,30,33,0.08)]"
                 >
                   <button
                     type="button"
