@@ -1,7 +1,7 @@
 "use client";
 
 import ChooseTheBestBtn from "@/app/Components/ChooseTheBestBtn";
-import DedicatedBoxes from "@/app/Components/DeticatedBoxes";
+import DedicatedBoxes from "@/app/Components/DedicatedBoxes";
 import { GlobeIcon } from "lucide-react";
 import { GiTrophyCup } from "react-icons/gi";
 import { GoLightBulb } from "react-icons/go";

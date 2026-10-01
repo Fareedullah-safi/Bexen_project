@@ -1,5 +1,5 @@
 import ChooseTheBestBtn from "@/app/Components/ChooseTheBestBtn";
-import DedicatedBoxes from "@/app/Components/DeticatedBoxes";
+import DedicatedBoxes from "@/app/Components/DedicatedBoxes";
 import { ArrowRight } from "lucide-react";
 
 export default function SectionOne() {

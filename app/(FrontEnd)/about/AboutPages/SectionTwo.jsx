@@ -1,6 +1,6 @@
 import { Box, ArrowRight, CheckCircle } from "lucide-react";
 import Image from "next/image";
-import ProgressBox from "./ProgressBox"; // ← ADD THIS
+// import ProgressBox from "./ProgressBox"; // ← ADD THIS
 
 export default function SectionTwo() {
   return (
@@ -27,7 +27,7 @@ export default function SectionTwo() {
               src="https://themejunction.net/html/bexon/demo/assets/images/about/about-5.webp"
               className="h-[280px] w-full rounded-2xl object-cover sm:h-[400px] md:h-[480px] lg:h-full lg:min-h-[500px]"
             />
-            <ProgressBox /> {/* ← REPLACE the old static div with this */}
+            {/* <ProgressBox /> ← REPLACE the old static div with this */}
           </div>
 
           {/* Right - Content */}

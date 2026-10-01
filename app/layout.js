@@ -18,7 +18,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={monaSans.className}>
+      <body className={monaSans.className} suppressHydrationWarning>
         {/* Top Route Progress Loader */}
         <NextTopLoader
           color="#1D8B8A"

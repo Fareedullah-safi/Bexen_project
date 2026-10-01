@@ -4,7 +4,7 @@ import { ChevronRight, Home } from "lucide-react";
 
 export default function About() {
   return (
-    <section className="w-full px-4 py-3">
+    <section className="-my-9 w-full px-4">
       {/* Container with responsive height scaling to prevent image cropping */}
       <div className="xs:h-[260px] relative flex h-55 w-full max-w-7xl items-center justify-center overflow-hidden rounded-2xl border border-white/10 shadow-2xl sm:h-82.5 md:h-100 lg:h-95">
         {/* Base Background Image */}
