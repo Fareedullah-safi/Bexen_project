@@ -3,6 +3,7 @@ import SectionThree from "../Home/SectionThree";
 import About from "./AboutPages/About";
 import SectionOne from "./AboutPages/SectionOne";
 import SectionTwo from "./AboutPages/SectionTwo";
+import SectionFive from "./AboutPages/SectionFive";
 
 export default function AboutPage() {
   return (
@@ -12,6 +13,7 @@ export default function AboutPage() {
       <SectionTwo />
       <SectionThree />
       <SectionFour />
+      <SectionFive />
     </main>
   );
 }

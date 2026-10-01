@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "animate.css": "^4.1.1",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.49.0",
     "motion": "^13.4.6",
     "next": "16.3.5",
     "next-nprogress-bar": "^2.4.7",
