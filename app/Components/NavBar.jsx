@@ -97,7 +97,7 @@ export const NavBar = () => {
 
               {/* Services */}
               <li className="group text-md flex cursor-pointer items-center gap-2 font-medium text-[#0C1E21] transition-colors duration-300 hover:text-[#1E8A8A]">
-                Services
+                <Link href="/services">Services</Link>
                 <ChevronDown
                   size={18}
                   className="transition-transform duration-300 group-hover:rotate-180"

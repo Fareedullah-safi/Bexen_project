@@ -8,7 +8,7 @@ import SectionSix from "./AboutPages/SectionSix";
 
 export default function AboutPage() {
   return (
-    <main className="pt-12">
+    <main className="pt-12 overflow-x-hidden">
       <About />
       <SectionOne />
       <SectionTwo />
