@@ -1,5 +1,5 @@
-import SectionOne from "./ServicePages/SectionOne";
-import Services from "./ServicePages/Service";
+import SectionOne from "./ServiceDetailPages/SectionOne";
+import Services from "./ServiceDetailPages/Service";
 
 export default function ServicePages() {
   return (

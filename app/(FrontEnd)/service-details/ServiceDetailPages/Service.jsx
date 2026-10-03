@@ -38,7 +38,7 @@ export default function Services() {
             data-wow-offset="80"
             className="wow animate__animated animate__fadeInDown xs:text-3xl mb-3 text-2xl font-bold tracking-tight text-white sm:mb-4 sm:text-4xl md:text-5xl lg:text-6xl"
           >
-            Services
+            Service Details
           </h1>
 
           <div
@@ -59,7 +59,7 @@ export default function Services() {
             <ChevronRight size={14} className="text-gray-400 sm:size-4" />
 
             <span className="text-xs font-semibold text-[#1D8B8A] sm:text-sm">
-              Services
+              Service Details
             </span>
           </div>
         </div>
