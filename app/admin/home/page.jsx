@@ -1,114 +1,133 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { ImagePlus, Trash2, LoaderCircle, Link } from "lucide-react";
 
 export default function HomePage() {
   const fileRef = useRef(null);
 
   const [slides, setSlides] = useState([]);
-  const [source, setSource] = useState("upload");
-  const [file, setFile] = useState(null);
-  const [imageUrl, setImageUrl] = useState("");
   const [preview, setPreview] = useState("");
-  const [editId, setEditId] = useState(null);
-  const [urlReady, setUrlReady] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadType, setUploadType] = useState("file");
 
-  const load = async () => {
-    const res = await fetch("/api/home-slider", { cache: "no-store" });
-    const data = await res.json();
-    setSlides(data.slides || []);
-  };
-
+  // Fetch slider images
   useEffect(() => {
-    load();
+    const getSlides = async () => {
+      try {
+        const res = await fetch("/api/homepage");
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message || "Failed to load slides.");
+        }
+
+        setSlides(data.slides || []);
+      } catch (error) {
+        console.error("Fetch slides:", error);
+        alert(error.message);
+      }
+    };
+
+    getSlides();
   }, []);
 
-  const reset = () => {
-    setFile(null);
-    setImageUrl("");
-    setPreview("");
-    setEditId(null);
-    setUrlReady(false);
-    setSource("upload");
-    if (fileRef.current) fileRef.current.value = "";
-  };
-
+  // Select and preview local image
   const chooseFile = (e) => {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
+    const file = e.target.files?.[0];
 
-    if (!selected.type.startsWith("image/"))
-      return alert("Please select an image.");
+    if (!file) return;
 
-    if (selected.size > 10 * 1024 * 1024)
-      return alert("Image must be under 10MB.");
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image.");
+      return;
+    }
 
-    setFile(selected);
-    setPreview(URL.createObjectURL(selected));
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Image must be under 10MB.");
+      return;
+    }
+
+    setPreview(URL.createObjectURL(file));
   };
 
-  const chooseUrl = (value) => {
+  // Preview image URL
+  const handleUrlChange = (e) => {
+    const value = e.target.value;
+
     setImageUrl(value);
-    setPreview(value);
-    setUrlReady(false);
+    setPreview(value.trim());
   };
 
-  const save = async () => {
-    if (source === "upload" && !file) return alert("Choose an image.");
+  // Upload image to API
+  const addImage = async () => {
+    const formData = new FormData();
 
-    if (source === "url" && !urlReady) return alert("Enter a valid image URL.");
+    if (uploadType === "file") {
+      const file = fileRef.current?.files?.[0];
 
-    setLoading(true);
+      if (!file) {
+        alert("Choose an image first.");
+        return;
+      }
+
+      formData.append("image", file);
+    }
+
+    if (uploadType === "url") {
+      const url = imageUrl.trim();
+
+      if (!url) {
+        alert("Enter an image URL first.");
+        return;
+      }
+
+      formData.append("imageUrl", url);
+    }
+
+    setUploading(true);
 
     try {
-      const form = new FormData();
-
-      if (source === "upload") form.append("image", file);
-      else form.append("imageUrl", imageUrl.trim());
-
-      const res = await fetch(
-        editId ? `/api/home-slider/${editId}` : "/api/home-slider",
-        {
-          method: editId ? "PUT" : "POST",
-          body: form,
-        },
-      );
+      const res = await fetch("/api/homepage", {
+        method: "POST",
+        body: formData,
+      });
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || "Upload failed.");
+      if (!res.ok) {
+        throw new Error(data.message || "Upload failed.");
+      }
 
-      await load();
-      reset();
+      // Add new image to the list
+      setSlides((prev) => [...prev, data]);
+
+      // Reset form
+      setPreview("");
+      setImageUrl("");
+
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
+
+      alert("Image uploaded successfully!");
     } catch (error) {
-      alert(error.message);
+      console.error("Upload image:", error);
+      alert(error.message || "Upload failed.");
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
 
-  const edit = (slide) => {
-    setEditId(slide._id);
-    setSource(slide.source || "url");
-    setPreview(slide.image);
-
-    if (slide.source === "url") {
-      setImageUrl(slide.image);
-      setUrlReady(true);
-    }
-  };
-
-  const remove = async (id) => {
-    if (!confirm("Delete this slider image?")) return;
-
-    await fetch(`/api/home-slider/${id}`, { method: "DELETE" });
-    load();
+  // Remove image from current UI
+  const removeImage = (id) => {
+    setSlides((prev) => prev.filter((slide) => slide._id !== id));
   };
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">
+      {/* Page header */}
       <div className="mb-6">
         <p className="text-sm font-semibold text-[var(--accent)]">Home Page</p>
 
@@ -121,45 +140,68 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* Form */}
+      {/* Upload card */}
       <div className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="font-bold">
-              {editId ? "Edit Slider" : "Add Slider"}
-            </h2>
+        <div>
+          <h2 className="font-bold">Add Slider</h2>
 
-            <p className="text-xs text-[var(--muted)]">
-              Upload from PC or use an image URL.
-            </p>
-          </div>
-
-          {editId && (
-            <button
-              onClick={reset}
-              className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--accent)]"
-            >
-              Cancel
-            </button>
-          )}
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Upload an image from your device or use an image URL.
+          </p>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-          {/* Preview */}
+        {/* Upload method */}
+        <div className="mt-5 flex w-full rounded-xl border border-[var(--border)] p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setUploadType("file");
+              setPreview("");
+              setImageUrl("");
+            }}
+            disabled={uploading}
+            className={`flex h-10 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${
+              uploadType === "file"
+                ? "bg-[var(--accent)] text-white"
+                : "text-[var(--muted)] hover:text-[var(--accent)]"
+            }`}
+          >
+            <ImagePlus size={16} />
+            Upload Image
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setUploadType("url");
+              setPreview("");
+
+              if (fileRef.current) {
+                fileRef.current.value = "";
+              }
+            }}
+            disabled={uploading}
+            className={`flex h-10 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${
+              uploadType === "url"
+                ? "bg-[var(--accent)] text-white"
+                : "text-[var(--muted)] hover:text-[var(--accent)]"
+            }`}
+          >
+            <Link size={16} />
+            Image URL
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+          {/* Image preview */}
           <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)]">
             <div className="aspect-[16/8] min-h-[220px]">
               {preview ? (
                 <img
                   src={preview}
                   alt="Slider preview"
-                  onLoad={() => source === "url" && setUrlReady(true)}
-                  onError={() => {
-                    if (source === "url") {
-                      setUrlReady(false);
-                      setPreview("");
-                    }
-                  }}
                   className="h-full w-full object-cover"
+                  onError={() => setPreview("")}
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center p-6 text-center">
@@ -168,47 +210,18 @@ export default function HomePage() {
                   <p className="mt-3 text-sm font-semibold">
                     No image selected
                   </p>
+
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Your image preview will appear here.
+                  </p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Controls */}
+          {/* Upload controls */}
           <div className="flex flex-col">
-            <div className="grid grid-cols-2 rounded-xl border border-[var(--border)] p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setSource("upload");
-                  setUrlReady(false);
-                }}
-                className={`h-10 rounded-lg text-sm font-semibold ${
-                  source === "upload"
-                    ? "bg-[var(--accent)] text-white"
-                    : "text-[var(--muted)]"
-                }`}
-              >
-                From PC
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSource("url");
-                  setFile(null);
-                  setUrlReady(false);
-                }}
-                className={`h-10 rounded-lg text-sm font-semibold ${
-                  source === "url"
-                    ? "bg-[var(--accent)] text-white"
-                    : "text-[var(--muted)]"
-                }`}
-              >
-                Image URL
-              </button>
-            </div>
-
-            {source === "upload" ? (
+            {uploadType === "file" ? (
               <>
                 <input
                   ref={fileRef}
@@ -221,36 +234,39 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="mt-4 h-11 rounded-xl border border-[var(--border)] text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  disabled={uploading}
+                  className="h-11 rounded-xl border border-[var(--border)] text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {file ? "Change Image" : "Choose Image"}
+                  Choose Image
                 </button>
               </>
             ) : (
               <input
                 type="url"
                 value={imageUrl}
-                onChange={(e) => chooseUrl(e.target.value)}
-                placeholder="https://example.com/image.webp"
-                className="mt-4 h-11 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 text-sm outline-none focus:border-[var(--accent)]"
+                onChange={handleUrlChange}
+                placeholder="https://example.com/image.jpg"
+                disabled={uploading}
+                className="h-11 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] disabled:opacity-50"
               />
             )}
 
+            {/* Upload button */}
             <button
               type="button"
-              onClick={save}
-              disabled={loading || (source === "upload" ? !file : !urlReady)}
-              className="mt-auto flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={addImage}
+              disabled={uploading}
+              className="mt-auto flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {loading ? (
+              {uploading ? (
                 <>
-                  <Loader2 size={17} className="animate-spin" />
-                  Saving...
+                  <LoaderCircle size={17} className="animate-spin" />
+                  Uploading...
                 </>
               ) : (
                 <>
                   <ImagePlus size={17} />
-                  {editId ? "Update Image" : "Upload Image"}
+                  Upload Slider Image
                 </>
               )}
             </button>
@@ -258,45 +274,56 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Slides */}
+      {/* Slider images */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
-        <h2 className="mb-5 font-bold">Slider Images</h2>
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h2 className="font-bold">Slider Images</h2>
+
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              {slides.length} {slides.length === 1 ? "image" : "images"}
+            </p>
+          </div>
+        </div>
 
         {slides.length ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {slides.map((slide, index) => (
               <div
                 key={slide._id}
-                className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)]"
+                className="group overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)]"
               >
-                <div className="aspect-video">
+                {/* Slider image */}
+                <div className="aspect-video overflow-hidden">
                   <img
                     src={slide.image}
                     alt={`Slider ${index + 1}`}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   />
                 </div>
 
                 <div className="flex items-center justify-between p-3 sm:p-4">
-                  <span className="text-sm font-semibold">
-                    Slide {index + 1}
-                  </span>
+                  <div>
+                    <span className="text-sm font-semibold">
+                      Slide {index + 1}
+                    </span>
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => edit(slide)}
-                      className="rounded-lg border border-[var(--border)] p-2 hover:text-[var(--accent)]"
-                    >
-                      <Pencil size={15} />
-                    </button>
-
-                    <button
-                      onClick={() => remove(slide._id)}
-                      className="rounded-lg border border-red-500/20 p-2 text-red-500"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    {slide.source && (
+                      <p className="mt-1 text-xs text-[var(--muted)] capitalize">
+                        Source: {slide.source}
+                      </p>
+                    )}
                   </div>
+
+                  {/* Delete button */}
+                  <button
+                    type="button"
+                    onClick={() => removeImage(slide._id)}
+                    disabled={uploading}
+                    className="rounded-lg border border-red-500/20 p-2 text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
             ))}
