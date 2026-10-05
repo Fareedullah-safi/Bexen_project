@@ -1,8 +1,12 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Trash2, LoaderCircle, Link } from "lucide-react";
+
+import { ImagePlus, Trash2, Link } from "lucide-react";
+
 import { toast } from "sonner";
+
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 export default function HomePage() {
   const fileRef = useRef(null);
@@ -12,6 +16,8 @@ export default function HomePage() {
   const [imageUrl, setImageUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadType, setUploadType] = useState("file");
+  const [deletingId, setDeletingId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Fetch slider images
   useEffect(() => {
@@ -28,6 +34,8 @@ export default function HomePage() {
       } catch (error) {
         console.error("Fetch slides:", error);
         toast.error(error.message || "Failed to load slides.");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -121,33 +129,38 @@ export default function HomePage() {
     }
   };
 
-  // Remove image from current UI
- const removeImage = async (id) => {
-  try {
-    console.log("ID:", id);
+  // Remove image
+  const removeImage = async (id) => {
+    if (deletingId) return;
 
-    const res = await fetch("/api/homepage", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ id }),
-    });
+    setDeletingId(id);
 
-    const data = await res.json();
+    try {
+      const res = await fetch("/api/homepage", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id }),
+      });
 
-    if (!res.ok) {
-      throw new Error(data.message || "Failed to delete image");
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to delete image");
+      }
+
+      setSlides((prev) => prev.filter((slide) => slide._id !== id));
+
+      toast.success("Image deleted successfully.");
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error(error.message || "Failed to delete image");
+    } finally {
+      setDeletingId(null);
     }
+  };
 
-    setSlides((prev) => prev.filter((slide) => slide._id !== id));
-
-    toast.success("Image deleted successfully.");
-  } catch (error) {
-    console.error("Delete error:", error);
-    toast.error(error.message || "Failed to delete image");
-  }
-};
   return (
     <div className="mx-auto w-full max-w-[1400px]">
       {/* Page header */}
@@ -283,7 +296,7 @@ export default function HomePage() {
             >
               {uploading ? (
                 <>
-                  <LoaderCircle size={17} className="animate-spin" />
+                  <Spinner size={17} color="white" />
                   Uploading...
                 </>
               ) : (
@@ -304,12 +317,20 @@ export default function HomePage() {
             <h2 className="font-bold">Slider Images</h2>
 
             <p className="mt-1 text-xs text-[var(--muted)]">
-              {slides.length} {slides.length === 1 ? "image" : "images"}
+              {loading
+                ? "Loading..."
+                : `${slides.length} ${
+                    slides.length === 1 ? "image" : "images"
+                  }`}
             </p>
           </div>
         </div>
 
-        {slides.length ? (
+        {loading ? (
+          <div className="flex min-h-[220px] items-center justify-center rounded-xl border border-dashed border-[var(--border)]">
+            <Spinner size={28} />
+          </div>
+        ) : slides.length ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {slides.map((slide, index) => (
               <div
@@ -342,10 +363,14 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={() => removeImage(slide._id)}
-                    disabled={uploading}
+                    disabled={deletingId !== null || uploading}
                     className="rounded-lg border border-red-500/20 p-2 text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <Trash2 size={15} />
+                    {deletingId === slide._id ? (
+                      <Spinner size={15} color="red" />
+                    ) : (
+                      <Trash2 size={15} />
+                    )}
                   </button>
                 </div>
               </div>
