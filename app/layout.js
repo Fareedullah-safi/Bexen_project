@@ -27,7 +27,9 @@ export default function RootLayout({ children }) {
           speed={200}
           shadow="0 0 10px #1D8B8A, 0 0 5px #1D8B8A"
         />
+
         <WowAnimation />
+
         {children}
       </body>
     </html>

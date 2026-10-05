@@ -1,4 +1,4 @@
-import connectDB from "@/app/Lib/mongoDB"
+import connectDB from "@/Lib/mongoDB"
 export async function GET() {
   try {
     await connectDB();
