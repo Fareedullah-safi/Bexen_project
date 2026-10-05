@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Trash2, LoaderCircle, Link } from "lucide-react";
+import { toast } from "sonner";
 
 export default function HomePage() {
   const fileRef = useRef(null);
@@ -26,7 +27,7 @@ export default function HomePage() {
         setSlides(data.slides || []);
       } catch (error) {
         console.error("Fetch slides:", error);
-        alert(error.message);
+        toast.error(error.message || "Failed to load slides.");
       }
     };
 
@@ -40,12 +41,12 @@ export default function HomePage() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image.");
+      toast.error("Please select an image.");
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      alert("Image must be under 10MB.");
+      toast.error("Image must be under 10MB.");
       return;
     }
 
@@ -68,7 +69,7 @@ export default function HomePage() {
       const file = fileRef.current?.files?.[0];
 
       if (!file) {
-        alert("Choose an image first.");
+        toast.error("Choose an image first.");
         return;
       }
 
@@ -79,7 +80,7 @@ export default function HomePage() {
       const url = imageUrl.trim();
 
       if (!url) {
-        alert("Enter an image URL first.");
+        toast.error("Enter an image URL first.");
         return;
       }
 
@@ -111,20 +112,42 @@ export default function HomePage() {
         fileRef.current.value = "";
       }
 
-      alert("Image uploaded successfully!");
+      toast.success("Image uploaded successfully!");
     } catch (error) {
       console.error("Upload image:", error);
-      alert(error.message || "Upload failed.");
+      toast.error(error.message || "Upload failed.");
     } finally {
       setUploading(false);
     }
   };
 
   // Remove image from current UI
-  const removeImage = (id) => {
-    setSlides((prev) => prev.filter((slide) => slide._id !== id));
-  };
+ const removeImage = async (id) => {
+  try {
+    console.log("ID:", id);
 
+    const res = await fetch("/api/homepage", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to delete image");
+    }
+
+    setSlides((prev) => prev.filter((slide) => slide._id !== id));
+
+    toast.success("Image deleted successfully.");
+  } catch (error) {
+    console.error("Delete error:", error);
+    toast.error(error.message || "Failed to delete image");
+  }
+};
   return (
     <div className="mx-auto w-full max-w-[1400px]">
       {/* Page header */}

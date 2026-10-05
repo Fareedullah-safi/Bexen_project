@@ -77,3 +77,43 @@ export async function GET() {
     );
   }
 }
+
+// delete api
+export async function DELETE(request) {
+  try {
+    await dbConnect();
+
+    const { id } = await request.json();
+
+    if (!id) {
+      return NextResponse.json(
+        { message: "Image ID is required" },
+        { status: 400 },
+      );
+    }
+
+    const slide = await HomeSlider.findById(id);
+
+    if (!slide) {
+      return NextResponse.json({ message: "Image not found" }, { status: 404 });
+    }
+
+    if (slide.publicId) {
+      await cloudinary.uploader.destroy(slide.publicId);
+    }
+
+    await HomeSlider.findByIdAndDelete(id);
+
+    return NextResponse.json(
+      { message: "Image deleted successfully" },
+      { status: 200 },
+    );
+  } catch (error) {
+    console.error("Delete image error:", error);
+
+    return NextResponse.json(
+      { message: error.message || "Failed to delete image" },
+      { status: 500 },
+    );
+  }
+}

@@ -1,6 +1,7 @@
 import { Mona_Sans } from "next/font/google";
 import "./globals.css";
 import NextTopLoader from "nextjs-toploader";
+import { Toaster } from "sonner";
 import WowAnimation from "./Components/WowAnimation";
 
 const monaSans = Mona_Sans({
@@ -31,6 +32,13 @@ export default function RootLayout({ children }) {
         <WowAnimation />
 
         {children}
+
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          duration={3000}
+        />
       </body>
     </html>
   );
