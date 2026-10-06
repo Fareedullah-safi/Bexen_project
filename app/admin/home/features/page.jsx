@@ -2,16 +2,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Link, Trash2 } from "lucide-react";
+import { ImagePlus, Link, Trash2, Plus } from "lucide-react";
+import { toast } from "sonner";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 function IconPicker({ icon, onChange }) {
   const fileRef = useRef(null);
 
   const chooseFile = (e) => {
     const file = e.target.files?.[0];
-
     if (!file) return;
-
     onChange({
       mode: "file",
       file,
@@ -23,7 +23,6 @@ function IconPicker({ icon, onChange }) {
 
   const changeUrl = (e) => {
     const value = e.target.value;
-
     onChange({
       mode: "url",
       file: null,
@@ -34,31 +33,13 @@ function IconPicker({ icon, onChange }) {
   };
 
   const switchMode = (mode) => {
-    if (fileRef.current) {
-      fileRef.current.value = "";
-    }
-
-    onChange({
-      mode,
-      file: null,
-      preview: "",
-      url: "",
-      publicId: "",
-    });
+    if (fileRef.current) fileRef.current.value = "";
+    onChange({ mode, file: null, preview: "", url: "", publicId: "" });
   };
 
   const clearIcon = () => {
-    if (fileRef.current) {
-      fileRef.current.value = "";
-    }
-
-    onChange({
-      mode: "file",
-      file: null,
-      preview: "",
-      url: "",
-      publicId: "",
-    });
+    if (fileRef.current) fileRef.current.value = "";
+    onChange({ mode: "file", file: null, preview: "", url: "", publicId: "" });
   };
 
   return (
@@ -66,7 +47,6 @@ function IconPicker({ icon, onChange }) {
       <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
         Icon
       </label>
-
       <div className="flex w-full rounded-xl border border-[var(--border)] p-1">
         <button
           type="button"
@@ -80,7 +60,6 @@ function IconPicker({ icon, onChange }) {
           <ImagePlus size={14} />
           From PC
         </button>
-
         <button
           type="button"
           onClick={() => switchMode("url")}
@@ -94,7 +73,6 @@ function IconPicker({ icon, onChange }) {
           URL
         </button>
       </div>
-
       <div className="mt-3 flex items-center gap-3">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
           {icon.preview ? (
@@ -104,13 +82,9 @@ function IconPicker({ icon, onChange }) {
               className="h-full w-full object-contain p-2"
             />
           ) : (
-            <ImagePlus
-              size={22}
-              className="text-[var(--accent)]"
-            />
+            <ImagePlus size={22} className="text-[var(--accent)]" />
           )}
         </div>
-
         <div className="min-w-0 flex-1">
           {icon.mode === "file" ? (
             <>
@@ -121,7 +95,6 @@ function IconPicker({ icon, onChange }) {
                 onChange={chooseFile}
                 className="hidden"
               />
-
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
@@ -129,7 +102,6 @@ function IconPicker({ icon, onChange }) {
               >
                 {icon.file ? "Change Icon" : "Choose Icon"}
               </button>
-
               {icon.file && (
                 <p className="mt-1 truncate text-xs text-[var(--muted)]">
                   {icon.file.name}
@@ -146,7 +118,6 @@ function IconPicker({ icon, onChange }) {
             />
           )}
         </div>
-
         {icon.preview && (
           <button
             type="button"
@@ -169,29 +140,10 @@ const createEmptyIcon = () => ({
   publicId: "",
 });
 
-const createInitialForm = () => ({
-  tagline: "Choose the Best",
-  title: "Empowering Business with Expertise.",
-  cards: [
-    {
-      title: "Innovative Solutions",
-      description:
-        "We stay ahead of the curve, leveraging cutting-edge technologies and strategies to keep you competitive in a marketplace.",
-      icon: createEmptyIcon(),
-    },
-    {
-      title: "Award-Winning Expertise",
-      description:
-        "Recognized by industry leaders, our award-winning team has a proven record of delivering excellence across projects.",
-      icon: createEmptyIcon(),
-    },
-    {
-      title: "Dedicated Support",
-      description:
-        "Our team is always available to address your concerns, providing quick and effective solution to keep your business.",
-      icon: createEmptyIcon(),
-    },
-  ],
+const createEmptyCard = () => ({
+  title: "",
+  description: "",
+  icon: createEmptyIcon(),
 });
 
 const normalizeFormData = (data) => ({
@@ -199,23 +151,16 @@ const normalizeFormData = (data) => ({
   title: data?.title || "",
   cards: (data?.cards || []).map((card) => {
     const { url = "", publicId = "" } = card.icon || {};
-
     return {
       title: card.title || "",
       description: card.description || "",
-      icon: {
-        mode: "url",
-        file: null,
-        preview: url,
-        url,
-        publicId,
-      },
+      icon: { mode: "url", file: null, preview: url, url, publicId },
     };
   }),
 });
 
 export default function Features() {
-  const [form, setForm] = useState(createInitialForm);
+  const [form, setForm] = useState({ tagline: "", title: "", cards: [] });
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
@@ -225,55 +170,52 @@ export default function Features() {
         const response = await fetch("/api/homepage/features", {
           cache: "no-store",
         });
-
         const result = await response.json();
-
-        if (!response.ok) {
+        if (!response.ok)
           throw new Error(result?.error || "Failed to load data");
-        }
-
-        if (result?.data) {
-          setForm(normalizeFormData(result.data));
-        }
+        if (result?.data) setForm(normalizeFormData(result.data));
       } catch (error) {
         console.error(error);
+        toast.error(error.message || "Failed to load features data");
       } finally {
         setFetching(false);
       }
     };
-
     loadData();
   }, []);
 
   const setField = (name, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const setCard = (index, name, value) => {
     setForm((prev) => ({
       ...prev,
       cards: prev.cards.map((card, i) =>
-        i === index
-          ? {
-              ...card,
-              [name]: value,
-            }
-          : card,
+        i === index ? { ...card, [name]: value } : card,
       ),
+    }));
+  };
+
+  const addCard = () => {
+    setForm((prev) => ({
+      ...prev,
+      cards: [...prev.cards, createEmptyCard()],
+    }));
+  };
+
+  const removeCard = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      cards: prev.cards.filter((_, i) => i !== index),
     }));
   };
 
   const handleSubmit = async () => {
     if (loading) return;
-
     setLoading(true);
-
     try {
       const formData = new FormData();
-
       formData.append("tagline", form.tagline.trim());
       formData.append("title", form.title.trim());
 
@@ -281,7 +223,6 @@ export default function Features() {
         if (card.icon.mode === "file" && card.icon.file) {
           formData.append(`icon_${index}`, card.icon.file);
         }
-
         return {
           title: card.title.trim(),
           description: card.description.trim(),
@@ -298,18 +239,15 @@ export default function Features() {
         method: "POST",
         body: formData,
       });
-
       const result = await response.json();
-
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(result?.error || "Failed to save features");
-      }
+      if (result?.data) setForm(normalizeFormData(result.data));
 
-      if (result?.data) {
-        setForm(normalizeFormData(result.data));
-      }
+      toast.success("Changes saved successfully!");
     } catch (error) {
       console.error(error);
+      toast.error(error.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -317,8 +255,8 @@ export default function Features() {
 
   if (fetching) {
     return (
-      <div className="mx-auto w-full max-w-[1400px] py-20 text-center text-sm text-[var(--muted)]">
-        Loading features data...
+      <div className="flex w-full items-center justify-center py-20">
+        <Spinner />
       </div>
     );
   }
@@ -326,14 +264,10 @@ export default function Features() {
   return (
     <div className="mx-auto w-full max-w-[1400px]">
       <div className="mb-6">
-        <p className="text-sm font-semibold text-[var(--accent)]">
-          Home Page
-        </p>
-
+        <p className="text-sm font-semibold text-[var(--accent)]">Home Page</p>
         <h1 className="mt-1 text-2xl font-black sm:text-3xl lg:text-4xl">
           Features
         </h1>
-
         <p className="mt-2 text-sm text-[var(--muted)]">
           Edit the heading and the feature cards.
         </p>
@@ -341,17 +275,14 @@ export default function Features() {
 
       <div className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
         <h2 className="font-bold">Section Heading</h2>
-
         <p className="mt-1 text-xs text-[var(--muted)]">
           The small text and big title above the cards.
         </p>
-
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-sm font-semibold">
               Tagline
             </label>
-
             <input
               type="text"
               value={form.tagline}
@@ -359,12 +290,10 @@ export default function Features() {
               className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 text-sm outline-none focus:border-[var(--accent)]"
             />
           </div>
-
           <div>
             <label className="mb-1.5 block text-sm font-semibold">
               Heading
             </label>
-
             <input
               type="text"
               value={form.title}
@@ -376,11 +305,23 @@ export default function Features() {
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
-        <h2 className="font-bold">Feature Cards</h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-bold">Feature Cards</h2>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              {form.cards.length} cards
+            </p>
+          </div>
 
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          {form.cards.length} cards
-        </p>
+          <button
+            type="button"
+            onClick={addCard}
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 text-xs font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            <Plus size={14} />
+            Add Card
+          </button>
+        </div>
 
         <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
           {form.cards.map((card, index) => (
@@ -388,39 +329,38 @@ export default function Features() {
               key={index}
               className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4"
             >
-              <span className="text-sm font-semibold">
-                Card {index + 1}
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Card {index + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => removeCard(index)}
+                  className="rounded-lg border border-red-500/20 p-1.5 text-red-500 transition hover:bg-red-500/10"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
 
               <div className="mt-3 space-y-4">
                 <IconPicker
                   icon={card.icon}
-                  onChange={(icon) =>
-                    setCard(index, "icon", icon)
-                  }
+                  onChange={(icon) => setCard(index, "icon", icon)}
                 />
-
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                     Title
                   </label>
-
                   <input
                     type="text"
                     value={card.title}
-                    onChange={(e) =>
-                      setCard(index, "title", e.target.value)
-                    }
+                    onChange={(e) => setCard(index, "title", e.target.value)}
                     placeholder="Card title"
                     className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]"
                   />
                 </div>
-
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                     Description
                   </label>
-
                   <textarea
                     rows={5}
                     value={card.description}
@@ -434,14 +374,21 @@ export default function Features() {
               </div>
             </div>
           ))}
+
+          {form.cards.length === 0 && (
+            <p className="col-span-full py-8 text-center text-sm text-[var(--muted)]">
+              No cards yet. Click &quot;Add Card&quot; to create one.
+            </p>
+          )}
         </div>
 
         <button
           type="button"
           onClick={handleSubmit}
           disabled={loading}
-          className="mt-6 flex h-11 items-center justify-center rounded-xl bg-[var(--accent)] px-8 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-6 flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-8 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
+          {loading && <Spinner size={16} />}
           {loading ? "Saving..." : "Save Changes"}
         </button>
       </div>

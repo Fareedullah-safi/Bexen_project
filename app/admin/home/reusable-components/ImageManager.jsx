@@ -1,322 +1,396 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useRef, useState } from "react";
-import { ImagePlus, Trash2, Link } from "lucide-react";
-import { toast } from "sonner";
+import { useEffect, useRef, useState } from "react";
+import { ImagePlus, Link, Trash2, Plus } from "lucide-react";
+import toast from "react-hot-toast";
 import Spinner from "@/app/admin/Components/Admin/Spinner";
 
-export default function ImageManager({
-  items = [],
-  loading = false,
-  onAdd,
-  onDelete,
-  title = "Images",
-  description = "Manage your images.",
-  addTitle = "Add Image",
-  uploadButtonText = "Upload Image",
-  emptyText = "No images yet.",
-  getImageAlt = (item, index) => `Image ${index + 1}`,
-}) {
+function IconPicker({ icon, onChange }) {
   const fileRef = useRef(null);
-
-  const [preview, setPreview] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadType, setUploadType] = useState("file");
-  const [deletingId, setDeletingId] = useState(null);
 
   const chooseFile = (e) => {
     const file = e.target.files?.[0];
-
     if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image.");
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image must be under 10MB.");
-      return;
-    }
-
-    setPreview(URL.createObjectURL(file));
+    onChange({
+      mode: "file",
+      file,
+      preview: URL.createObjectURL(file),
+      url: "",
+      publicId: "",
+    });
   };
 
-  const handleUrlChange = (e) => {
+  const changeUrl = (e) => {
     const value = e.target.value;
-
-    setImageUrl(value);
-    setPreview(value.trim());
+    onChange({
+      mode: "url",
+      file: null,
+      preview: value.trim(),
+      url: value,
+      publicId: "",
+    });
   };
 
-  const addImage = async () => {
-    let payload;
+  const switchMode = (mode) => {
+    if (fileRef.current) fileRef.current.value = "";
+    onChange({ mode, file: null, preview: "", url: "", publicId: "" });
+  };
 
-    if (uploadType === "file") {
-      const file = fileRef.current?.files?.[0];
+  const clearIcon = () => {
+    if (fileRef.current) fileRef.current.value = "";
+    onChange({ mode: "file", file: null, preview: "", url: "", publicId: "" });
+  };
 
-      if (!file) {
-        toast.error("Choose an image first.");
-        return;
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+        Icon
+      </label>
+      <div className="flex w-full rounded-xl border border-[var(--border)] p-1">
+        <button
+          type="button"
+          onClick={() => switchMode("file")}
+          className={`flex h-9 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition ${
+            icon.mode === "file"
+              ? "bg-[var(--accent)] text-white"
+              : "text-[var(--muted)] hover:text-[var(--accent)]"
+          }`}
+        >
+          <ImagePlus size={14} />
+          From PC
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode("url")}
+          className={`flex h-9 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition ${
+            icon.mode === "url"
+              ? "bg-[var(--accent)] text-white"
+              : "text-[var(--muted)] hover:text-[var(--accent)]"
+          }`}
+        >
+          <Link size={14} />
+          URL
+        </button>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+          {icon.preview ? (
+            <img
+              src={icon.preview}
+              alt="Icon preview"
+              className="h-full w-full object-contain p-2"
+            />
+          ) : (
+            <ImagePlus size={22} className="text-[var(--accent)]" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          {icon.mode === "file" ? (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                onChange={chooseFile}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="h-11 w-full rounded-xl border border-[var(--border)] text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              >
+                {icon.file ? "Change Icon" : "Choose Icon"}
+              </button>
+              {icon.file && (
+                <p className="mt-1 truncate text-xs text-[var(--muted)]">
+                  {icon.file.name}
+                </p>
+              )}
+            </>
+          ) : (
+            <input
+              type="url"
+              value={icon.url}
+              onChange={changeUrl}
+              placeholder="https://example.com/icon.svg"
+              className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+            />
+          )}
+        </div>
+        {icon.preview && (
+          <button
+            type="button"
+            onClick={clearIcon}
+            className="rounded-lg border border-red-500/20 p-2 text-red-500 transition hover:bg-red-500/10"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const createEmptyIcon = () => ({
+  mode: "file",
+  file: null,
+  preview: "",
+  url: "",
+  publicId: "",
+});
+
+const createEmptyCard = () => ({
+  title: "",
+  description: "",
+  icon: createEmptyIcon(),
+});
+
+const normalizeFormData = (data) => ({
+  tagline: data?.tagline || "",
+  title: data?.title || "",
+  cards: (data?.cards || []).map((card) => {
+    const { url = "", publicId = "" } = card.icon || {};
+    return {
+      title: card.title || "",
+      description: card.description || "",
+      icon: { mode: "url", file: null, preview: url, url, publicId },
+    };
+  }),
+});
+
+export default function Features() {
+  const [form, setForm] = useState({ tagline: "", title: "", cards: [] });
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const response = await fetch("/api/homepage/features", {
+          cache: "no-store",
+        });
+        const result = await response.json();
+        if (!response.ok)
+          throw new Error(result?.error || "Failed to load data");
+        if (result?.data) setForm(normalizeFormData(result.data));
+      } catch (error) {
+        console.error(error);
+        toast.error(error.message || "Failed to load features data");
+      } finally {
+        setFetching(false);
       }
+    };
+    loadData();
+  }, []);
 
-      payload = { file };
-    } else {
-      const url = imageUrl.trim();
+  const setField = (name, value) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
-      if (!url) {
-        toast.error("Enter an image URL first.");
-        return;
-      }
+  const setCard = (index, name, value) => {
+    setForm((prev) => ({
+      ...prev,
+      cards: prev.cards.map((card, i) =>
+        i === index ? { ...card, [name]: value } : card,
+      ),
+    }));
+  };
 
-      payload = { url };
-    }
+  const addCard = () => {
+    setForm((prev) => ({
+      ...prev,
+      cards: [...prev.cards, createEmptyCard()],
+    }));
+  };
 
-    setUploading(true);
+  const removeCard = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      cards: prev.cards.filter((_, i) => i !== index),
+    }));
+  };
 
+  const handleSubmit = async () => {
+    if (loading) return;
+    setLoading(true);
     try {
-      await onAdd(payload);
+      const formData = new FormData();
+      formData.append("tagline", form.tagline.trim());
+      formData.append("title", form.title.trim());
 
-      setPreview("");
-      setImageUrl("");
+      const cards = form.cards.map((card, index) => {
+        if (card.icon.mode === "file" && card.icon.file) {
+          formData.append(`icon_${index}`, card.icon.file);
+        }
+        return {
+          title: card.title.trim(),
+          description: card.description.trim(),
+          iconMode: card.icon.mode,
+          iconUrl: card.icon.mode === "url" ? card.icon.url.trim() : "",
+          iconPublicId:
+            card.icon.mode === "url" ? card.icon.publicId || "" : "",
+        };
+      });
 
-      if (fileRef.current) {
-        fileRef.current.value = "";
-      }
+      formData.append("cards", JSON.stringify(cards));
 
-      toast.success("Image uploaded successfully!");
+      const response = await fetch("/api/homepage/features", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result?.error || "Failed to save features");
+      if (result?.data) setForm(normalizeFormData(result.data));
+
+      toast.success("Changes saved successfully!");
     } catch (error) {
-      console.error("Upload image:", error);
-      toast.error(error.message || "Upload failed.");
+      console.error(error);
+      toast.error(error.message || "Something went wrong");
     } finally {
-      setUploading(false);
+      setLoading(false);
     }
   };
 
-  const removeImage = async (id) => {
-    if (deletingId) return;
-
-    setDeletingId(id);
-
-    try {
-      await onDelete(id);
-      toast.success("Image deleted successfully.");
-    } catch (error) {
-      console.error("Delete image:", error);
-      toast.error(error.message || "Failed to delete image.");
-    } finally {
-      setDeletingId(null);
-    }
-  };
+  if (fetching) {
+    return (
+      <div className="flex w-full items-center justify-center py-20">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">
       <div className="mb-6">
         <p className="text-sm font-semibold text-[var(--accent)]">Home Page</p>
-
         <h1 className="mt-1 text-2xl font-black sm:text-3xl lg:text-4xl">
-          {title}
+          Features
         </h1>
-
-        <p className="mt-2 text-sm text-[var(--muted)]">{description}</p>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Edit the heading and the feature cards.
+        </p>
       </div>
 
       <div className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
-        <div>
-          <h2 className="font-bold">{addTitle}</h2>
-
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Upload an image from your device or use an image URL.
-          </p>
-        </div>
-
-        <div className="mt-5 flex w-full rounded-xl border border-[var(--border)] p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setUploadType("file");
-              setPreview("");
-              setImageUrl("");
-            }}
-            disabled={uploading}
-            className={`flex h-10 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${
-              uploadType === "file"
-                ? "bg-[var(--accent)] text-white"
-                : "text-[var(--muted)] hover:text-[var(--accent)]"
-            }`}
-          >
-            <ImagePlus size={16} />
-            Upload Image
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setUploadType("url");
-              setPreview("");
-
-              if (fileRef.current) {
-                fileRef.current.value = "";
-              }
-            }}
-            disabled={uploading}
-            className={`flex h-10 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${
-              uploadType === "url"
-                ? "bg-[var(--accent)] text-white"
-                : "text-[var(--muted)] hover:text-[var(--accent)]"
-            }`}
-          >
-            <Link size={16} />
-            Image URL
-          </button>
-        </div>
-
-        <div className="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-          <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)]">
-            <div className="aspect-[16/8] min-h-[220px]">
-              {preview ? (
-                <img
-                  src={preview}
-                  alt="Image preview"
-                  className="h-full w-full object-cover"
-                  onError={() => setPreview("")}
-                />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-                  <ImagePlus size={38} className="text-[var(--accent)]" />
-
-                  <p className="mt-3 text-sm font-semibold">
-                    No image selected
-                  </p>
-
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    Your image preview will appear here.
-                  </p>
-                </div>
-              )}
-            </div>
+        <h2 className="font-bold">Section Heading</h2>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          The small text and big title above the cards.
+        </p>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold">
+              Tagline
+            </label>
+            <input
+              type="text"
+              value={form.tagline}
+              onChange={(e) => setField("tagline", e.target.value)}
+              className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+            />
           </div>
-
-          <div className="flex flex-col">
-            {uploadType === "file" ? (
-              <>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={chooseFile}
-                  className="hidden"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="h-11 rounded-xl border border-[var(--border)] text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Choose Image
-                </button>
-              </>
-            ) : (
-              <input
-                type="url"
-                value={imageUrl}
-                onChange={handleUrlChange}
-                placeholder="https://example.com/image.jpg"
-                disabled={uploading}
-                className="h-11 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 text-sm outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] disabled:opacity-50"
-              />
-            )}
-
-            <button
-              type="button"
-              onClick={addImage}
-              disabled={uploading}
-              className="mt-auto flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {uploading ? (
-                <>
-                  <Spinner size={17} color="white" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <ImagePlus size={17} />
-                  {uploadButtonText}
-                </>
-              )}
-            </button>
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold">
+              Heading
+            </label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) => setField("title", e.target.value)}
+              className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+            />
           </div>
         </div>
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
-        <div className="mb-5 flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-bold">{title}</h2>
-
+            <h2 className="font-bold">Feature Cards</h2>
             <p className="mt-1 text-xs text-[var(--muted)]">
-              {loading
-                ? "Loading..."
-                : `${items.length} ${items.length === 1 ? "image" : "images"}`}
+              {form.cards.length} cards
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={addCard}
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 text-xs font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            <Plus size={14} />
+            Add Card
+          </button>
         </div>
 
-        {loading ? (
-          <div className="flex min-h-[220px] items-center justify-center rounded-xl border border-dashed border-[var(--border)]">
-            <Spinner size={28} />
-          </div>
-        ) : items.length ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {items.map((item, index) => (
-              <div
-                key={item._id}
-                className="group overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)]"
-              >
-                <div className="aspect-video overflow-hidden">
-                  <img
-                    src={item.image}
-                    alt={getImageAlt(item, index)}
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+        <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {form.cards.map((card, index) => (
+            <div
+              key={index}
+              className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Card {index + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => removeCard(index)}
+                  className="rounded-lg border border-red-500/20 p-1.5 text-red-500 transition hover:bg-red-500/10"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+
+              <div className="mt-3 space-y-4">
+                <IconPicker
+                  icon={card.icon}
+                  onChange={(icon) => setCard(index, "icon", icon)}
+                />
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={card.title}
+                    onChange={(e) => setCard(index, "title", e.target.value)}
+                    placeholder="Card title"
+                    className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]"
                   />
                 </div>
-
-                <div className="flex items-center justify-between p-3 sm:p-4">
-                  <div>
-                    <span className="text-sm font-semibold">
-                      {getImageAlt(item, index)}
-                    </span>
-
-                    {item.source && (
-                      <p className="mt-1 text-xs text-[var(--muted)] capitalize">
-                        Source: {item.source}
-                      </p>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => removeImage(item._id)}
-                    disabled={deletingId !== null || uploading}
-                    className="rounded-lg border border-red-500/20 p-2 text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {deletingId === item._id ? (
-                      <Spinner size={15} color="red" />
-                    ) : (
-                      <Trash2 size={15} />
-                    )}
-                  </button>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+                    Description
+                  </label>
+                  <textarea
+                    rows={5}
+                    value={card.description}
+                    onChange={(e) =>
+                      setCard(index, "description", e.target.value)
+                    }
+                    placeholder="Card description"
+                    className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-sm outline-none focus:border-[var(--accent)]"
+                  />
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex min-h-[220px] items-center justify-center rounded-xl border border-dashed border-[var(--border)] text-sm text-[var(--muted)]">
-            {emptyText}
-          </div>
-        )}
+            </div>
+          ))}
+
+          {form.cards.length === 0 && (
+            <p className="col-span-full py-8 text-center text-sm text-[var(--muted)]">
+              No cards yet. Click &quot;Add Card&quot; to create one.
+            </p>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={loading}
+          className="mt-6 flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-8 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading && <Spinner size={16} />}
+          {loading ? "Saving..." : "Save Changes"}
+        </button>
       </div>
     </div>
   );
