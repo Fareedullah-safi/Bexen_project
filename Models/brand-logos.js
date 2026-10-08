@@ -2,11 +2,6 @@ import mongoose from "mongoose";
 
 const BrandLogoSchema = new mongoose.Schema(
   {
-    title: {
-      type: String,
-      required: true,
-    },
-
     logos: [
       {
         id: {

@@ -1,3 +1,4 @@
+import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
 import BrandLogo from "@/Models/brand-logos";
 
@@ -9,20 +10,19 @@ export async function POST(request) {
 
     console.log("RECEIVED DATA:", data);
 
-    const { title, logos } = data;
+    const { logos } = data;
 
-    if (!title || !logos?.length) {
+    if (!logos?.length) {
       return Response.json(
         {
           success: false,
-          error: "Title and logos are required",
+          error: "Logos are required",
         },
         { status: 400 },
       );
     }
 
     const brandLogo = await BrandLogo.create({
-      title,
       logos: logos.map((logo) => ({
         id: Number(logo.id),
         url: logo.url,
@@ -50,6 +50,7 @@ export async function POST(request) {
 }
 
 // Get data from DB
+
 export async function GET() {
   try {
     await connectDB();
@@ -62,6 +63,70 @@ export async function GET() {
     });
   } catch (error) {
     console.error("GET brand logos error:", error);
+
+    return Response.json(
+      {
+        success: false,
+        error: error.message,
+      },
+      { status: 500 },
+    );
+  }
+}
+
+// Delete icon from DB and Cloudinary
+
+export async function DELETE(request) {
+  try {
+    await connectDB();
+
+    const { logoId, publicId } = await request.json();
+
+    if (!logoId || !publicId) {
+      return Response.json(
+        {
+          success: false,
+          error: "logoId and publicId are required",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Delete directly from Cloudinary
+    await cloudinary.uploader.destroy(publicId);
+
+    // Delete exact logo object
+    const result = await BrandLogo.updateOne(
+      {
+        "logos._id": logoId,
+      },
+      {
+        $pull: {
+          logos: {
+            _id: logoId,
+          },
+        },
+      },
+    );
+
+    if (result.modifiedCount === 0) {
+      return Response.json(
+        {
+          success: false,
+          error: "Logo not found",
+        },
+        { status: 404 },
+      );
+    }
+
+    return Response.json({
+      success: true,
+      message: "Logo deleted successfully",
+      logoId,
+      publicId,
+    });
+  } catch (error) {
+    console.error("DELETE LOGO ERROR:", error);
 
     return Response.json(
       {
