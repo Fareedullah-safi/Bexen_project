@@ -206,3 +206,43 @@ export async function POST(req) {
     );
   }
 }
+
+// delete logic
+
+export async function DELETE(request) {
+  try {
+    await dbConnect();
+
+    const { cardId } = await request.json();
+
+    if (!cardId) {
+      return Response.json({ error: "Card ID is required" }, { status: 400 });
+    }
+
+    const updatedData = await Features.findOneAndUpdate(
+      { "cards._id": cardId },
+      {
+        $pull: {
+          cards: {
+            _id: cardId,
+          },
+        },
+      },
+      { new: true },
+    );
+
+    if (!updatedData) {
+      return Response.json({ error: "Card not found" }, { status: 404 });
+    }
+
+    return Response.json({
+      success: true,
+      message: "Card deleted successfully",
+      data: updatedData,
+    });
+  } catch (error) {
+    console.error("Delete card error:", error);
+
+    return Response.json({ error: "Failed to delete card" }, { status: 500 });
+  }
+}
