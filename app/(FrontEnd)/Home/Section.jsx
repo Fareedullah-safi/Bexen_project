@@ -1,10 +1,9 @@
 "use client";
 
 import Image from "next/image";
-
 import { useEffect, useState } from "react";
-
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import Loader from "@/app/Components/Loader";
 
 export default function Section() {
   const [images, setImages] = useState([]);
@@ -13,7 +12,6 @@ export default function Section() {
   const [loading, setLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
 
-  // Get slider data
   useEffect(() => {
     const getSlides = async () => {
       try {
@@ -24,7 +22,8 @@ export default function Section() {
           throw new Error(data.message || "Failed to load slides");
         }
 
-        const imageData = data.slides?.map((slide) => slide.image) || [];
+        const imageData =
+          data.slides?.map((slide) => slide.image) || [];
 
         setImages(imageData);
 
@@ -41,7 +40,6 @@ export default function Section() {
     getSlides();
   }, []);
 
-  // Automatic slider
   useEffect(() => {
     if (images.length <= 1) return;
 
@@ -50,7 +48,6 @@ export default function Section() {
         if (!current) return images[0];
 
         const index = images.indexOf(current);
-
         const nextImage = images[(index + 1) % images.length];
 
         setImageKey((key) => key + 1);
@@ -62,7 +59,6 @@ export default function Section() {
     return () => clearInterval(interval);
   }, [images]);
 
-  // Hide controls after 5 seconds
   useEffect(() => {
     if (!showControls) return;
 
@@ -85,8 +81,8 @@ export default function Section() {
     if (images.length <= 1) return;
 
     const currentIndex = images.indexOf(image);
-
-    const previousIndex = (currentIndex - 1 + images.length) % images.length;
+    const previousIndex =
+      (currentIndex - 1 + images.length) % images.length;
 
     handleImageChange(images[previousIndex]);
   };
@@ -95,7 +91,6 @@ export default function Section() {
     if (images.length <= 1) return;
 
     const currentIndex = images.indexOf(image);
-
     const nextIndex = (currentIndex + 1) % images.length;
 
     handleImageChange(images[nextIndex]);
@@ -118,7 +113,6 @@ export default function Section() {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {/* IMAGE */}
         {image && (
           <div
             key={imageKey}
@@ -135,21 +129,14 @@ export default function Section() {
           </div>
         )}
 
-        {/* LOADING */}
-        {loading && !image && (
-          <div className="flex h-full w-full items-center justify-center rounded-lg bg-[var(--surface)]">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--accent)]" />
-          </div>
-        )}
+        {loading && !image && <Loader />}
 
-        {/* NO IMAGE */}
         {!loading && !image && (
           <div className="flex h-full w-full items-center justify-center rounded-lg bg-[var(--surface)] text-sm text-[var(--muted)]">
             No slider images available.
           </div>
         )}
 
-        {/* BOTTOM GLASS CONTROLS */}
         {images.length > 1 && (
           <div
             className={`absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/25 bg-black/20 p-1.5 shadow-lg backdrop-blur-md transition-all duration-500 ${
@@ -158,7 +145,6 @@ export default function Section() {
                 : "pointer-events-none translate-y-3 opacity-0"
             }`}
           >
-            {/* PREVIOUS */}
             <button
               type="button"
               onClick={handlePrevious}
@@ -172,12 +158,10 @@ export default function Section() {
               />
             </button>
 
-            {/* SLIDE NUMBER */}
             <span className="min-w-12 px-1 text-center text-xs font-semibold tracking-wide text-white">
               {images.indexOf(image) + 1} / {images.length}
             </span>
 
-            {/* NEXT */}
             <button
               type="button"
               onClick={handleNext}

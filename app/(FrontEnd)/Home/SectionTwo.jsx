@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Box } from "lucide-react";
 import { GoLightBulb } from "react-icons/go";
+import Loader from "@/app/Components/Loader";
 
 const FALLBACK_ICON = GoLightBulb;
 
@@ -35,8 +36,8 @@ export default function SectionTwoSectionTwo() {
   if (loading) {
     return (
       <section className="w-full">
-        <main className="px-4 py-12 text-center sm:px-6 lg:px-12">
-          <p className="text-sm text-gray-400">Loading...</p>
+        <main className="flex min-h-100 w-full items-center justify-center px-4 py-12 sm:px-6 lg:px-12">
+          <Loader />
         </main>
       </section>
     );
@@ -49,7 +50,6 @@ export default function SectionTwoSectionTwo() {
   return (
     <section className="w-full">
       <main className="px-4 py-12 sm:px-6 lg:px-12">
-        {/* Heading Badge */}
         <div className="flex justify-center">
           <span
             className="wow animate__animated animate__fadeIn group inline-flex items-center gap-2 border border-cyan-100 bg-cyan-50/30 px-3 py-1.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:bg-cyan-100 hover:shadow-md sm:px-4"
@@ -66,7 +66,6 @@ export default function SectionTwoSectionTwo() {
           </span>
         </div>
 
-        {/* Main Heading */}
         <h1
           className="wow animate__animated animate__fadeInUp pt-6 pb-8 text-center text-4xl leading-tight font-medium text-gray-700 sm:text-5xl"
           data-wow-duration="1s"
@@ -75,7 +74,6 @@ export default function SectionTwoSectionTwo() {
           {title}
         </h1>
 
-        {/* Cards Container */}
         <div className="mx-auto grid w-full grid-cols-1 gap-6 md:grid-cols-1 lg:grid-cols-3">
           {cards.map((card, index) => {
             const iconUrl = card.icon?.url || "";
@@ -88,7 +86,6 @@ export default function SectionTwoSectionTwo() {
                 data-wow-delay={`${0.2 + index * 0.2}s`}
               >
                 {iconUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={iconUrl}
                     alt={card.title}
