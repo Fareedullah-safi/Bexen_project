@@ -1,8 +1,4 @@
-import connectDB from "@/Lib/mongoDB";
-import brandLogos from "@/Models/brand-logos";
 import cloudinary from "@/Lib/cloudinary";
-import { buffer } from "node:stream/consumers";
-import { rejects } from "node:assert";
 
 export async function POST(request) {
   try {
@@ -12,60 +8,71 @@ export async function POST(request) {
     const ids = formData.getAll("ids");
     const files = formData.getAll("files");
     const urls = formData.getAll("urls");
+    const oldPublicIds = formData.getAll("oldPublicIds");
 
-    console.log("Title:", title);
-    console.log("IDs:", ids);
-    console.log("Files:", files);
-    console.log("URLs:", urls);
+    const logos = [];
 
-    //cloudinary
-    const file = files[0];
-    if (!file) {
-      return Response.json(
-        {
-          status: 404,
-        },
-        {
-          success: false,
-          error: "No file found",
-        },
-      );
-    }
+    // Process every logo
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const file = files[i];
+      const url = urls[i];
+      const oldPublicId = oldPublicIds[i];
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+      // Delete old Cloudinary image
+      if (oldPublicId) {
+        await cloudinary.uploader.destroy(oldPublicId);
+      }
 
-    const result = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
+      let result;
+
+      // Upload new PC image
+      if (file instanceof File && file.size > 0) {
+        const buffer = Buffer.from(await file.arrayBuffer());
+
+        result = await new Promise((resolve, reject) => {
+          cloudinary.uploader
+            .upload_stream(
+              {
+                folder: "bexon/brand-logos",
+              },
+              (error, result) => {
+                error ? reject(error) : resolve(result);
+              },
+            )
+            .end(buffer);
+        });
+      }
+
+      // Upload new image URL
+      else if (url?.startsWith("http")) {
+        result = await cloudinary.uploader.upload(url, {
           folder: "bexon/brand-logos",
-        },
-        (error, result) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(result);
-          }
-        },
-      );
+        });
+      }
 
-      uploadStream.end(buffer);
-    });
-
-    console.log("Cloudinary:", result);
+      if (result) {
+        logos.push({
+          id: Number(id),
+          url: result.secure_url,
+          publicId: result.public_id,
+        });
+      }
+    }
 
     return Response.json({
       success: true,
       title,
-      ids,
-      fileCount: files.length,
-      urls,
+      logos,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Upload error:", error);
 
     return Response.json(
-      { success: false, error: "Something went wrong" },
+      {
+        success: false,
+        error: "Upload failed",
+      },
       { status: 500 },
     );
   }

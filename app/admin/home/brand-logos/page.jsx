@@ -112,6 +112,18 @@ export default function BrandLogos() {
 
     const result = await response.json();
 
+    const postRes = await fetch("/api/homepage/brand-logos/postlogoDB", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: result.title,
+        logos: result.logos,
+      }),
+    });
+    console.log(postRes);
+
     console.log("API:", result);
   };
 
