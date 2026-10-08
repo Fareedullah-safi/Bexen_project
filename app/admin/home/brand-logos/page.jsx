@@ -1,11 +1,13 @@
 "use client";
 
 import { ImagePlus, Link, Trash2Icon, Upload } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 export default function BrandLogos() {
+  const fileRefs = useRef({});
+
   const [logos, setLogos] = useState([
     { id: 1, preview: "", file: null, url: "" },
     { id: 2, preview: "", file: null, url: "" },
@@ -14,14 +16,11 @@ export default function BrandLogos() {
 
   const [sectionTitle, setSectionTitle] = useState("");
   const [savedData, setSavedData] = useState([]);
-
   const [deletingLogo, setDeletingLogo] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [isChangingTitle, setIsChangingTitle] = useState(false);
   const [isFetchingTitle, setIsFetchingTitle] = useState(false);
-
-  // ==================== LOGO HANDLERS ====================
 
   const handleLogo = (id, e) => {
     const file = e.target.files[0];
@@ -53,6 +52,7 @@ export default function BrandLogos() {
 
   const handleUrl = (id, e) => {
     const url = e.target.value;
+
     const currentLogo = logos.find((logo) => logo.id === id);
 
     if (currentLogo?.file) return;
@@ -84,9 +84,11 @@ export default function BrandLogos() {
           : logo,
       ),
     );
-  };
 
-  // ==================== SAVE LOGOS ====================
+    if (fileRefs.current[id]) {
+      fileRefs.current[id].value = "";
+    }
+  };
 
   const handleSubmit = async () => {
     if (isSaving) return;
@@ -143,12 +145,26 @@ export default function BrandLogos() {
 
       if (!postResponse.ok || !postResult.success) {
         return toast.error(
-          postResult.error ||
-            "Failed to uplad Logos see your logos links working properly or not",
+          postResult.error || "Failed to upload logos. Check your logo links.",
         );
       }
 
+      Object.values(fileRefs.current).forEach((input) => {
+        if (input) {
+          input.value = "";
+        }
+      });
+
       toast.success("Brand logos saved successfully");
+
+      setLogos((prev) =>
+        prev.map((logo) => ({
+          ...logo,
+          file: null,
+          url: "",
+          preview: "",
+        })),
+      );
 
       await allBoxData();
     } catch (error) {
@@ -158,8 +174,6 @@ export default function BrandLogos() {
       setIsSaving(false);
     }
   };
-
-  // ==================== GET SAVED LOGOS ====================
 
   const allBoxData = async () => {
     if (isFetching) return;
@@ -183,8 +197,6 @@ export default function BrandLogos() {
       setIsFetching(false);
     }
   };
-
-  // ==================== GET TITLE ====================
 
   const getSectionTitle = async () => {
     if (isFetchingTitle) return;
@@ -210,8 +222,6 @@ export default function BrandLogos() {
       setIsFetchingTitle(false);
     }
   };
-
-  // ==================== CHANGE TITLE ====================
 
   const handleTitleSubmit = async () => {
     if (isChangingTitle) return;
@@ -251,8 +261,6 @@ export default function BrandLogos() {
     }
   };
 
-  // ==================== DELETE LOGO ====================
-
   const handleDeleteSavedLogo = async (publicId, _id) => {
     if (deletingLogo) return;
 
@@ -287,8 +295,6 @@ export default function BrandLogos() {
     }
   };
 
-  // ==================== INITIAL LOAD ====================
-
   useEffect(() => {
     allBoxData();
     getSectionTitle();
@@ -301,7 +307,6 @@ export default function BrandLogos() {
 
   return (
     <div className="w-full">
-      {/* Header */}
       <div className="mb-10 flex items-center gap-4">
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
           <ImagePlus size={27} />
@@ -318,9 +323,7 @@ export default function BrandLogos() {
         </div>
       </div>
 
-      {/* Main Card */}
       <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#111b1d]">
-        {/* Section Title */}
         <div className="border-b border-gray-200 p-7 sm:p-8 dark:border-white/10">
           <label className="mb-3 block text-base font-semibold text-[#0C1E21] dark:text-white">
             Section Title
@@ -332,14 +335,14 @@ export default function BrandLogos() {
             onChange={(e) => setSectionTitle(e.target.value)}
             placeholder="Enter section title"
             disabled={isChangingTitle || isFetchingTitle}
-            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 text-base text-[#0C1E21] outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-[#0C1E21] dark:text-white"
+            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 text-base text-[#0C1E21] transition outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 disabled:cursor-not-allowed disabled:border-[#1E8A8A]/20 disabled:bg-[#E8F2F2] disabled:text-[#6B8585] disabled:placeholder:text-[#8FA5A5] dark:border-white/10 dark:bg-[#0C1E21] dark:text-white dark:disabled:border-[#1E8A8A]/20 dark:disabled:bg-[#122A2D] dark:disabled:text-[#789494]"
           />
 
           <button
             type="button"
             onClick={handleTitleSubmit}
             disabled={isChangingTitle || isFetchingTitle}
-            className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-6 text-sm font-semibold text-white transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:opacity-70"
+            className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:bg-[#155F61] disabled:text-white/80 disabled:shadow-none"
           >
             {isChangingTitle ? (
               <>
@@ -352,7 +355,6 @@ export default function BrandLogos() {
           </button>
         </div>
 
-        {/* Logo Form */}
         <div className="p-7 sm:p-8">
           <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -382,7 +384,7 @@ export default function BrandLogos() {
                     onClick={() => handleRemove(logo.id)}
                     disabled={isSaving}
                     title="Remove logo"
-                    className="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#111b1d]"
+                    className="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:bg-[#E8F2F2] disabled:text-[#789494] disabled:opacity-100 dark:bg-[#111b1d] dark:disabled:bg-[#122A2D] dark:disabled:text-[#789494]"
                   >
                     <Trash2Icon size={17} />
                   </button>
@@ -426,7 +428,7 @@ export default function BrandLogos() {
                       htmlFor={`logo-${logo.id}`}
                       className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-semibold transition ${
                         isSaving || logo.url
-                          ? "cursor-not-allowed bg-gray-100 text-gray-400"
+                          ? "cursor-not-allowed border border-[#1E8A8A]/20 bg-[#E8F2F2] text-[#789494] dark:bg-[#122A2D] dark:text-[#789494]"
                           : "cursor-pointer bg-[#0C1E21] text-white hover:bg-[#1E8A8A]"
                       }`}
                     >
@@ -435,6 +437,9 @@ export default function BrandLogos() {
                     </label>
 
                     <input
+                      ref={(element) => {
+                        fileRefs.current[logo.id] = element;
+                      }}
                       id={`logo-${logo.id}`}
                       type="file"
                       accept="image/*"
@@ -455,7 +460,7 @@ export default function BrandLogos() {
                         disabled={isSaving || !!logo.file}
                         placeholder="Paste image URL"
                         onChange={(e) => handleUrl(logo.id, e)}
-                        className="min-h-12 w-full rounded-2xl border border-gray-200 bg-white py-3 pr-4 pl-11 text-sm outline-none focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-white/10 dark:bg-[#111b1d] dark:text-white"
+                        className="min-h-12 w-full rounded-2xl border border-gray-200 bg-white py-3 pr-4 pl-11 text-sm transition outline-none focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 disabled:cursor-not-allowed disabled:border-[#1E8A8A]/20 disabled:bg-[#E8F2F2] disabled:text-[#789494] disabled:placeholder:text-[#9AB0B0] dark:border-white/10 dark:bg-[#111b1d] dark:text-white dark:disabled:border-[#1E8A8A]/20 dark:disabled:bg-[#122A2D] dark:disabled:text-[#789494]"
                       />
                     </div>
                   </div>
@@ -464,13 +469,12 @@ export default function BrandLogos() {
             ))}
           </div>
 
-          {/* Save Logos */}
           <div className="mt-7 flex justify-end border-t border-gray-200 pt-7 dark:border-white/10">
             <button
               type="button"
               onClick={handleSubmit}
               disabled={isSaving}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-7 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-7 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:bg-[#155F61] disabled:text-white/80 disabled:opacity-100 disabled:shadow-none sm:w-auto"
             >
               {isSaving ? (
                 <>
@@ -488,7 +492,6 @@ export default function BrandLogos() {
         </div>
       </div>
 
-      {/* Saved Logos */}
       {savedData.length > 0 && (
         <div className="mt-8 rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
           <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -531,7 +534,7 @@ export default function BrandLogos() {
                           deletingLogo === logo.publicId || !!deletingLogo
                         }
                         title="Delete saved logo"
-                        className="absolute top-2 right-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#111b1d]"
+                        className="absolute top-2 right-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:bg-[#E8F2F2] disabled:text-[#789494] disabled:opacity-100 dark:bg-[#111b1d] dark:disabled:bg-[#122A2D] dark:disabled:text-[#789494]"
                       >
                         {deletingLogo === logo.publicId ? (
                           <Spinner />

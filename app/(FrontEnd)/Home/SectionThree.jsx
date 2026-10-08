@@ -55,7 +55,7 @@ export default function BrandLogos() {
     <section className="relative h-100 w-[96vw] overflow-hidden bg-[#eef2f2] py-20">
       <div className="relative z-0 mx-auto flex max-w-7xl flex-col items-center px-4">
         <div
-          className="wow animate__animated animate__zoomIn pointer-events-none absolute top-1/2 left-1/2 z-9 mt-6 flex h-50 w-50 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-gray-300 bg-white/30 leading-loose backdrop-blur-md lg:h-80 lg:w-80"
+          className="wow animate__animated animate__zoomIn pointer-events-none absolute top-1/2 left-1/2 z-9 mt-6 flex h-50 w-50 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-gray-300 bg-white/20 leading-loose backdrop-blur-md lg:h-80 lg:w-80"
           data-wow-duration="1s"
         >
           <h2
@@ -85,18 +85,18 @@ export default function BrandLogos() {
               animation: "logoScroll 20s linear infinite",
             }}
           >
-            <div className="flex shrink-0 gap-6 pr-6">
+            <div className="flex shrink-0 gap-3 pr-3 sm:gap-4 sm:pr-4 md:gap-5 md:pr-5 lg:gap-6 lg:pr-6">
               {dbLogos.map((logo, index) => (
                 <div
                   key={`first-${index}`}
-                  className="wow animate__animated animate__fadeIn flex h-28 w-48 shrink-0 items-center justify-center rounded-xl bg-white px-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                  className="wow animate__animated animate__fadeIn flex h-20 w-32 shrink-0 items-center justify-center rounded-xl bg-white px-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg sm:h-30 sm:w-40 sm:px-5 md:h-35 md:w-44 md:px-5 lg:h-40 lg:w-48 lg:px-6"
                   data-wow-duration="0.7s"
                   data-wow-delay={`${0.1 + (index % 6) * 0.1}s`}
                 >
                   <img
                     src={logo}
                     alt={`Company logo ${index + 1}`}
-                    className="h-auto w-full max-w-35 object-contain opacity-60 transition-all duration-300 hover:opacity-100"
+                    className="h-auto max-h-12 w-auto max-w-[75%] object-contain opacity-60 transition-all duration-300 hover:opacity-100 sm:max-h-14 sm:max-w-[78%] md:max-h-16 md:max-w-[80%] lg:max-h-20 lg:max-w-[85%]"
                   />
                 </div>
               ))}
@@ -106,7 +106,7 @@ export default function BrandLogos() {
               {dbLogos.map((logo, index) => (
                 <div
                   key={`second-${index}`}
-                  className="wow animate__animated animate__fadeIn flex h-28 w-48 shrink-0 items-center justify-center rounded-xl bg-white px-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                  className="wow animate__animated animate__fadeIn flex h-20 w-32 shrink-0 items-center justify-center rounded-xl bg-white px-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg sm:h-30 sm:w-40 sm:px-5 md:h-35 md:w-44 md:px-5 lg:h-40 lg:w-48 lg:px-6"
                   data-wow-duration="0.7s"
                   data-wow-delay={`${0.1 + (index % 6) * 0.1}s`}
                 >
@@ -129,7 +129,7 @@ export default function BrandLogos() {
           }
 
           to {
-            transform: translateX(-50%);
+            transform: translateX(-20%);
           }
         }
       `}</style>
