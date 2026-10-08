@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect } from "react";
 
 export default function SectionThree() {
   // Company logos
@@ -13,17 +14,26 @@ export default function SectionThree() {
     "https://themejunction.net/html/bexon/demo/assets/images/brands/brand-6.webp",
   ];
 
+  useEffect(() => {
+    const dataLogos = async () => {
+      const res = await fetch("/api/homepage/brand-logos/postlogoDB");
+      const logos = await res.json();
+      console.log(logos);
+    };
+    dataLogos();
+  }, []);
+
   return (
     <section className="relative h-100 w-[96vw] overflow-hidden bg-[#eef2f2] py-20">
       {/* Main section container */}
       <div className="relative z-0 mx-auto flex max-w-7xl flex-col items-center px-4">
         {/* Center circle */}
         <div
-          className="wow animate__animated animate__zoomIn pointer-events-none absolute left-1/2 top-1/2 z-9 mt-6 flex h-50 w-50 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-gray-300 bg-white/30 leading-loose backdrop-blur-md lg:h-80 lg:w-80"
+          className="wow animate__animated animate__zoomIn pointer-events-none absolute top-1/2 left-1/2 z-9 mt-6 flex h-50 w-50 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-gray-300 bg-white/30 leading-loose backdrop-blur-md lg:h-80 lg:w-80"
           data-wow-duration="1s"
         >
           <h2
-            className="wow animate__animated animate__fadeInUp max-w-80 text-center text-lg font-semibold leading-7 text-[#102124] lg:text-xl"
+            className="wow animate__animated animate__fadeInUp max-w-80 text-center text-lg leading-7 font-semibold text-[#102124] lg:text-xl"
             data-wow-duration="0.8s"
             data-wow-delay="0.4s"
           >

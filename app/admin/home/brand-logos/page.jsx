@@ -126,29 +126,25 @@ export default function BrandLogos() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        return toast.error(
-          result.error || "Cloudinary upload failed",
-        );
+        return toast.error(result.error || "Cloudinary upload failed");
       }
 
-      const postResponse = await fetch(
-        "/api/homepage/brand-logos/postlogoDB",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            logos: result.logos,
-          }),
+      const postResponse = await fetch("/api/homepage/brand-logos/postlogoDB", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          logos: result.logos,
+        }),
+      });
 
       const postResult = await postResponse.json();
 
       if (!postResponse.ok || !postResult.success) {
         return toast.error(
-          postResult.error || "Failed to save data",
+          postResult.error ||
+            "Failed to uplad Logos see your logos links working properly or not",
         );
       }
 
@@ -171,9 +167,7 @@ export default function BrandLogos() {
     try {
       setIsFetching(true);
 
-      const response = await fetch(
-        "/api/homepage/brand-logos/postlogoDB",
-      );
+      const response = await fetch("/api/homepage/brand-logos/postlogoDB");
 
       const data = await response.json();
 
@@ -245,9 +239,7 @@ export default function BrandLogos() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        return toast.error(
-          data.error || "Failed to change title",
-        );
+        return toast.error(data.error || "Failed to change title");
       }
 
       toast.success("Title changed successfully");
@@ -267,26 +259,21 @@ export default function BrandLogos() {
     try {
       setDeletingLogo(publicId);
 
-      const response = await fetch(
-        "/api/homepage/brand-logos/postlogoDB",
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            publicId,
-            logoId: _id,
-          }),
+      const response = await fetch("/api/homepage/brand-logos/postlogoDB", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          publicId,
+          logoId: _id,
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        return toast.error(
-          data.error || "Failed to delete logo",
-        );
+        return toast.error(data.error || "Failed to delete logo");
       }
 
       toast.success("Logo deleted successfully");
@@ -453,9 +440,7 @@ export default function BrandLogos() {
                       accept="image/*"
                       className="hidden"
                       disabled={isSaving || !!logo.url}
-                      onChange={(e) =>
-                        handleLogo(logo.id, e)
-                      }
+                      onChange={(e) => handleLogo(logo.id, e)}
                     />
 
                     <div className="relative flex-1">
@@ -469,9 +454,7 @@ export default function BrandLogos() {
                         value={logo.url}
                         disabled={isSaving || !!logo.file}
                         placeholder="Paste image URL"
-                        onChange={(e) =>
-                          handleUrl(logo.id, e)
-                        }
+                        onChange={(e) => handleUrl(logo.id, e)}
                         className="min-h-12 w-full rounded-2xl border border-gray-200 bg-white py-3 pr-4 pl-11 text-sm outline-none focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 disabled:cursor-not-allowed disabled:bg-gray-100 dark:border-white/10 dark:bg-[#111b1d] dark:text-white"
                       />
                     </div>
@@ -542,14 +525,10 @@ export default function BrandLogos() {
                       <button
                         type="button"
                         onClick={() =>
-                          handleDeleteSavedLogo(
-                            logo.publicId,
-                            logo._id,
-                          )
+                          handleDeleteSavedLogo(logo.publicId, logo._id)
                         }
                         disabled={
-                          deletingLogo === logo.publicId ||
-                          !!deletingLogo
+                          deletingLogo === logo.publicId || !!deletingLogo
                         }
                         title="Delete saved logo"
                         className="absolute top-2 right-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#111b1d]"
@@ -568,10 +547,7 @@ export default function BrandLogos() {
                           className="max-h-20 max-w-[85%] object-contain"
                         />
                       ) : (
-                        <ImagePlus
-                          size={27}
-                          className="text-gray-400"
-                        />
+                        <ImagePlus size={27} className="text-gray-400" />
                       )}
                     </div>
                   );
@@ -590,4 +566,3 @@ export default function BrandLogos() {
     </div>
   );
 }
-
