@@ -8,54 +8,37 @@ export default function SectionFive() {
   const [current, setCurrent] = useState(0);
   const [animate, setAnimate] = useState(true);
 
-  const solutions = [
-    {
-      title: "Business Strategy Development",
-      description:
-        "Through a combination of data-driven insights and innovative approaches, we work closely with you to develop customized strategies.",
-      // Old Bexon image:
-      // New Unsplash image:
-      image: "https://themejunction.net/html/bexon/demo/assets/images/service/service-1.webp",
-    },
-    {
-      title: "Customer Experience Solutions",
-      description:
-        "Developing personalized customer journeys to increase satisfaction and loyalty while helping your business stay competitive.",
-      // Old Bexon image:
-      // New Unsplash image:
-      image: "https://themejunction.net/html/bexon/demo/assets/images/service/service-2.webp",
-    },
-    {
-      title: "Sustainability and ESG Consulting",
-      description:
-        "We provide tailored strategies that drive long-term value while building trust with stakeholders and investors.",
-      // Old Bexon image:
-      // New Unsplash image:
-      image: "https://themejunction.net/html/bexon/demo/assets/images/service/service-3.webp",
-    },
-    {
-      title: "Training and Development Programs",
-      description:
-        "Our programs empower employees with the skills, knowledge, and tools they need to achieve better results.",
-      // Old Bexon image:
-      // New Unsplash image:
-      image: "https://themejunction.net/html/bexon/demo/assets/images/service/service-4.webp",
-    },
-    {
-      title: "Digital Transformation",
-      description:
-        "Transform your business with modern digital solutions designed to improve efficiency, scalability, and customer experiences.",
-      image: "https://themejunction.net/html/bexon/demo/assets/images/service/service-5.webp",
-    },
-    {
-      title: "Technology Consulting",
-      description:
-        "Build smarter technology strategies with practical solutions that help your organization grow and adapt to changing markets.",
-      image: "https://themejunction.net/html/bexon/demo/assets/images/service/service-6.webp",
-    },
-  ];
+  const [badge, setBadge] = useState("OUR SOLUTIONS");
+  const [headingOne, setHeadingOne] = useState("Solutions to Transform");
+  const [headingTwo, setHeadingTwo] = useState("Your");
+  const [highlight, setHighlight] = useState("Business.");
+  const [solutions, setSolutions] = useState([]);
 
-  const sliderItems = [...solutions, ...solutions];
+  useEffect(() => {
+    const LoadData = async () => {
+      try {
+        const res = await fetch("/api/homepage/services");
+        const result = await res.json();
+
+        if (result.success && result.data) {
+          if (result.data.badge) setBadge(result.data.badge);
+          if (result.data.headingOne) setHeadingOne(result.data.headingOne);
+          if (result.data.headingTwo) setHeadingTwo(result.data.headingTwo);
+          if (result.data.highlight) setHighlight(result.data.highlight);
+          if (result.data.solutions?.length > 0) {
+            setSolutions(result.data.solutions);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading services:", error);
+      }
+    };
+
+    LoadData();
+  }, []);
+
+  const sliderItems =
+    solutions.length > 1 ? [...solutions, ...solutions] : solutions;
 
   const nextSlide = () => {
     setAnimate(true);
@@ -78,15 +61,17 @@ export default function SectionFive() {
   };
 
   useEffect(() => {
+    if (solutions.length === 0) return;
+
     const interval = setInterval(() => {
       nextSlide();
     }, 4000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [solutions.length]);
 
   useEffect(() => {
-    if (current === solutions.length) {
+    if (solutions.length > 0 && current === solutions.length) {
       const timeout = setTimeout(() => {
         setAnimate(false);
         setCurrent(0);
@@ -104,10 +89,10 @@ export default function SectionFive() {
     <main className="w-full px-3 sm:px-4">
       <section className="relative min-h-screen w-full overflow-hidden rounded-2xl bg-slate-950">
         {/* Grid Background */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#10b98133_1px,transparent_1px),linear-gradient(to_bottom,#10b98133_1px,transparent_1px)] bg-size-[14px_24px] mask-[radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#10b98133_1px,transparent_1px),linear-gradient(to_bottom,#10b98133_1px,transparent_1px)] mask-[radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] bg-size-[14px_24px]" />
 
         {/* Soft Glow */}
-        <div className="absolute left-1/2 top-0 h-100 w-100 -translate-x-1/2 rounded-full bg-[#1E8A8A]/10 blur-3xl" />
+        <div className="absolute top-0 left-1/2 h-100 w-100 -translate-x-1/2 rounded-full bg-[#1E8A8A]/10 blur-3xl" />
 
         <div className="relative z-10 px-4 py-16 sm:px-6 sm:py-20 lg:px-10 lg:py-24">
           {/* Badge */}
@@ -122,20 +107,20 @@ export default function SectionFive() {
               />
 
               <span className="text-xs font-semibold tracking-wide text-zinc-200">
-                OUR SOLUTIONS
+                {badge}
               </span>
             </span>
           </div>
 
           {/* Heading */}
           <h1
-            className="wow animate__animated animate__fadeInUp mx-auto mt-5 max-w-3xl text-center text-3xl font-medium leading-tight text-zinc-200 sm:text-4xl md:text-5xl lg:text-[50px]"
+            className="wow animate__animated animate__fadeInUp mx-auto mt-5 max-w-3xl text-center text-3xl leading-tight font-medium text-zinc-200 sm:text-4xl md:text-5xl lg:text-[50px]"
             data-wow-duration="1s"
             data-wow-delay="0.2s"
           >
-            Solutions to Transform
+            {headingOne}
             <br />
-            Your <span className="text-[#1E8A8A]">Business.</span>
+            {headingTwo} <span className="text-[#1E8A8A]">{highlight}</span>
           </h1>
 
           {/* Slider */}
@@ -154,7 +139,10 @@ export default function SectionFive() {
               }}
             >
               {sliderItems.map((solution, index) => (
-                <div key={`${solution.title}-${index}`} className="w-full shrink-0 px-2 lg:w-1/3">
+                <div
+                  key={`${solution.title}-${index}`}
+                  className="w-full shrink-0 px-2 lg:w-1/3"
+                >
                   {/* Card */}
                   <div
                     className="wow animate__animated animate__fadeInUp group relative h-105 overflow-hidden rounded-2xl border border-white/10 bg-[#102326] shadow-lg transition-all duration-500 hover:-translate-y-2 hover:border-[#1E8A8A]/40 hover:shadow-2xl hover:shadow-[#1E8A8A]/10"
@@ -174,14 +162,14 @@ export default function SectionFive() {
                     <div className="absolute inset-0 bg-linear-to-t from-[#071719] via-[#071719]/70 to-[#071719]/20 opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
 
                     {/* Content */}
-                    <div className="absolute bottom-0 left-0 right-0 z-10 p-5 sm:p-6">
+                    <div className="absolute right-0 bottom-0 left-0 z-10 p-5 sm:p-6">
                       {/* Number */}
                       <span className="text-sm font-semibold text-[#1E8A8A] transition-colors duration-300 group-hover:text-white">
-                        {String((index % solutions.length) + 1).padStart(2, "0")}
+                        {String(index + 1).padStart(2, "0")}
                       </span>
 
                       {/* Title */}
-                      <h2 className="mt-2 max-w-75 text-xl font-semibold leading-7 text-white transition-transform duration-500 group-hover:-translate-y-1 sm:text-2xl">
+                      <h2 className="mt-2 max-w-75 text-xl leading-7 font-semibold text-white transition-transform duration-500 group-hover:-translate-y-1 sm:text-2xl">
                         {solution.title}
                       </h2>
 
