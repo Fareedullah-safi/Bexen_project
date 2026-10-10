@@ -1,11 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowRight, Box, Play, Star } from "lucide-react";
 import Image from "next/image";
 
 export default function SectionFour() {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [aboutData, setAboutData] = useState(null);
+
+  useEffect(() => {
+    async function fetchAboutData() {
+      try {
+        const response = await fetch("/api/homepage/about-us");
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          setAboutData(result.data);
+        }
+      } catch (error) {
+        console.error("Failed to load About Us data:", error);
+      }
+    }
+
+    fetchAboutData();
+  }, []);
+
+  const getImageUrl = (image, fallback) => {
+    if (typeof image === "string" && image) return image;
+    if (image?.url) return image.url;
+    return fallback;
+  };
+
+  const mainImage = getImageUrl(
+    aboutData?.mainImage,
+    "https://themejunction.net/html/bexon/demo/assets/images/about/about-1.webp",
+  );
+
+  const clientImage = getImageUrl(aboutData?.clientImage, "");
 
   return (
     <main className="w-full bg-[#eef2f2] px-4 py-10 sm:px-6 md:px-10 lg:px-12 xl:px-16">
@@ -17,10 +48,11 @@ export default function SectionFour() {
           data-wow-delay="0.1s"
         >
           <Image
-            src="https://themejunction.net/html/bexon/demo/assets/images/about/about-1.webp"
+            src={mainImage}
             alt="About us"
             width={1000}
             height={700}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 50vw"
             className="h-112.5 w-full rounded-2xl object-cover sm:h-130 md:h-150 lg:h-155"
           />
 
@@ -32,17 +64,21 @@ export default function SectionFour() {
           >
             <div className="w-52.5 rounded-tr-2xl bg-white p-5 sm:w-62.5 sm:p-6 md:w-70 md:p-7">
               <p className="text-sm font-medium text-[#229393] sm:text-base md:text-lg">
-                Experiences
+                {aboutData?.experienceLabel || "Experiences"}
               </p>
 
               <h2 className="mt-6 text-4xl leading-none font-bold text-[#102326] sm:mt-8 sm:text-5xl md:mt-10 md:text-6xl">
-                13+
+                {aboutData?.experienceNumber || "13+"}
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base sm:leading-7 md:text-lg">
-                Decades of Experience,
-                <br />
-                Endless Innovation
+                {aboutData?.experienceText || (
+                  <>
+                    Decades of Experience,
+                    <br />
+                    Endless Innovation
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -68,7 +104,7 @@ export default function SectionFour() {
               />
 
               <span className="text-sm font-bold tracking-wide text-zinc-950">
-                GET TO KNOW US
+                {aboutData?.sectionLabel || "GET TO KNOW US"}
               </span>
             </span>
 
@@ -78,14 +114,18 @@ export default function SectionFour() {
               data-wow-duration="1s"
               data-wow-delay="0.5s"
             >
-              Empowering
-              <br />
-              Businesses with
-              <br />
-              Innovation, Expertise,
-              <br />
-              and for
-              <span className="text-[#1E8A8A]"> Success.</span>
+              {aboutData?.title || (
+                <>
+                  Empowering
+                  <br />
+                  Businesses with
+                  <br />
+                  Innovation, Expertise,
+                  <br />
+                  and for
+                  <span className="text-[#1E8A8A]"> Success.</span>
+                </>
+              )}
             </h1>
 
             {/* Button */}
@@ -94,13 +134,13 @@ export default function SectionFour() {
               data-wow-duration="0.8s"
               data-wow-delay="0.7s"
             >
-              <button
-                type="button"
+              <a
+                href={aboutData?.buttonLink || "/about"}
                 className="group/button inline-flex w-35 cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#0C1E21] py-1 pr-1 pl-4 text-xs font-semibold text-white transition-colors duration-300 hover:bg-[#1E8A8A]"
               >
                 <span className="overflow-hidden leading-none">
                   <span className="block transition-transform duration-400 ease-in-out [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5">
-                    View demo
+                    {aboutData?.buttonText || "View demo"}
                   </span>
                 </span>
 
@@ -110,7 +150,7 @@ export default function SectionFour() {
                     className="-rotate-45 text-[#0C1E21] transition-transform duration-300 group-hover/button:rotate-0"
                   />
                 </span>
-              </button>
+              </a>
             </div>
           </div>
 
@@ -136,14 +176,19 @@ export default function SectionFour() {
 
               {/* Testimonial */}
               <p className="mt-5 text-sm leading-6 text-white/90 sm:text-base">
-                We believe in building lasting relationships with our clients
-                through trust, innovation, and exceptional service.
+                {aboutData?.description ||
+                  "We believe in building lasting relationships with our clients through trust, innovation, and exceptional service."}
               </p>
 
               {/* Person */}
               <div className="mt-5">
-                <p className="text-sm font-semibold">Esther Howard</p>
-                <p className="mt-1 text-xs text-white/70">Co.Founder</p>
+                <p className="text-sm font-semibold">
+                  {aboutData?.clientName || "Esther Howard"}
+                </p>
+
+                <p className="mt-1 text-xs text-white/70">
+                  {aboutData?.clientRole || "Co.Founder"}
+                </p>
               </div>
             </div>
 
