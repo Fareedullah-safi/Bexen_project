@@ -4,25 +4,27 @@ const LargeProjectSchema = new mongoose.Schema(
   {
     tag: {
       type: String,
-      required: true,
-      trim: true,
+      default: "",
     },
     title: {
       type: String,
-      required: true,
-      trim: true,
+      default: "",
     },
     image: {
       type: String,
-      required: true,
-      trim: true,
+      default: "",
+    },
+    publicId: {
+      type: String,
+      default: "",
+    },
+    order: {
+      type: Number,
+      default: 0,
     },
   },
   { timestamps: true },
 );
 
-const LargeProject =
-  mongoose.models.LargeProject ||
+export default mongoose.models.LargeProject ||
   mongoose.model("LargeProject", LargeProjectSchema);
-
-export default LargeProject;
