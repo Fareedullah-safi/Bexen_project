@@ -472,7 +472,7 @@ export default function AboutUs() {
 
   if (isFetching) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center bg-[#0C1E21]">
+      <div className="flex min-h-[85vh] items-center justify-center bg-[#0C1E21]">
         <LoaderCircle size={34} className="animate-spin text-[#1E8A8A]" />
       </div>
     );
