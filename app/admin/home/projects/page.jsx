@@ -111,6 +111,9 @@ export default function ProjectsAdmin() {
       }, 10000);
     }
   };
+  // images logics handle process
+
+  
 
   return (
     <div className="w-full">
