@@ -1,3 +1,5 @@
+"use client";
+import axios from "axios";
 import {
   FolderKanban,
   Plus,
@@ -9,7 +11,10 @@ import {
   ArrowDown,
   Link as LinkIcon,
   Info,
+  LoaderCircle,
 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export default function ProjectsAdmin() {
   const inputClass =
@@ -18,6 +23,95 @@ export default function ProjectsAdmin() {
   const labelClass =
     "mb-2 block text-sm font-semibold text-[#0C1E21] dark:text-gray-200";
 
+  const [largeProjects, setLargeProjects] = useState([]);
+  const [miniProjects, setMiniProjects] = useState([]);
+  // headers state
+  const [headerData, setHeaderData] = useState({
+    badgeText: "",
+    headingLine: "",
+    highlightWord: "",
+    description: "",
+    buttonText: "",
+    buttonLink: "/",
+  });
+
+  // spiner for header saving btn
+  const [isSavingHeader, setIsSavingHeader] = useState(false);
+  const [isCoolingDown, setIsCoolingDown] = useState(false);
+  // Handling containers
+  function addLargeProject() {
+    setLargeProjects((prev) => [
+      ...prev,
+      {
+        _id: Date.now(),
+        tag: "",
+        title: "",
+        image: "",
+      },
+    ]);
+  }
+  //Handling mini project container
+
+  function addMiniProject() {
+    setMiniProjects((prev) => [
+      ...prev,
+      {
+        _id: Date.now(),
+        tag: "",
+        title: "",
+        image: "",
+      },
+    ]);
+  }
+  //   uploading header first
+
+  const handleHeaderSubmit = async () => {
+    if (isSavingHeader || isCoolingDown) return;
+
+    setIsCoolingDown(true);
+    try {
+      if (
+        !headerData.badgeText.trim() ||
+        !headerData.headingLine.trim() ||
+        !headerData.highlightWord.trim() ||
+        !headerData.description.trim() ||
+        !headerData.buttonText.trim() ||
+        !headerData.buttonLink.trim()
+      ) {
+        toast.error("Please fill in all header fields.");
+        return;
+      }
+
+      const link = headerData.buttonLink.trim();
+
+      if (!/^\/[a-zA-Z0-9/_-]*$/.test(link) || link.startsWith("//")) {
+        toast.error(
+          "Use / followed by letters, numbers, /, - or _ only in Button Linking.",
+        );
+        return;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to get header data.");
+    }
+    // sending data to api now
+    try {
+      setIsSavingHeader(true);
+      const res = await axios.post("/api/homepage/projects/header", headerData);
+      if (res.status === 201) {
+        toast.success("Headers Updated successfully");
+      }
+      console.log(res);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setIsSavingHeader(false);
+      setTimeout(() => {
+        setIsCoolingDown(false);
+      }, 10000);
+    }
+  };
+
   return (
     <div className="w-full">
       {/* Page Header */}
@@ -25,6 +119,7 @@ export default function ProjectsAdmin() {
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
           <FolderKanban size={27} />
         </div>
+
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-[#0C1E21] dark:text-white">
             Proud Projects
@@ -36,15 +131,14 @@ export default function ProjectsAdmin() {
       </div>
 
       <div className="space-y-8">
-        {/* ====================================================== */}
-        {/* SECTION 01 — Header & Text Content (Single Record)    */}
-        {/* ====================================================== */}
+        {/* SECTION 01 — Header & Text Content */}
         <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
                 01
               </span>
+
               <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
                 Section Header Content
               </h2>
@@ -58,12 +152,23 @@ export default function ProjectsAdmin() {
           <div className="grid gap-5 md:grid-cols-2">
             <div>
               <label className={labelClass}>Badge Text</label>
-              <input placeholder="PROUD PROJECTS" className={inputClass} />
+              <input
+                placeholder="PROUD PROJECTS"
+                className={inputClass}
+                value={headerData.badgeText}
+                onChange={(e) =>
+                  setHeaderData({ ...headerData, badgeText: e.target.value })
+                }
+              />
             </div>
 
             <div>
               <label className={labelClass}>Heading Line</label>
               <input
+                value={headerData.headingLine}
+                onChange={(e) =>
+                  setHeaderData({ ...headerData, headingLine: e.target.value })
+                }
                 placeholder="Breaking Boundaries,"
                 className={inputClass}
               />
@@ -71,12 +176,26 @@ export default function ProjectsAdmin() {
 
             <div>
               <label className={labelClass}>Highlight Word</label>
-              <input placeholder="Dreams." className={inputClass} />
+              <input
+                value={headerData.highlightWord}
+                onChange={(e) =>
+                  setHeaderData({
+                    ...headerData,
+                    highlightWord: e.target.value,
+                  })
+                }
+                placeholder="Dreams."
+                className={inputClass}
+              />
             </div>
 
             <div className="md:col-span-2">
               <label className={labelClass}>Description</label>
               <textarea
+                value={headerData.description}
+                onChange={(e) =>
+                  setHeaderData({ ...headerData, description: e.target.value })
+                }
                 rows={3}
                 placeholder="We work closely with our clients to understand their unique needs..."
                 className={`${inputClass} resize-y`}
@@ -85,12 +204,26 @@ export default function ProjectsAdmin() {
 
             <div>
               <label className={labelClass}>Button Text</label>
-              <input placeholder="More Projects" className={inputClass} />
+              <input
+                value={headerData.buttonText}
+                onChange={(e) =>
+                  setHeaderData({ ...headerData, buttonText: e.target.value })
+                }
+                placeholder="More Projects"
+                className={inputClass}
+              />
             </div>
 
             <div>
               <label className={labelClass}>Button Link</label>
-              <input placeholder="/projects" className={inputClass} />
+              <input
+                value={headerData.buttonLink}
+                onChange={(e) =>
+                  setHeaderData({ ...headerData, buttonLink: e.target.value })
+                }
+                placeholder="/projects"
+                className={inputClass}
+              />
             </div>
           </div>
 
@@ -99,11 +232,13 @@ export default function ProjectsAdmin() {
             <span className="inline-flex items-center gap-1.5 bg-[#ECF0F0] px-3 py-1 text-xs font-bold text-zinc-950 dark:bg-[#111b1d] dark:text-white">
               PROUD PROJECTS
             </span>
+
             <p className="mt-3 text-2xl leading-tight font-medium">
               Breaking Boundaries,
               <br />
               Building <span className="text-[#1E8A8A]">Dreams.</span>
             </p>
+
             <p className="mt-2 max-w-lg text-sm text-zinc-600 dark:text-gray-400">
               We work closely with our clients to understand their unique needs
               and craft tailored solutions that address challenges.
@@ -114,23 +249,33 @@ export default function ProjectsAdmin() {
           <div className="mt-6 flex justify-end border-t border-gray-200 pt-6 dark:border-white/10">
             <button
               type="button"
-              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-8 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167777]"
+              disabled={isSavingHeader || isCoolingDown}
+              onClick={handleHeaderSubmit}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-8 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:opacity-70"
             >
-              <Save size={18} />
-              Change Section Header
+              {isSavingHeader ? (
+                <>
+                  <LoaderCircle size={18} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={18} />
+                  Change Section Header
+                </>
+              )}
             </button>
           </div>
         </div>
 
-        {/* ====================================================== */}
-        {/* SECTION 02 — Large Projects Box (Unlimited Entries)   */}
-        {/* ====================================================== */}
+        {/* SECTION 02 — Large Projects */}
         <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
                 02
               </span>
+
               <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
                 Large Projects
               </h2>
@@ -142,125 +287,133 @@ export default function ProjectsAdmin() {
           </div>
 
           <div className="space-y-6">
-            {/* ---------- Single Large Card Template ---------- */}
-            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5 sm:p-6 dark:border-white/10 dark:bg-[#0C1E21]">
-              <div className="mb-5 flex items-center justify-between gap-3 border-b border-gray-200 pb-4 dark:border-white/10">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A] text-sm font-bold text-white">
-                    01
-                  </span>
-                  <div>
-                    <p className="truncate text-base font-bold text-[#0C1E21] dark:text-white">
-                      Event Management Platform
-                    </p>
-                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                      Tag: Large
+            {largeProjects.map((project, index) => (
+              <div
+                key={project._id}
+                className="rounded-3xl border border-gray-200 bg-gray-50 p-5 sm:p-6 dark:border-white/10 dark:bg-[#0C1E21]"
+              >
+                <div className="mb-5 flex items-center justify-between gap-3 border-b border-gray-200 pb-4 dark:border-white/10">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A] text-sm font-bold text-white">
+                      {String(index + 1).padStart(2, "0")}
                     </span>
-                  </div>
-                </div>
 
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    title="Move up"
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
-                  >
-                    <ArrowUp size={16} />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Move down"
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
-                  >
-                    <ArrowDown size={16} />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Delete project"
-                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white dark:bg-[#111b1d]"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-4">
-                  <div>
-                    <label className={labelClass}>Tag / Category</label>
-                    <input
-                      placeholder="e.g. Connect, Business"
-                      className={`${inputClass} !bg-white dark:!bg-[#111b1d]`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>Project Title</label>
-                    <textarea
-                      rows={3}
-                      placeholder="e.g. Event Management Platform"
-                      className={`${inputClass} resize-y !bg-white dark:!bg-[#111b1d]`}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className={labelClass}>Large Cover Image</label>
-
-                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#111b1d]">
-                    <div className="flex h-44 flex-col items-center justify-center bg-gray-50 text-gray-400 dark:bg-[#0C1E21]">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
-                        <ImagePlus size={24} />
-                      </div>
-                      <p className="mt-2 text-xs font-medium text-[#0C1E21] dark:text-white">
-                        No large image selected
+                    <div>
+                      <p className="truncate text-base font-bold text-[#0C1E21] dark:text-white">
+                        {project.title || "Untitled Project"}
                       </p>
-                    </div>
 
-                    <div className="space-y-3 p-4">
-                      <div className="relative">
-                        <LinkIcon
-                          size={15}
-                          className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400"
-                        />
-                        <input
-                          type="url"
-                          placeholder="Paste large image URL..."
-                          className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pr-4 pl-10 text-xs text-[#0C1E21] transition outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 dark:border-white/10 dark:bg-[#0C1E21] dark:text-white"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
-                        <span className="text-[10px] font-bold tracking-wider text-gray-400">
-                          OR
-                        </span>
-                        <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
-                      </div>
-
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-2.5 text-xs font-semibold text-white transition hover:bg-[#1E8A8A] dark:bg-white/10 dark:hover:bg-[#1E8A8A]"
-                      >
-                        <Upload size={14} />
-                        Upload Large Image
-                      </button>
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                        Tag: Large
+                      </span>
                     </div>
                   </div>
 
-                  <p className="mt-2 flex items-start gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <Info size={13} className="mt-0.5 shrink-0" />
-                    Recommended: 999 × 666 — Large Display
-                  </p>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      title="Move up"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
+                    >
+                      <ArrowUp size={16} />
+                    </button>
+
+                    <button
+                      type="button"
+                      title="Move down"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
+                    >
+                      <ArrowDown size={16} />
+                    </button>
+
+                    <button
+                      type="button"
+                      title="Delete project"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white dark:bg-[#111b1d]"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-4">
+                    <div>
+                      <label className={labelClass}>Tag / Category</label>
+                      <input
+                        placeholder="e.g. Connect, Business"
+                        className={`${inputClass} !bg-white dark:!bg-[#111b1d]`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Project Title</label>
+                      <textarea
+                        rows={3}
+                        placeholder="e.g. Event Management Platform"
+                        className={`${inputClass} resize-y !bg-white dark:!bg-[#111b1d]`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Large Cover Image</label>
+
+                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#111b1d]">
+                      <div className="flex h-44 flex-col items-center justify-center bg-gray-50 text-gray-400 dark:bg-[#0C1E21]">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+                          <ImagePlus size={24} />
+                        </div>
+
+                        <p className="mt-2 text-xs font-medium text-[#0C1E21] dark:text-white">
+                          No large image selected
+                        </p>
+                      </div>
+
+                      <div className="space-y-3 p-4">
+                        <div className="relative">
+                          <LinkIcon
+                            size={15}
+                            className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400"
+                          />
+
+                          <input
+                            type="url"
+                            placeholder="Paste large image URL..."
+                            className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pr-4 pl-10 text-xs text-[#0C1E21] transition outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 dark:border-white/10 dark:bg-[#0C1E21] dark:text-white"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+                          <span className="text-[10px] font-bold tracking-wider text-gray-400">
+                            OR
+                          </span>
+                          <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+                        </div>
+
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-2.5 text-xs font-semibold text-white transition hover:bg-[#1E8A8A] dark:bg-white/10 dark:hover:bg-[#1E8A8A]"
+                        >
+                          <Upload size={14} />
+                          Upload Large Image
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="mt-2 flex items-start gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <Info size={13} className="mt-0.5 shrink-0" />
+                      Recommended: 999 × 666 — Large Display
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-            {/* ---------- End Large Card Template ---------- */}
+            ))}
           </div>
 
           <button
+            onClick={addLargeProject}
             type="button"
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 py-4 text-sm font-semibold text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/15 dark:text-gray-400"
           >
@@ -279,15 +432,14 @@ export default function ProjectsAdmin() {
           </div>
         </div>
 
-        {/* ====================================================== */}
-        {/* SECTION 03 — Mini Projects Box (Unlimited Entries)    */}
-        {/* ====================================================== */}
+        {/* SECTION 03 — Mini Projects */}
         <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
                 03
               </span>
+
               <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
                 Mini Projects
               </h2>
@@ -299,125 +451,135 @@ export default function ProjectsAdmin() {
           </div>
 
           <div className="space-y-6">
-            {/* ---------- Single Mini Card Template ---------- */}
-            <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5 sm:p-6 dark:border-white/10 dark:bg-[#0C1E21]">
-              <div className="mb-5 flex items-center justify-between gap-3 border-b border-gray-200 pb-4 dark:border-white/10">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A] text-sm font-bold text-white">
-                    01
-                  </span>
-                  <div>
-                    <p className="truncate text-base font-bold text-[#0C1E21] dark:text-white">
-                      Digital Marketing Campaign
-                    </p>
-                    <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                      Tag: Mini
+            {miniProjects.map((project, index) => (
+              // Single Mini Card Template
+              <div
+                key={project._id}
+                className="rounded-3xl border border-gray-200 bg-gray-50 p-5 sm:p-6 dark:border-white/10 dark:bg-[#0C1E21]"
+              >
+                <div className="mb-5 flex items-center justify-between gap-3 border-b border-gray-200 pb-4 dark:border-white/10">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A] text-sm font-bold text-white">
+                      {String(index + 1).padStart(2, "0")}
                     </span>
-                  </div>
-                </div>
 
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    title="Move up"
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
-                  >
-                    <ArrowUp size={16} />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Move down"
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
-                  >
-                    <ArrowDown size={16} />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Delete project"
-                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white dark:bg-[#111b1d]"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="space-y-4">
-                  <div>
-                    <label className={labelClass}>Tag / Category</label>
-                    <input
-                      placeholder="e.g. Empower, Support"
-                      className={`${inputClass} !bg-white dark:!bg-[#111b1d]`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>Project Title</label>
-                    <textarea
-                      rows={3}
-                      placeholder="e.g. Digital Marketing Campaign"
-                      className={`${inputClass} resize-y !bg-white dark:!bg-[#111b1d]`}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className={labelClass}>Mini Cover Image</label>
-
-                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#111b1d]">
-                    <div className="flex h-44 flex-col items-center justify-center bg-gray-50 text-gray-400 dark:bg-[#0C1E21]">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
-                        <ImagePlus size={24} />
-                      </div>
-                      <p className="mt-2 text-xs font-medium text-[#0C1E21] dark:text-white">
-                        No mini image selected
+                    <div>
+                      <p className="truncate text-base font-bold text-[#0C1E21] dark:text-white">
+                        Digital Marketing Campaign
                       </p>
-                    </div>
 
-                    <div className="space-y-3 p-4">
-                      <div className="relative">
-                        <LinkIcon
-                          size={15}
-                          className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400"
-                        />
-                        <input
-                          type="url"
-                          placeholder="Paste mini image URL..."
-                          className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pr-4 pl-10 text-xs text-[#0C1E21] transition outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 dark:border-white/10 dark:bg-[#0C1E21] dark:text-white"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
-                        <span className="text-[10px] font-bold tracking-wider text-gray-400">
-                          OR
-                        </span>
-                        <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
-                      </div>
-
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-2.5 text-xs font-semibold text-white transition hover:bg-[#1E8A8A] dark:bg-white/10 dark:hover:bg-[#1E8A8A]"
-                      >
-                        <Upload size={14} />
-                        Upload Mini Image
-                      </button>
+                      <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                        Tag: Mini
+                      </span>
                     </div>
                   </div>
 
-                  <p className="mt-2 flex items-start gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <Info size={13} className="mt-0.5 shrink-0" />
-                    Recommended: 600 × 400 — Compact Display
-                  </p>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      title="Move up"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
+                    >
+                      <ArrowUp size={16} />
+                    </button>
+
+                    <button
+                      type="button"
+                      title="Move down"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
+                    >
+                      <ArrowDown size={16} />
+                    </button>
+
+                    <button
+                      type="button"
+                      title="Delete project"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white dark:bg-[#111b1d]"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-4">
+                    <div>
+                      <label className={labelClass}>Tag / Category</label>
+                      <input
+                        placeholder="e.g. Empower, Support"
+                        className={`${inputClass} !bg-white dark:!bg-[#111b1d]`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Project Title</label>
+                      <textarea
+                        rows={3}
+                        placeholder="e.g. Digital Marketing Campaign"
+                        className={`${inputClass} resize-y !bg-white dark:!bg-[#111b1d]`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Mini Cover Image</label>
+
+                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#111b1d]">
+                      <div className="flex h-44 flex-col items-center justify-center bg-gray-50 text-gray-400 dark:bg-[#0C1E21]">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+                          <ImagePlus size={24} />
+                        </div>
+
+                        <p className="mt-2 text-xs font-medium text-[#0C1E21] dark:text-white">
+                          No mini image selected
+                        </p>
+                      </div>
+
+                      <div className="space-y-3 p-4">
+                        <div className="relative">
+                          <LinkIcon
+                            size={15}
+                            className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400"
+                          />
+
+                          <input
+                            type="url"
+                            placeholder="Paste mini image URL..."
+                            className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pr-4 pl-10 text-xs text-[#0C1E21] transition outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 dark:border-white/10 dark:bg-[#0C1E21] dark:text-white"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+                          <span className="text-[10px] font-bold tracking-wider text-gray-400">
+                            OR
+                          </span>
+                          <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+                        </div>
+
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-2.5 text-xs font-semibold text-white transition hover:bg-[#1E8A8A] dark:bg-white/10 dark:hover:bg-[#1E8A8A]"
+                        >
+                          <Upload size={14} />
+                          Upload Mini Image
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="mt-2 flex items-start gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <Info size={13} className="mt-0.5 shrink-0" />
+                      Recommended: 600 × 400 — Compact Display
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-            {/* ---------- End Mini Card Template ---------- */}
+            ))}
+            {/* End Mini Card Template */}
           </div>
 
           <button
+            onClick={addMiniProject}
             type="button"
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 py-4 text-sm font-semibold text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/15 dark:text-gray-400"
           >
