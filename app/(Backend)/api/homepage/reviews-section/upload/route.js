@@ -5,22 +5,48 @@ export async function POST(req) {
   try {
     const formData = await req.formData();
     const file = formData.get("file");
+    const imageUrl = formData.get("imageUrl");
 
-    if (!file) {
+    let uploaded;
+
+    if (file && typeof file !== "string") {
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+
+      const base64String = `data:${file.type};base64,${buffer.toString("base64")}`;
+
+      uploaded = await cloudinary.uploader.upload(base64String, {
+        folder: "reviews",
+      });
+    } else if (typeof imageUrl === "string" && imageUrl.trim()) {
+      let parsedUrl;
+
+      try {
+        parsedUrl = new URL(imageUrl.trim());
+      } catch {
+        return NextResponse.json(
+          { success: false, message: "Invalid image URL" },
+          { status: 400 },
+        );
+      }
+
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        return NextResponse.json(
+          { success: false, message: "Invalid image URL protocol" },
+          { status: 400 },
+        );
+      }
+
+      uploaded = await cloudinary.uploader.upload(parsedUrl.href, {
+        folder: "reviews",
+        resource_type: "image",
+      });
+    } else {
       return NextResponse.json(
-        { success: false, message: "No file uploaded" },
+        { success: false, message: "No file or image URL provided" },
         { status: 400 },
       );
     }
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    const base64String = `data:${file.type};base64,${buffer.toString("base64")}`;
-
-    const uploaded = await cloudinary.uploader.upload(base64String, {
-      folder: "reviews",
-    });
 
     return NextResponse.json({
       success: true,
@@ -28,6 +54,8 @@ export async function POST(req) {
       publicId: uploaded.public_id,
     });
   } catch (error) {
+    console.error("Upload failed:", error);
+
     return NextResponse.json(
       {
         success: false,

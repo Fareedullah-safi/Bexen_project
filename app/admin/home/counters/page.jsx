@@ -118,9 +118,14 @@ export default function ReviewsAdminPanel() {
 
   /* Upload Image */
 
-  const uploadImage = async (file) => {
+  const uploadImage = async (fileOrUrl) => {
     const formData = new FormData();
-    formData.append("file", file);
+
+    if (fileOrUrl instanceof File) {
+      formData.append("file", fileOrUrl);
+    } else {
+      formData.append("imageUrl", fileOrUrl);
+    }
 
     const { data } = await axios.post(
       "/api/homepage/reviews-section/upload",
@@ -130,7 +135,7 @@ export default function ReviewsAdminPanel() {
     if (!data.success || !data.url) {
       throw new Error(data.message || "Image upload failed");
     }
-    console.log(data.url);
+
     return data.url;
   };
 
@@ -174,7 +179,9 @@ export default function ReviewsAdminPanel() {
           text: review.text,
           image: review.imageFile
             ? await uploadImage(review.imageFile)
-            : review.image || "",
+            : review.image?.trim()
+              ? await uploadImage(review.image.trim())
+              : "",
         })),
       );
 
