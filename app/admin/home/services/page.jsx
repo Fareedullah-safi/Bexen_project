@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import {
   Box,
@@ -26,6 +27,7 @@ function ImagePicker({ value, onChange, disabled }) {
       const url = URL.createObjectURL(value);
       setPreview(url);
       setError(false);
+
       return () => URL.revokeObjectURL(url);
     }
 
@@ -41,11 +43,15 @@ function ImagePicker({ value, onChange, disabled }) {
 
   function handleUrlChange(e) {
     onChange(e.target.value);
-    if (fileRef.current) fileRef.current.value = "";
+
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
   }
 
   function handleFileChange(e) {
     const file = e.target.files?.[0];
+
     if (!file) return;
 
     if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
@@ -65,19 +71,31 @@ function ImagePicker({ value, onChange, disabled }) {
 
   function removeImage() {
     onChange("");
-    if (fileRef.current) fileRef.current.value = "";
+
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
   }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#111b1d]">
       {preview && !error ? (
         <div className="relative flex h-52 items-center justify-center bg-gray-50 p-4 dark:bg-[#0C1E21]">
-          <img
-            src={preview}
-            alt="Solution preview"
-            onError={() => setError(true)}
-            className="h-full w-full rounded-xl object-cover"
-          />
+          <div className="relative h-full w-full">
+            <Image
+              src={preview}
+              alt="Solution preview"
+              fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              unoptimized={
+                value instanceof File ||
+                preview.startsWith("blob:") ||
+                preview.startsWith("data:")
+              }
+              onError={() => setError(true)}
+              className="rounded-xl object-cover"
+            />
+          </div>
 
           <button
             type="button"
@@ -100,6 +118,7 @@ function ImagePicker({ value, onChange, disabled }) {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
             <ImagePlus size={28} />
           </div>
+
           <p className="mt-3 text-sm font-medium text-[#0C1E21] dark:text-white">
             {error ? "Unable to load image" : "No image selected"}
           </p>
@@ -112,6 +131,7 @@ function ImagePicker({ value, onChange, disabled }) {
             size={15}
             className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400"
           />
+
           <input
             type="url"
             value={typeof value === "string" ? value : ""}
@@ -222,7 +242,9 @@ export default function SolutionsAdmin() {
     setSolutions((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
+
         const isSame = typeof value === "string" && value === item.image;
+
         return {
           ...item,
           image: value,
@@ -247,10 +269,13 @@ export default function SolutionsAdmin() {
 
   function moveSolution(index, direction) {
     const target = direction === "up" ? index - 1 : index + 1;
+
     if (target < 0 || target >= solutions.length) return;
 
     const list = [...solutions];
+
     [list[index], list[target]] = [list[target], list[index]];
+
     setSolutions(list);
   }
 
@@ -262,14 +287,14 @@ export default function SolutionsAdmin() {
       return toast.error("You must have at least one card");
     }
 
-    // A: If it's a locally added card that was never saved to DB
+    // A: Remove a locally added card that was never saved to DB
     if (String(cardId).startsWith("new-")) {
       setSolutions((prev) => prev.filter((c) => c.id !== cardId));
       toast.success("Card removed");
       return;
     }
 
-    // B: If it's saved in MongoDB -> send only cardId to DELETE API
+    // B: Delete the saved card using its MongoDB ID
     try {
       setDeletingId(cardId);
 
@@ -298,23 +323,32 @@ export default function SolutionsAdmin() {
   /* ---------------- 4. Save Data (POST) ---------------- */
   async function handleSave(e) {
     e.preventDefault();
+
     if (isSaving || deletingId) return;
 
-    if (!headingOne.trim()) return toast.error("Heading Line 1 is required");
+    if (!headingOne.trim()) {
+      return toast.error("Heading Line 1 is required");
+    }
 
     for (let i = 0; i < solutions.length; i++) {
-      if (!solutions[i].title.trim())
+      if (!solutions[i].title.trim()) {
         return toast.error(`Card ${i + 1}: Title is required`);
-      if (!solutions[i].description.trim())
+      }
+
+      if (!solutions[i].description.trim()) {
         return toast.error(`Card ${i + 1}: Description is required`);
-      if (!solutions[i].image)
+      }
+
+      if (!solutions[i].image) {
         return toast.error(`Card ${i + 1}: Image is required`);
+      }
     }
 
     try {
       setIsSaving(true);
 
       const formData = new FormData();
+
       formData.append("badge", badge);
       formData.append("headingOne", headingOne);
       formData.append("headingTwo", headingTwo);
@@ -376,8 +410,9 @@ export default function SolutionsAdmin() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3">
+      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-white dark:bg-[#0b1117]">
         <Loader2 size={32} className="animate-spin text-[#1E8A8A]" />
+
         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
           Loading solutions...
         </p>
@@ -386,237 +421,254 @@ export default function SolutionsAdmin() {
   }
 
   return (
-    <div className="w-full">
-      {/* Header */}
-      <div className="mb-10 flex items-center gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
-          <Box size={27} />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#0C1E21] dark:text-white">
-            Solutions Slider
-          </h1>
-          <p className="mt-1 text-base text-gray-500 dark:text-gray-400">
-            Manage Section Five — solutions cards and heading.
-          </p>
-        </div>
-      </div>
-
-      <form onSubmit={handleSave} className="space-y-6">
-        {/* 01 Section Header */}
-        <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
-          <div className="mb-6 flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
-              01
-            </span>
-            <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
-              Section Header
-            </h2>
+    <div className="min-h-screen w-full bg-white text-[#0C1E21] dark:bg-[#0b1117] dark:text-white">
+      <div className="w-full">
+        {/* Header */}
+        <div className="mb-10 flex items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+            <Box size={27} />
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
-            <div>
-              <label className={labelClass}>Badge Text</label>
-              <input
-                value={badge}
-                onChange={(e) => setBadge(e.target.value)}
-                disabled={isSaving}
-                placeholder="OUR SOLUTIONS"
-                className={inputClass}
-              />
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-[#0C1E21] dark:text-white">
+              Solutions Slider
+            </h1>
 
-            <div>
-              <label className={labelClass}>Highlight Word</label>
-              <input
-                value={highlight}
-                onChange={(e) => setHighlight(e.target.value)}
-                disabled={isSaving}
-                placeholder="Business."
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Heading Line 1</label>
-              <input
-                value={headingOne}
-                onChange={(e) => setHeadingOne(e.target.value)}
-                disabled={isSaving}
-                placeholder="Solutions to Transform"
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Heading Line 2</label>
-              <input
-                value={headingTwo}
-                onChange={(e) => setHeadingTwo(e.target.value)}
-                disabled={isSaving}
-                placeholder="Your"
-                className={inputClass}
-              />
-            </div>
+            <p className="mt-1 text-base text-gray-500 dark:text-gray-400">
+              Manage Section Five — solutions cards and heading.
+            </p>
           </div>
         </div>
 
-        {/* 02 Solutions Cards */}
-        <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
+        <form onSubmit={handleSave} className="space-y-6">
+          {/* 01 Section Header */}
+          <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
+            <div className="mb-6 flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
-                02
+                01
               </span>
+
               <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
-                Solutions Cards
+                Section Header
               </h2>
             </div>
 
-            <span className="w-fit rounded-full bg-[#1E8A8A]/10 px-4 py-2 text-sm font-semibold text-[#1E8A8A]">
-              {solutions.length} cards
-            </span>
-          </div>
+            <div className="grid gap-5 md:grid-cols-2">
+              <div>
+                <label className={labelClass}>Badge Text</label>
 
-          <div className="space-y-5">
-            {solutions.map((item, index) => (
-              <div
-                key={item.id}
-                className="rounded-3xl border border-gray-200 bg-gray-50 p-5 sm:p-6 dark:border-white/10 dark:bg-[#0C1E21]"
-              >
-                {/* Top Action Bar of Card */}
-                <div className="mb-5 flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A] text-sm font-bold text-white">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <p className="truncate text-sm font-semibold text-[#0C1E21] dark:text-white">
-                      {item.title || `Solution ${index + 1}`}
-                    </p>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => moveSolution(index, "up")}
-                      disabled={
-                        index === 0 || isSaving || deletingId === item.id
-                      }
-                      title="Move up"
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30 dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
-                    >
-                      <ArrowUp size={16} />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => moveSolution(index, "down")}
-                      disabled={
-                        index === solutions.length - 1 ||
-                        isSaving ||
-                        deletingId === item.id
-                      }
-                      title="Move down"
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30 dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
-                    >
-                      <ArrowDown size={16} />
-                    </button>
-
-                    {/* Single Item Delete Button - passing only item.id */}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCard(item.id)}
-                      disabled={isSaving || deletingId === item.id}
-                      title="Delete card"
-                      className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white disabled:opacity-40 dark:bg-[#111b1d]"
-                    >
-                      {deletingId === item.id ? (
-                        <Loader2
-                          size={16}
-                          className="animate-spin text-red-500"
-                        />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid gap-5 lg:grid-cols-2">
-                  <div className="space-y-4">
-                    <div>
-                      <label className={labelClass}>Card Title</label>
-                      <input
-                        value={item.title}
-                        onChange={(e) =>
-                          updateSolution(item.id, "title", e.target.value)
-                        }
-                        disabled={isSaving || deletingId === item.id}
-                        placeholder="e.g. Business Strategy Development"
-                        className={`${inputClass} !bg-white dark:!bg-[#111b1d]`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={labelClass}>Description</label>
-                      <textarea
-                        value={item.description}
-                        onChange={(e) =>
-                          updateSolution(item.id, "description", e.target.value)
-                        }
-                        disabled={isSaving || deletingId === item.id}
-                        rows={5}
-                        placeholder="Enter short card description..."
-                        className={`${inputClass} resize-y !bg-white dark:!bg-[#111b1d]`}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={labelClass}>Card Image</label>
-                    <ImagePicker
-                      value={item.image}
-                      disabled={isSaving || deletingId === item.id}
-                      onChange={(val) => updateImage(item.id, val)}
-                    />
-                  </div>
-                </div>
+                <input
+                  value={badge}
+                  onChange={(e) => setBadge(e.target.value)}
+                  disabled={isSaving}
+                  placeholder="OUR SOLUTIONS"
+                  className={inputClass}
+                />
               </div>
-            ))}
+
+              <div>
+                <label className={labelClass}>Highlight Word</label>
+
+                <input
+                  value={highlight}
+                  onChange={(e) => setHighlight(e.target.value)}
+                  disabled={isSaving}
+                  placeholder="Business."
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Heading Line 1</label>
+
+                <input
+                  value={headingOne}
+                  onChange={(e) => setHeadingOne(e.target.value)}
+                  disabled={isSaving}
+                  placeholder="Solutions to Transform"
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className={labelClass}>Heading Line 2</label>
+
+                <input
+                  value={headingTwo}
+                  onChange={(e) => setHeadingTwo(e.target.value)}
+                  disabled={isSaving}
+                  placeholder="Your"
+                  className={inputClass}
+                />
+              </div>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={addSolution}
-            disabled={isSaving || !!deletingId}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 py-4 text-sm font-semibold text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-40 dark:border-white/15 dark:text-gray-400"
-          >
-            <Plus size={18} />
-            Add New Solution
-          </button>
-        </div>
+          {/* 02 Solutions Cards */}
+          <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
+                  02
+                </span>
 
-        {/* Save Footer */}
-        <div className="flex justify-end rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111b1d]">
-          <button
-            type="submit"
-            disabled={isSaving || !!deletingId}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-8 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:bg-[#155F61] disabled:text-white/80 sm:w-auto"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save size={18} />
-                Save Solutions
-              </>
-            )}
-          </button>
-        </div>
-      </form>
+                <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
+                  Solutions Cards
+                </h2>
+              </div>
+
+              <span className="w-fit rounded-full bg-[#1E8A8A]/10 px-4 py-2 text-sm font-semibold text-[#1E8A8A]">
+                {solutions.length} cards
+              </span>
+            </div>
+
+            <div className="space-y-5">
+              {solutions.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="rounded-3xl border border-gray-200 bg-gray-50 p-5 sm:p-6 dark:border-white/10 dark:bg-[#0C1E21]"
+                >
+                  {/* Card Action Bar */}
+                  <div className="mb-5 flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A] text-sm font-bold text-white">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+
+                      <p className="truncate text-sm font-semibold text-[#0C1E21] dark:text-white">
+                        {item.title || `Solution ${index + 1}`}
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => moveSolution(index, "up")}
+                        disabled={
+                          index === 0 || isSaving || deletingId === item.id
+                        }
+                        title="Move up"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30 dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
+                      >
+                        <ArrowUp size={16} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => moveSolution(index, "down")}
+                        disabled={
+                          index === solutions.length - 1 ||
+                          isSaving ||
+                          deletingId === item.id
+                        }
+                        title="Move down"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30 dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
+                      >
+                        <ArrowDown size={16} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCard(item.id)}
+                        disabled={isSaving || deletingId === item.id}
+                        title="Delete card"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white disabled:opacity-40 dark:bg-[#111b1d]"
+                      >
+                        {deletingId === item.id ? (
+                          <Loader2
+                            size={16}
+                            className="animate-spin text-red-500"
+                          />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    <div className="space-y-4">
+                      <div>
+                        <label className={labelClass}>Card Title</label>
+
+                        <input
+                          value={item.title}
+                          onChange={(e) =>
+                            updateSolution(item.id, "title", e.target.value)
+                          }
+                          disabled={isSaving || deletingId === item.id}
+                          placeholder="e.g. Business Strategy Development"
+                          className={`${inputClass} !bg-white dark:!bg-[#111b1d]`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>Description</label>
+
+                        <textarea
+                          value={item.description}
+                          onChange={(e) =>
+                            updateSolution(
+                              item.id,
+                              "description",
+                              e.target.value,
+                            )
+                          }
+                          disabled={isSaving || deletingId === item.id}
+                          rows={5}
+                          placeholder="Enter short card description..."
+                          className={`${inputClass} resize-y !bg-white dark:!bg-[#111b1d]`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Card Image</label>
+
+                      <ImagePicker
+                        value={item.image}
+                        disabled={isSaving || deletingId === item.id}
+                        onChange={(val) => updateImage(item.id, val)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={addSolution}
+              disabled={isSaving || !!deletingId}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 py-4 text-sm font-semibold text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-40 dark:border-white/15 dark:text-gray-400"
+            >
+              <Plus size={18} />
+              Add New Solution
+            </button>
+          </div>
+
+          {/* Save Footer */}
+          <div className="flex justify-end rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111b1d]">
+            <button
+              type="submit"
+              disabled={isSaving || !!deletingId}
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-8 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:bg-[#155F61] disabled:text-white/80 sm:w-auto"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={18} />
+                  Save Solutions
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

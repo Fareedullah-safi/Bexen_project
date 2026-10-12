@@ -1,6 +1,7 @@
-﻿
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @import "animate.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #f7f9fc;
@@ -11,6 +12,7 @@
   --muted: #667085;
   --accent: #1e8a8a;
   --accent-soft: #e7f5f5;
+
   color-scheme: light;
 }
 
@@ -23,6 +25,7 @@
   --muted: #98a2b3;
   --accent: #35b5b5;
   --accent-soft: #123537;
+
   color-scheme: dark;
 }
 

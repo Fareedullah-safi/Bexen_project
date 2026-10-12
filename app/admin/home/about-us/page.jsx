@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import {
   ImagePlus,
@@ -57,6 +58,24 @@ export default function AboutUs() {
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasSavedData, setHasSavedData] = useState(false);
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    const updateTheme = () => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    };
+
+    updateTheme();
+
+    const observer = new MutationObserver(updateTheme);
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -336,7 +355,6 @@ export default function AboutUs() {
       });
 
       const result = await response.json();
-      console.log(result);
 
       if (!response.ok || !result.success) {
         throw new Error(result.message || "Failed to save About Us data");
@@ -371,10 +389,25 @@ export default function AboutUs() {
     }
   };
 
-  const inputClass =
-    "w-full rounded-xl border border-white/10 bg-[#0C1E21] px-4 py-3 text-sm text-white placeholder:text-gray-500 outline-none transition focus:border-[#1E8A8A] focus:ring-2 focus:ring-[#1E8A8A]/20";
+  const pageClass = isDark
+    ? "bg-[#0b1117] text-[#f2f4f7]"
+    : "bg-[#f7f9fc] text-[#101828]";
 
-  const labelClass = "mb-2 block text-sm font-medium text-gray-300";
+  const cardClass = isDark
+    ? "border-[#263442] bg-[#111a23]"
+    : "border-[#e4e7ec] bg-white";
+
+  const inputClass = `w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-[#1E8A8A] focus:ring-2 focus:ring-[#1E8A8A]/20 ${
+    isDark
+      ? "border-[#263442] bg-[#16212c] text-[#f2f4f7] placeholder:text-gray-500"
+      : "border-[#e4e7ec] bg-white text-[#101828] placeholder:text-gray-400"
+  }`;
+
+  const labelClass = `mb-2 block text-sm font-medium ${
+    isDark ? "text-gray-300" : "text-gray-700"
+  }`;
+
+  const mutedTextClass = isDark ? "text-gray-400" : "text-gray-500";
 
   const renderInput = (
     label,
@@ -409,12 +442,26 @@ export default function AboutUs() {
       </label>
 
       {previews[field] ? (
-        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0C1E21] p-3">
-          <img
-            src={previews[field]}
-            alt={label}
-            className="h-52 w-full rounded-lg object-contain"
-          />
+        <div
+          className={`relative overflow-hidden rounded-xl border p-3 ${
+            isDark
+              ? "border-[#263442] bg-[#16212c]"
+              : "border-[#e4e7ec] bg-[#f8fafc]"
+          }`}
+        >
+          <div className="relative h-52 w-full">
+            <Image
+              src={previews[field]}
+              alt={label}
+              fill
+              sizes="(max-width: 640px) 100vw, 50vw"
+              unoptimized={
+                previews[field].startsWith("blob:") ||
+                previews[field].startsWith("data:")
+              }
+              className="rounded-lg object-contain"
+            />
+          </div>
 
           <button
             type="button"
@@ -425,22 +472,32 @@ export default function AboutUs() {
             <Trash2 size={17} />
           </button>
 
-          <div className="mt-3 flex items-center gap-2 text-xs text-emerald-400">
+          <div className="mt-3 flex items-center gap-2 text-xs text-emerald-500">
             <CheckCircle2 size={15} />
             Image selected
           </div>
         </div>
       ) : (
-        <label className="flex h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/15 bg-[#0C1E21] px-4 text-center transition hover:border-[#1E8A8A] hover:bg-[#1E8A8A]/5">
-          <span className="mb-3 rounded-xl bg-[#1E8A8A]/15 p-4 text-[#39b5b2]">
+        <label
+          className={`flex h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 text-center transition hover:border-[#1E8A8A] hover:bg-[#1E8A8A]/5 ${
+            isDark
+              ? "border-[#263442] bg-[#16212c]"
+              : "border-[#d0d5dd] bg-[#f8fafc]"
+          }`}
+        >
+          <span className="mb-3 rounded-xl bg-[#1E8A8A]/15 p-4 text-[#1E8A8A]">
             <ImagePlus size={27} />
           </span>
 
-          <span className="text-sm font-medium text-gray-200">
+          <span
+            className={`text-sm font-medium ${
+              isDark ? "text-gray-200" : "text-gray-700"
+            }`}
+          >
             Upload {label}
           </span>
 
-          <span className="mt-2 text-xs text-gray-500">
+          <span className={`mt-2 text-xs ${mutedTextClass}`}>
             JPG, PNG or WEBP · Maximum 5 MB
           </span>
 
@@ -472,18 +529,20 @@ export default function AboutUs() {
 
   if (isFetching) {
     return (
-      <div className="flex min-h-[85vh] items-center justify-center bg-[#0C1E21]">
+      <div
+        className={`flex min-h-[85vh] items-center justify-center ${pageClass}`}
+      >
         <LoaderCircle size={34} className="animate-spin text-[#1E8A8A]" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0C1E21] p-4 text-white sm:p-6 lg:p-8">
+    <div className={`min-h-screen p-4 sm:p-6 lg:p-8 ${pageClass}`}>
       <div className="mx-auto max-w-6xl">
         <header className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <div className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-[0.2em] text-[#36aaa7] uppercase">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-[0.2em] text-[#1E8A8A] uppercase">
               <span className="h-2 w-2 rounded-full bg-[#1E8A8A]" />
               Homepage Management
             </div>
@@ -492,21 +551,27 @@ export default function AboutUs() {
               About Us Section
             </h1>
 
-            <p className="mt-2 max-w-xl text-sm leading-6 text-gray-400">
+            <p className={`mt-2 max-w-xl text-sm leading-6 ${mutedTextClass}`}>
               Manage the content, images and client information displayed on
               your website.
             </p>
           </div>
 
-          <div className="flex w-fit items-center gap-2 rounded-full border border-white/10 bg-[#132629] px-4 py-2 text-xs text-gray-300">
+          <div
+            className={`flex w-fit items-center gap-2 rounded-full border px-4 py-2 text-xs ${
+              isDark
+                ? "border-[#263442] bg-[#16212c] text-gray-300"
+                : "border-[#e4e7ec] bg-white text-gray-600"
+            }`}
+          >
             {hasSavedData ? (
               <>
-                <CheckCircle2 size={15} className="text-emerald-400" />
+                <CheckCircle2 size={15} className="text-emerald-500" />
                 Saved data loaded
               </>
             ) : (
               <>
-                <FileImage size={15} className="text-gray-400" />
+                <FileImage size={15} className={mutedTextClass} />
                 New section
               </>
             )}
@@ -514,16 +579,20 @@ export default function AboutUs() {
         </header>
 
         <form onSubmit={handleSave} className="space-y-6">
-          <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#132629] shadow-xl shadow-black/10">
-            <div className="border-b border-white/10 px-5 py-5 sm:px-7">
+          <section
+            className={`overflow-hidden rounded-2xl border shadow-xl shadow-black/5 ${cardClass}`}
+          >
+            <div
+              className={`border-b px-5 py-5 sm:px-7 ${isDark ? "border-[#263442]" : "border-[#e4e7ec]"}`}
+            >
               <div className="flex items-center gap-3">
-                <span className="rounded-xl bg-[#1E8A8A]/15 p-3 text-[#36aaa7]">
+                <span className="rounded-xl bg-[#1E8A8A]/15 p-3 text-[#1E8A8A]">
                   <FileImage size={21} />
                 </span>
 
                 <div>
-                  <h2 className="font-semibold text-white">Section Content</h2>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <h2 className="font-semibold">Section Content</h2>
+                  <p className={`mt-1 text-xs ${mutedTextClass}`}>
                     All fields are required.
                   </p>
                 </div>
@@ -563,23 +632,27 @@ export default function AboutUs() {
                   className={`${inputClass} resize-y leading-6`}
                 />
 
-                <p className="mt-2 text-right text-xs text-gray-500">
+                <p className={`mt-2 text-right text-xs ${mutedTextClass}`}>
                   {formData.description.length} characters
                 </p>
               </div>
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#132629] shadow-xl shadow-black/10">
-            <div className="border-b border-white/10 px-5 py-5 sm:px-7">
+          <section
+            className={`overflow-hidden rounded-2xl border shadow-xl shadow-black/5 ${cardClass}`}
+          >
+            <div
+              className={`border-b px-5 py-5 sm:px-7 ${isDark ? "border-[#263442]" : "border-[#e4e7ec]"}`}
+            >
               <div className="flex items-center gap-3">
-                <span className="rounded-xl bg-[#1E8A8A]/15 p-3 text-[#36aaa7]">
+                <span className="rounded-xl bg-[#1E8A8A]/15 p-3 text-[#1E8A8A]">
                   <ImagePlus size={21} />
                 </span>
 
                 <div>
-                  <h2 className="font-semibold text-white">Section Images</h2>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <h2 className="font-semibold">Section Images</h2>
+                  <p className={`mt-1 text-xs ${mutedTextClass}`}>
                     Both images are required. Upload a file or provide a URL.
                   </p>
                 </div>
@@ -592,11 +665,15 @@ export default function AboutUs() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#132629] shadow-xl shadow-black/10">
-            <div className="border-b border-white/10 px-5 py-5 sm:px-7">
+          <section
+            className={`overflow-hidden rounded-2xl border shadow-xl shadow-black/5 ${cardClass}`}
+          >
+            <div
+              className={`border-b px-5 py-5 sm:px-7 ${isDark ? "border-[#263442]" : "border-[#e4e7ec]"}`}
+            >
               <div>
-                <h2 className="font-semibold text-white">Client Information</h2>
-                <p className="mt-1 text-xs text-gray-500">
+                <h2 className="font-semibold">Client Information</h2>
+                <p className={`mt-1 text-xs ${mutedTextClass}`}>
                   Enter the client details displayed in your section.
                 </p>
               </div>
@@ -608,8 +685,14 @@ export default function AboutUs() {
             </div>
           </section>
 
-          <footer className="sticky bottom-3 z-10 flex flex-col justify-between gap-3 rounded-2xl border border-white/10 bg-[#132629]/95 p-4 shadow-2xl backdrop-blur-xl sm:flex-row sm:items-center sm:px-6">
-            <p className="text-xs text-gray-400">
+          <footer
+            className={`sticky bottom-3 z-10 flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-xl sm:flex-row sm:items-center sm:px-6 ${
+              isDark
+                ? "border-[#263442] bg-[#111a23]/95"
+                : "border-[#e4e7ec] bg-white/95"
+            }`}
+          >
+            <p className={`text-xs ${mutedTextClass}`}>
               <span className="text-red-400">*</span> All fields are required.
             </p>
 
@@ -618,7 +701,11 @@ export default function AboutUs() {
                 type="button"
                 onClick={() => window.location.reload()}
                 disabled={isSaving}
-                className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-5 py-3 text-sm font-medium text-gray-300 transition hover:bg-white/5 disabled:opacity-50"
+                className={`flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition disabled:opacity-50 ${
+                  isDark
+                    ? "border-[#263442] text-gray-300 hover:bg-white/5"
+                    : "border-[#e4e7ec] text-gray-700 hover:bg-gray-50"
+                }`}
               >
                 <RotateCcw size={16} />
                 Reload Saved Data

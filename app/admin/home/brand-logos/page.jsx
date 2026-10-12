@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { ImagePlus, Link, Trash2Icon, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -38,35 +39,20 @@ export default function BrandLogos() {
 
     setLogos((prev) =>
       prev.map((logo) =>
-        logo.id === id
-          ? {
-              ...logo,
-              file,
-              url: "",
-              preview,
-            }
-          : logo,
+        logo.id === id ? { ...logo, file, url: "", preview } : logo,
       ),
     );
   };
 
   const handleUrl = (id, e) => {
     const url = e.target.value;
-
     const currentLogo = logos.find((logo) => logo.id === id);
 
     if (currentLogo?.file) return;
 
     setLogos((prev) =>
       prev.map((logo) =>
-        logo.id === id
-          ? {
-              ...logo,
-              file: null,
-              url,
-              preview: url,
-            }
-          : logo,
+        logo.id === id ? { ...logo, file: null, url, preview: url } : logo,
       ),
     );
   };
@@ -74,14 +60,7 @@ export default function BrandLogos() {
   const handleRemove = (id) => {
     setLogos((prev) =>
       prev.map((logo) =>
-        logo.id === id
-          ? {
-              ...logo,
-              file: null,
-              url: "",
-              preview: "",
-            }
-          : logo,
+        logo.id === id ? { ...logo, file: null, url: "", preview: "" } : logo,
       ),
     );
 
@@ -133,12 +112,8 @@ export default function BrandLogos() {
 
       const postResponse = await fetch("/api/homepage/brand-logos/postlogoDB", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          logos: result.logos,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logos: result.logos }),
       });
 
       const postResult = await postResponse.json();
@@ -150,9 +125,7 @@ export default function BrandLogos() {
       }
 
       Object.values(fileRefs.current).forEach((input) => {
-        if (input) {
-          input.value = "";
-        }
+        if (input) input.value = "";
       });
 
       toast.success("Brand logos saved successfully");
@@ -237,12 +210,8 @@ export default function BrandLogos() {
         "/api/homepage/brand-logos/postlogoDB/title",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title: sectionTitle.trim(),
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: sectionTitle.trim() }),
         },
       );
 
@@ -269,9 +238,7 @@ export default function BrandLogos() {
 
       const response = await fetch("/api/homepage/brand-logos/postlogoDB", {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           publicId,
           logoId: _id,
@@ -285,7 +252,6 @@ export default function BrandLogos() {
       }
 
       toast.success("Logo deleted successfully");
-
       await allBoxData();
     } catch (error) {
       console.error("Delete logo error:", error);
@@ -306,26 +272,23 @@ export default function BrandLogos() {
   );
 
   return (
-    <div className="w-full">
+    <div className="w-full bg-[var(--background)] text-[var(--foreground)]">
       <div className="mb-10 flex items-center gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
           <ImagePlus size={27} />
         </div>
 
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#0C1E21] dark:text-white">
-            Brand Logos
-          </h1>
-
-          <p className="mt-1 text-base text-gray-500 dark:text-gray-400">
+          <h1 className="text-3xl font-bold tracking-tight">Brand Logos</h1>
+          <p className="mt-1 text-base text-[var(--muted)]">
             Manage the brand logos displayed on your homepage.
           </p>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-[#111b1d]">
-        <div className="border-b border-gray-200 p-7 sm:p-8 dark:border-white/10">
-          <label className="mb-3 block text-base font-semibold text-[#0C1E21] dark:text-white">
+      <div className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
+        <div className="border-b border-[var(--border)] p-7 sm:p-8">
+          <label className="mb-3 block text-base font-semibold">
             Section Title
           </label>
 
@@ -335,14 +298,14 @@ export default function BrandLogos() {
             onChange={(e) => setSectionTitle(e.target.value)}
             placeholder="Enter section title"
             disabled={isChangingTitle || isFetchingTitle}
-            className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 text-base text-[#0C1E21] transition outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 disabled:cursor-not-allowed disabled:border-[#1E8A8A]/20 disabled:bg-[#E8F2F2] disabled:text-[#6B8585] disabled:placeholder:text-[#8FA5A5] dark:border-white/10 dark:bg-[#0C1E21] dark:text-white dark:disabled:border-[#1E8A8A]/20 dark:disabled:bg-[#122A2D] dark:disabled:text-[#789494]"
+            className="w-full rounded-2xl border border-[var(--border)] bg-[var(--background)] px-5 py-4 text-base text-[var(--foreground)] transition outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-60"
           />
 
           <button
             type="button"
             onClick={handleTitleSubmit}
             disabled={isChangingTitle || isFetchingTitle}
-            className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:bg-[#155F61] disabled:text-white/80 disabled:shadow-none"
+            className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-6 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isChangingTitle ? (
               <>
@@ -358,16 +321,13 @@ export default function BrandLogos() {
         <div className="p-7 sm:p-8">
           <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
-                Brand Logos
-              </h2>
-
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <h2 className="text-lg font-bold">Brand Logos</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
                 Add your company logos.
               </p>
             </div>
 
-            <span className="w-fit rounded-full bg-[#1E8A8A]/10 px-4 py-2 text-sm font-semibold text-[#1E8A8A]">
+            <span className="w-fit rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent)]">
               Logo 1 required
             </span>
           </div>
@@ -376,7 +336,7 @@ export default function BrandLogos() {
             {logos.map((logo) => (
               <div
                 key={logo.id}
-                className="relative flex flex-col gap-6 rounded-3xl border border-gray-200 bg-gray-50 p-5 transition hover:border-[#1E8A8A]/40 hover:shadow-lg sm:p-6 lg:flex-row lg:items-center dark:border-white/10 dark:bg-[#0C1E21]"
+                className="relative flex flex-col gap-6 rounded-3xl border border-[var(--border)] bg-[var(--background)] p-5 transition hover:border-[var(--accent)]/40 hover:shadow-lg sm:p-6 lg:flex-row lg:items-center"
               >
                 {logo.preview && (
                   <button
@@ -384,25 +344,29 @@ export default function BrandLogos() {
                     onClick={() => handleRemove(logo.id)}
                     disabled={isSaving}
                     title="Remove logo"
-                    className="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:bg-[#E8F2F2] disabled:text-[#789494] disabled:opacity-100 dark:bg-[#111b1d] dark:disabled:bg-[#122A2D] dark:disabled:text-[#789494]"
+                    className="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Trash2Icon size={17} />
                   </button>
                 )}
 
-                <div className="flex h-36 w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 sm:h-40 lg:w-56 dark:border-white/10 dark:bg-[#111b1d]">
+                <div className="flex h-36 w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:h-40 lg:w-56">
                   {logo.preview ? (
-                    <img
-                      src={logo.preview}
-                      alt={`Logo ${logo.id}`}
-                      className="max-h-28 max-w-[85%] object-contain"
-                    />
+                    <div className="relative h-full w-full">
+                      <Image
+                        src={logo.preview}
+                        alt={`Logo ${logo.id}`}
+                        fill
+                        sizes="(max-width: 640px) 85vw, 184px"
+                        unoptimized={logo.preview.startsWith("blob:")}
+                        className="object-contain"
+                      />
+                    </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center text-gray-400">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+                    <div className="flex flex-col items-center justify-center text-[var(--muted)]">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
                         <ImagePlus size={29} />
                       </div>
-
                       <span className="mt-3 text-sm font-medium">
                         Logo {logo.id}
                       </span>
@@ -412,11 +376,8 @@ export default function BrandLogos() {
 
                 <div className="min-w-0 flex-1 pr-0 lg:pr-12">
                   <div className="mb-4">
-                    <p className="text-lg font-bold text-[#0C1E21] dark:text-white">
-                      Logo {logo.id}
-                    </p>
-
-                    <p className="mt-1 text-sm text-gray-400">
+                    <p className="text-lg font-bold">Logo {logo.id}</p>
+                    <p className="mt-1 text-sm text-[var(--muted)]">
                       {logo.id === 1
                         ? "Required brand logo"
                         : "Optional brand logo"}
@@ -428,8 +389,8 @@ export default function BrandLogos() {
                       htmlFor={`logo-${logo.id}`}
                       className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-semibold transition ${
                         isSaving || logo.url
-                          ? "cursor-not-allowed border border-[#1E8A8A]/20 bg-[#E8F2F2] text-[#789494] dark:bg-[#122A2D] dark:text-[#789494]"
-                          : "cursor-pointer bg-[#0C1E21] text-white hover:bg-[#1E8A8A]"
+                          ? "cursor-not-allowed border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
+                          : "cursor-pointer bg-[var(--foreground)] text-[var(--background)] hover:bg-[var(--accent)] hover:text-white"
                       }`}
                     >
                       <Upload size={18} />
@@ -451,16 +412,15 @@ export default function BrandLogos() {
                     <div className="relative flex-1">
                       <Link
                         size={17}
-                        className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400"
+                        className="absolute top-1/2 left-4 -translate-y-1/2 text-[var(--muted)]"
                       />
-
                       <input
                         type="url"
                         value={logo.url}
                         disabled={isSaving || !!logo.file}
                         placeholder="Paste image URL"
                         onChange={(e) => handleUrl(logo.id, e)}
-                        className="min-h-12 w-full rounded-2xl border border-gray-200 bg-white py-3 pr-4 pl-11 text-sm transition outline-none focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 disabled:cursor-not-allowed disabled:border-[#1E8A8A]/20 disabled:bg-[#E8F2F2] disabled:text-[#789494] disabled:placeholder:text-[#9AB0B0] dark:border-white/10 dark:bg-[#111b1d] dark:text-white dark:disabled:border-[#1E8A8A]/20 dark:disabled:bg-[#122A2D] dark:disabled:text-[#789494]"
+                        className="min-h-12 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-3 pr-4 pl-11 text-sm text-[var(--foreground)] transition outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-60"
                       />
                     </div>
                   </div>
@@ -469,12 +429,12 @@ export default function BrandLogos() {
             ))}
           </div>
 
-          <div className="mt-7 flex justify-end border-t border-gray-200 pt-7 dark:border-white/10">
+          <div className="mt-7 flex justify-end border-t border-[var(--border)] pt-7">
             <button
               type="button"
               onClick={handleSubmit}
               disabled={isSaving}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-7 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:bg-[#155F61] disabled:text-white/80 disabled:opacity-100 disabled:shadow-none sm:w-auto"
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-7 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {isSaving ? (
                 <>
@@ -493,19 +453,16 @@ export default function BrandLogos() {
       </div>
 
       {savedData.length > 0 && (
-        <div className="mt-8 rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
+        <div className="mt-8 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
           <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
-                Saved Brand Logos
-              </h2>
-
-              <p className="mt-1 text-sm text-gray-400">
+              <h2 className="text-lg font-bold">Saved Brand Logos</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
                 Logos currently saved in your database.
               </p>
             </div>
 
-            <span className="w-fit rounded-full bg-[#1E8A8A]/10 px-4 py-2 text-sm font-semibold text-[#1E8A8A]">
+            <span className="w-fit rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent)]">
               {savedLogoCount} saved
             </span>
           </div>
@@ -523,7 +480,7 @@ export default function BrandLogos() {
                   return (
                     <div
                       key={deleteKey}
-                      className="relative flex h-36 w-48 items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 p-5 shadow-sm transition hover:border-[#1E8A8A]/40 hover:shadow-md dark:border-white/10 dark:bg-[#0C1E21]"
+                      className="relative flex h-36 w-48 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5 shadow-sm transition hover:border-[var(--accent)]/40 hover:shadow-md"
                     >
                       <button
                         type="button"
@@ -534,7 +491,7 @@ export default function BrandLogos() {
                           deletingLogo === logo.publicId || !!deletingLogo
                         }
                         title="Delete saved logo"
-                        className="absolute top-2 right-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:bg-[#E8F2F2] disabled:text-[#789494] disabled:opacity-100 dark:bg-[#111b1d] dark:disabled:bg-[#122A2D] dark:disabled:text-[#789494]"
+                        className="absolute top-2 right-2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {deletingLogo === logo.publicId ? (
                           <Spinner />
@@ -544,13 +501,17 @@ export default function BrandLogos() {
                       </button>
 
                       {logo.url ? (
-                        <img
-                          src={logo.url}
-                          alt={`Logo ${logo.id}`}
-                          className="max-h-20 max-w-[85%] object-contain"
-                        />
+                        <div className="relative h-full w-full">
+                          <Image
+                            src={logo.url}
+                            alt={`Logo ${logo.id}`}
+                            fill
+                            sizes="192px"
+                            className="object-contain"
+                          />
+                        </div>
                       ) : (
-                        <ImagePlus size={27} className="text-gray-400" />
+                        <ImagePlus size={27} className="text-[var(--muted)]" />
                       )}
                     </div>
                   );
@@ -562,7 +523,7 @@ export default function BrandLogos() {
       )}
 
       {isFetching && savedData.length === 0 && (
-        <div className="mt-8 flex min-h-32 items-center justify-center rounded-3xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#111b1d]">
+        <div className="mt-8 flex min-h-32 items-center justify-center rounded-3xl border border-[var(--border)] bg-[var(--surface)]">
           <Spinner />
         </div>
       )}

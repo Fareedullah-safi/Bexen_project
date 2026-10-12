@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import axios from "axios";
 import {
   ArrowDown,
   ArrowUp,
@@ -14,18 +16,28 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { toast } from "sonner";
 
 export default function ReviewsAdminPanel() {
   const input =
-    "w-full rounded-xl border border-white/10 bg-[#16212C] px-4 py-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-[#1E8A8A] focus:ring-2 focus:ring-[#1E8A8A]/10";
+    "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#0C1E21] outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-2 focus:ring-[#1E8A8A]/10 dark:border-white/10 dark:bg-[#16212C] dark:text-white dark:placeholder:text-gray-500";
 
   const button =
     "inline-flex items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#167575] disabled:cursor-not-allowed disabled:opacity-50";
 
   const smallButton =
-    "inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#16212C] px-4 py-2.5 text-sm text-gray-300 transition hover:border-[#1E8A8A] hover:text-white disabled:opacity-30";
+    "inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-600 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:cursor-not-allowed disabled:opacity-30 dark:border-white/10 dark:bg-[#16212C] dark:text-gray-300 dark:hover:text-white";
+
+  const card =
+    "rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7 dark:border-white/10 dark:bg-[#111B27]";
+
+  const innerBox =
+    "rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-[#16212C]";
+
+  const label =
+    "mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300";
+
+  const muted = "text-gray-500 dark:text-gray-400";
 
   const [section, setSection] = useState({
     badgeText: "CLIENTS FEEDBACK",
@@ -37,13 +49,34 @@ export default function ReviewsAdminPanel() {
   });
 
   const [stats, setStats] = useState([
-    { id: 1, publicId: "", value: "93%", label: "Projects Completed" },
-    { id: 2, publicId: "", value: "20M", label: "Reach Worldwide" },
-    { id: 3, publicId: "", value: "8.5X", label: "Faster Growth" },
-    { id: 4, publicId: "", value: "100+", label: "Awards Archived" },
+    {
+      id: 1,
+      publicId: "",
+      value: "93%",
+      label: "Projects Completed",
+    },
+    {
+      id: 2,
+      publicId: "",
+      value: "20M",
+      label: "Reach Worldwide",
+    },
+    {
+      id: 3,
+      publicId: "",
+      value: "8.5X",
+      label: "Faster Growth",
+    },
+    {
+      id: 4,
+      publicId: "",
+      value: "100+",
+      label: "Awards Archived",
+    },
   ]);
 
   const [reviews, setReviews] = useState([]);
+
   const [draft, setDraft] = useState({
     id: Date.now(),
     name: "",
@@ -52,61 +85,65 @@ export default function ReviewsAdminPanel() {
     image: "",
     imageFile: null,
     imagePreview: "",
+    publicId: "",
   });
 
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState(null);
   const [visible, setVisible] = useState(20);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingDraft, setUploadingDraft] = useState(false);
 
-  /* Load Data */
-
+  // Load existing section data
   const loadData = async () => {
     try {
       setLoading(true);
 
-      const { data } = await axios.get("/api/homepage/reviews-section");
+      const res = await axios.get("/api/homepage/reviews-section");
 
-      if (!data.success) {
-        throw new Error(data.message || "Failed to load data");
-      }
+      if (res.data.success && res.data.data) {
+        const data = res.data.data;
 
-      if (data.data.section) {
-        setSection((prev) => ({ ...prev, ...data.data.section }));
-      }
+        if (data.section) {
+          setSection((previous) => ({
+            ...previous,
+            ...data.section,
+          }));
+        }
 
-      if (Array.isArray(data.data.stats)) {
-        setStats(
-          data.data.stats.map((item, index) => ({
-            ...item,
-            id: item.id || index + 1,
-            publicId: item.publicId || "",
-            value: item.value || "",
-            label: item.label || "",
-          })),
-        );
-      }
+        if (Array.isArray(data.stats) && data.stats.length > 0) {
+          setStats(
+            data.stats.map((item, index) => ({
+              ...item,
+              id: item.id || item._id || index + 1,
+              value: item.value || "",
+              label: item.label || "",
+              publicId: item.publicId || "",
+            })),
+          );
+        }
 
-      if (Array.isArray(data.data.reviews)) {
-        setReviews(
-          data.data.reviews.map((item) => ({
-            ...item,
-            id: item.id || Date.now() + Math.random(),
-            name: item.name || "",
-            role: item.role || "",
-            text: item.text || "",
-            image: item.image || "",
-            imageFile: null,
-            imagePreview: "",
-          })),
-        );
+        if (Array.isArray(data.reviews)) {
+          setReviews(
+            data.reviews.map((item, index) => ({
+              ...item,
+              id: item.id || item._id || Date.now() + index,
+              name: item.name || "",
+              role: item.role || "",
+              text: item.text || "",
+              image: item.image || "",
+              publicId: item.publicId || "",
+              imageFile: null,
+              imagePreview: "",
+            })),
+          );
+        }
       }
     } catch (error) {
-      console.error("Load data error:", error);
-      toast.error(
-        error.response?.data?.message || error.message || "Failed to load data",
-      );
+      console.error("Failed to load reviews:", error);
+      toast.error("Failed to load reviews data.");
     } finally {
       setLoading(false);
     }
@@ -116,316 +153,487 @@ export default function ReviewsAdminPanel() {
     loadData();
   }, []);
 
-  /* Upload Image */
-
+  // Upload an image file or image URL
   const uploadImage = async (fileOrUrl) => {
-    const formData = new FormData();
+    try {
+      const formData = new FormData();
 
-    if (fileOrUrl instanceof File) {
-      formData.append("file", fileOrUrl);
-    } else {
-      formData.append("imageUrl", fileOrUrl);
+      if (fileOrUrl instanceof File) {
+        formData.append("file", fileOrUrl);
+      } else {
+        formData.append("imageUrl", fileOrUrl);
+      }
+
+      const res = await axios.post(
+        "/api/homepage/reviews-section/upload",
+        formData,
+      );
+
+      if (res.data.success && res.data.url) {
+        return {
+          image: res.data.url,
+          publicId: res.data.publicId || "",
+        };
+      }
+
+      throw new Error(res.data.message || "Image upload failed.");
+    } catch (error) {
+      console.error("Image upload failed:", error);
+      throw error;
     }
-
-    const { data } = await axios.post(
-      "/api/homepage/reviews-section/upload",
-      formData,
-    );
-
-    if (!data.success || !data.url) {
-      throw new Error(data.message || "Image upload failed");
-    }
-
-    return data.url;
   };
 
-  /* Add Review */
+  // Save section, statistics, and reviews
+  const saveAll = async (reviewsToSave = reviews) => {
+    try {
+      setSaving(true);
 
-  const addReview = () => {
+      const finalReviews = [];
+
+      for (const review of reviewsToSave) {
+        let image = review.image || "";
+        let publicId = review.publicId || "";
+
+        if (review.imageFile) {
+          const uploaded = await uploadImage(review.imageFile);
+
+          image = uploaded.image;
+          publicId = uploaded.publicId;
+        } else if (image && !publicId && image.startsWith("http")) {
+          const uploaded = await uploadImage(image);
+
+          image = uploaded.image;
+          publicId = uploaded.publicId;
+        }
+
+        finalReviews.push({
+          id: review.id,
+          name: review.name,
+          role: review.role,
+          text: review.text,
+          image,
+          publicId,
+        });
+      }
+
+      const finalStats = stats.map((item) => ({
+        value: item.value,
+        label: item.label,
+        publicId: item.publicId || "",
+      }));
+
+      const res = await axios.post("/api/homepage/reviews-section", {
+        section,
+        stats: finalStats,
+        reviews: finalReviews,
+      });
+
+      if (res.data.success) {
+        setReviews((previous) =>
+          finalReviews.map((review, index) => ({
+            ...review,
+            id: previous[index]?.id || review.id || Date.now() + index,
+            imageFile: null,
+            imagePreview: "",
+          })),
+        );
+
+        setDraft((previous) => ({
+          ...previous,
+          imageFile: null,
+          imagePreview: "",
+        }));
+
+        toast.success("All changes saved successfully.");
+      } else {
+        toast.error(res.data.message || "Failed to save changes.");
+      }
+    } catch (error) {
+      console.error("Failed to save reviews:", error);
+      toast.error(error.response?.data?.message || "Failed to save changes.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Add a review and save all changes
+  const addReview = async () => {
     if (!draft.name.trim() || !draft.role.trim() || !draft.text.trim()) {
-      toast.error("Please fill Name, Role and Review Text");
+      toast.error("Please enter the client's name, role, and review.");
       return;
     }
 
-    const review = { ...draft, id: Date.now() + Math.random() };
+    const newReview = {
+      ...draft,
+      id: Date.now(),
+    };
 
-    setReviews((prev) => [review, ...prev]);
+    const updatedReviews = [newReview, ...reviews];
+
+    setReviews(updatedReviews);
+    setOpenId(newReview.id);
 
     setDraft({
-      id: Date.now() + Math.random(),
+      id: Date.now() + 1,
       name: "",
       role: "",
       text: "",
       image: "",
       imageFile: null,
       imagePreview: "",
+      publicId: "",
     });
 
-    setOpenId(review.id);
-    toast.success("Review added. Click Save All Changes to save it.");
+    toast.success("Review added. Saving changes...");
+
+    await saveAll(updatedReviews);
   };
 
-  /* Save All */
+  // Choose an image for the new review
+  const chooseDraftImage = (event) => {
+    const file = event.target.files?.[0];
 
-  const saveAll = async () => {
-    try {
-      setSaving(true);
+    if (!file) return;
 
-      const finalReviews = await Promise.all(
-        reviews.map(async (review) => ({
-          id: review.id,
-          name: review.name,
-          role: review.role,
-          text: review.text,
-          image: review.imageFile
-            ? await uploadImage(review.imageFile)
-            : review.image?.trim() || "",
-        })),
-      );
-
-      const { data } = await axios.post("/api/homepage/reviews-section", {
-        section,
-        stats: stats.map(({ value, label, publicId }) => ({
-          value,
-          label,
-          publicId,
-        })),
-        reviews: finalReviews,
-      });
-
-      if (!data.success) {
-        throw new Error(data.message || "Save failed");
-      }
-
-      setReviews((prev) =>
-        prev.map((review) => {
-          const saved = finalReviews.find((item) => item.id === review.id);
-
-          return saved
-            ? {
-                ...review,
-                image: saved.image,
-                imageFile: null,
-                imagePreview: "",
-              }
-            : review;
-        }),
-      );
-
-      toast.success("Saved successfully");
-    } catch (error) {
-      console.error("Save error:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.message ||
-          "Failed to save reviews",
-      );
-    } finally {
-      setSaving(false);
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file.");
+      event.target.value = "";
+      return;
     }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be less than 5MB.");
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      setDraft((previous) => ({
+        ...previous,
+        imageFile: file,
+        imagePreview: reader.result,
+      }));
+    };
+
+    reader.readAsDataURL(file);
   };
 
-  /* Search Reviews */
+  // Choose an image for an existing review
+  const chooseReviewImage = (event, reviewId) => {
+    const file = event.target.files?.[0];
 
-  const filteredReviews = reviews.filter(
-    (review) =>
-      review.name.toLowerCase().includes(search.toLowerCase()) ||
-      review.role.toLowerCase().includes(search.toLowerCase()) ||
-      review.text.toLowerCase().includes(search.toLowerCase()),
-  );
+    if (!file) return;
 
-  /* Loading Screen */
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be less than 5MB.");
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      setReviews((previous) =>
+        previous.map((item) =>
+          item.id === reviewId
+            ? {
+                ...item,
+                imageFile: file,
+                imagePreview: reader.result,
+              }
+            : item,
+        ),
+      );
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  // Update a review field
+  const updateReview = (reviewId, field, value) => {
+    setReviews((previous) =>
+      previous.map((item) =>
+        item.id === reviewId ? { ...item, [field]: value } : item,
+      ),
+    );
+  };
+
+  // Move a review up or down
+  const moveReview = (index, direction) => {
+    const nextIndex = index + direction;
+
+    if (nextIndex < 0 || nextIndex >= reviews.length) return;
+
+    const updatedReviews = [...reviews];
+    const current = updatedReviews[index];
+
+    updatedReviews[index] = updatedReviews[nextIndex];
+    updatedReviews[nextIndex] = current;
+
+    setReviews(updatedReviews);
+  };
+
+  // Delete a review
+  const deleteReview = (reviewId) => {
+    const updatedReviews = reviews.filter((item) => item.id !== reviewId);
+
+    setReviews(updatedReviews);
+
+    if (openId === reviewId) {
+      setOpenId(null);
+    }
+
+    toast.success("Review removed. Save your changes to confirm.");
+  };
+
+  // Add a statistic
+  const addStat = () => {
+    setStats((previous) => [
+      ...previous,
+      {
+        id: Date.now(),
+        publicId: "",
+        value: "",
+        label: "",
+      },
+    ]);
+  };
+
+  // Update a statistic
+  const updateStat = (statId, field, value) => {
+    setStats((previous) =>
+      previous.map((item) =>
+        item.id === statId ? { ...item, [field]: value } : item,
+      ),
+    );
+  };
+
+  // Move a statistic up or down
+  const moveStat = (index, direction) => {
+    const nextIndex = index + direction;
+
+    if (nextIndex < 0 || nextIndex >= stats.length) return;
+
+    const updatedStats = [...stats];
+    const current = updatedStats[index];
+
+    updatedStats[index] = updatedStats[nextIndex];
+    updatedStats[nextIndex] = current;
+
+    setStats(updatedStats);
+  };
+
+  const filteredReviews = reviews.filter((item) => {
+    const searchText = search.toLowerCase();
+
+    return (
+      item.name.toLowerCase().includes(searchText) ||
+      item.role.toLowerCase().includes(searchText) ||
+      item.text.toLowerCase().includes(searchText)
+    );
+  });
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#16212C]">
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#1E8A8A]/20 border-t-[#1E8A8A]" />
-          <p className="mt-4 text-sm text-gray-400">Loading reviews...</p>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 text-[#0C1E21] dark:bg-[#16212C] dark:text-white">
+        <div className="flex items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#1E8A8A]/20 border-t-[#1E8A8A]" />
+          <p className="text-sm font-medium">Loading reviews...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#16212C] px-4 py-6 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div className="min-h-screen bg-gray-50 px-4 py-6 text-[#0C1E21] sm:px-6 lg:px-8 dark:bg-[#16212C] dark:text-white">
+      <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-
-        <div className="rounded-2xl border border-white/10 bg-[#111B27] p-5 sm:p-7">
-          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#48C5C5]">
-                <MessageSquareQuote size={27} />
-              </div>
-
-              <div>
-                <h1 className="text-2xl font-bold sm:text-3xl">
-                  Reviews Manager
-                </h1>
-                <p className="mt-2 text-sm text-gray-400">
-                  Manage testimonials, statistics and client reviews.
-                </p>
-              </div>
+        <div className="sticky top-3 z-30 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+              <MessageSquareQuote size={24} />
             </div>
 
-            <button onClick={saveAll} disabled={saving} className={button}>
-              <Save size={18} />
-              {saving ? "Saving..." : "Save All Changes"}
-            </button>
-          </div>
-
-          <div className="mt-6 grid grid-cols-2 gap-3 border-t border-white/10 pt-5 sm:grid-cols-3">
-            <div className="rounded-xl bg-[#16212C] p-4">
-              <p className="text-xs text-gray-400">Total Reviews</p>
-              <p className="mt-2 text-2xl font-bold">{reviews.length}</p>
-            </div>
-
-            <div className="rounded-xl bg-[#16212C] p-4">
-              <p className="text-xs text-gray-400">Statistics</p>
-              <p className="mt-2 text-2xl font-bold">{stats.length}</p>
-            </div>
-
-            <div className="col-span-2 rounded-xl bg-[#16212C] p-4 sm:col-span-1">
-              <p className="text-xs text-gray-400">Search Results</p>
-              <p className="mt-2 text-2xl font-bold">
-                {filteredReviews.length}
+            <div>
+              <h1 className="text-xl font-bold sm:text-2xl">Reviews Manager</h1>
+              <p className={`mt-1 text-sm ${muted}`}>
+                Manage testimonials and client feedback.
               </p>
             </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => saveAll()}
+            disabled={saving}
+            className={button}
+          >
+            <Save size={18} />
+            {saving ? "Saving Changes..." : "Save All Changes"}
+          </button>
+        </div>
+
+        {/* Overview */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className={card}>
+            <p className={`text-sm ${muted}`}>Total Reviews</p>
+            <h2 className="mt-2 text-3xl font-bold">{reviews.length}</h2>
+            <p className={`mt-1 text-xs ${muted}`}>Client testimonials</p>
+          </div>
+
+          <div className={card}>
+            <p className={`text-sm ${muted}`}>Statistics</p>
+            <h2 className="mt-2 text-3xl font-bold">{stats.length}</h2>
+            <p className={`mt-1 text-xs ${muted}`}>Testimonial section stats</p>
+          </div>
+
+          <div className={card}>
+            <p className={`text-sm ${muted}`}>Filtered Reviews</p>
+            <h2 className="mt-2 text-3xl font-bold">
+              {filteredReviews.length}
+            </h2>
+            <p className={`mt-1 text-xs ${muted}`}>
+              Results matching your search
+            </p>
           </div>
         </div>
 
         {/* Section Content */}
-
-        <section className="rounded-2xl border border-white/10 bg-[#111B27] p-5 sm:p-7">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold">01. Section Content</h2>
-              <p className="mt-1 text-sm text-gray-400">
-                Edit the testimonial section text.
-              </p>
-            </div>
-
-            <button
-              onClick={loadData}
-              disabled={saving || loading}
-              className={smallButton}
-            >
-              Reload
-            </button>
+        <section className={card}>
+          <div className="mb-6">
+            <h2 className="text-lg font-bold">Section Content</h2>
+            <p className={`mt-1 text-sm ${muted}`}>
+              Edit the heading and description displayed on your website.
+            </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <input
-              className={input}
-              value={section.badgeText}
-              onChange={(e) =>
-                setSection({ ...section, badgeText: e.target.value })
-              }
-              placeholder="Badge Text"
-            />
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div>
+              <label className={label}>Badge Text</label>
+              <input
+                className={input}
+                value={section.badgeText}
+                onChange={(event) =>
+                  setSection({
+                    ...section,
+                    badgeText: event.target.value,
+                  })
+                }
+                placeholder="CLIENTS FEEDBACK"
+              />
+            </div>
 
-            <input
-              className={input}
-              value={section.highlightWord}
-              onChange={(e) =>
-                setSection({ ...section, highlightWord: e.target.value })
-              }
-              placeholder="Highlight Word"
-            />
+            <div>
+              <label className={label}>Highlighted Word</label>
+              <input
+                className={input}
+                value={section.highlightWord}
+                onChange={(event) =>
+                  setSection({
+                    ...section,
+                    highlightWord: event.target.value,
+                  })
+                }
+                placeholder="Stories"
+              />
+            </div>
 
-            <input
-              className={input}
-              value={section.headingLineOne}
-              onChange={(e) =>
-                setSection({ ...section, headingLineOne: e.target.value })
-              }
-              placeholder="Heading Line 1"
-            />
+            <div>
+              <label className={label}>Heading Line One</label>
+              <input
+                className={input}
+                value={section.headingLineOne}
+                onChange={(event) =>
+                  setSection({
+                    ...section,
+                    headingLineOne: event.target.value,
+                  })
+                }
+                placeholder="Success Stories Fuel"
+              />
+            </div>
 
-            <input
-              className={input}
-              value={section.headingLineTwo}
-              onChange={(e) =>
-                setSection({ ...section, headingLineTwo: e.target.value })
-              }
-              placeholder="Heading Line 2"
-            />
+            <div>
+              <label className={label}>Heading Line Two</label>
+              <input
+                className={input}
+                value={section.headingLineTwo}
+                onChange={(event) =>
+                  setSection({
+                    ...section,
+                    headingLineTwo: event.target.value,
+                  })
+                }
+                placeholder="our Innovation."
+              />
+            </div>
 
-            <textarea
-              className={`${input} resize-y md:col-span-2`}
-              rows={4}
-              value={section.description}
-              onChange={(e) =>
-                setSection({ ...section, description: e.target.value })
-              }
-              placeholder="Section Description"
-            />
+            <div className="md:col-span-2">
+              <label className={label}>Description</label>
+              <textarea
+                className={`${input} min-h-28 resize-y`}
+                value={section.description}
+                onChange={(event) =>
+                  setSection({
+                    ...section,
+                    description: event.target.value,
+                  })
+                }
+                placeholder="Enter section description..."
+                rows={4}
+              />
+            </div>
           </div>
         </section>
 
         {/* Statistics */}
-
-        <section className="rounded-2xl border border-white/10 bg-[#111B27] p-5 sm:p-7">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <section className={card}>
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold">02. Top Statistics</h2>
-              <p className="mt-1 text-sm text-gray-400">
-                Edit, reorder and delete statistics.
+              <h2 className="text-lg font-bold">Statistics</h2>
+              <p className={`mt-1 text-sm ${muted}`}>
+                Manage the statistics shown in your testimonial section.
               </p>
             </div>
 
-            <button
-              onClick={() =>
-                setStats([
-                  ...stats,
-                  { id: Date.now(), publicId: "", value: "", label: "" },
-                ])
-              }
-              className={smallButton}
-            >
-              <Plus size={16} />
+            <button type="button" onClick={addStat} className={smallButton}>
+              <Plus size={17} />
               Add Statistic
             </button>
           </div>
 
           <div className="space-y-4">
             {stats.map((item, index) => (
-              <div
-                key={item.id}
-                className="rounded-xl border border-white/10 bg-[#16212C] p-4"
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-semibold">Statistic {index + 1}</h3>
+              <div key={item.id} className={innerBox}>
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold">
+                    Statistic {index + 1}
+                  </span>
 
                   <div className="flex gap-2">
                     <button
-                      disabled={index === 0}
-                      onClick={() => {
-                        const updated = [...stats];
-                        [updated[index - 1], updated[index]] = [
-                          updated[index],
-                          updated[index - 1],
-                        ];
-                        setStats(updated);
-                      }}
+                      type="button"
                       className={smallButton}
+                      onClick={() => moveStat(index, -1)}
+                      disabled={index === 0}
                       aria-label="Move statistic up"
                     >
                       <ArrowUp size={16} />
                     </button>
 
                     <button
-                      disabled={index === stats.length - 1}
-                      onClick={() => {
-                        const updated = [...stats];
-                        [updated[index + 1], updated[index]] = [
-                          updated[index],
-                          updated[index + 1],
-                        ];
-                        setStats(updated);
-                      }}
+                      type="button"
                       className={smallButton}
+                      onClick={() => moveStat(index, 1)}
+                      disabled={index === stats.length - 1}
                       aria-label="Move statistic down"
                     >
                       <ArrowDown size={16} />
@@ -433,466 +641,450 @@ export default function ReviewsAdminPanel() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <input
-                    className={input}
-                    value={item.value}
-                    onChange={(e) =>
-                      setStats(
-                        stats.map((stat) =>
-                          stat.id === item.id
-                            ? { ...stat, value: e.target.value }
-                            : stat,
-                        ),
-                      )
-                    }
-                    placeholder="Value"
-                  />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className={label}>Value</label>
+                    <input
+                      className={input}
+                      value={item.value}
+                      onChange={(event) =>
+                        updateStat(item.id, "value", event.target.value)
+                      }
+                      placeholder="93%"
+                    />
+                  </div>
 
-                  <input
-                    className={input}
-                    value={item.label}
-                    onChange={(e) =>
-                      setStats(
-                        stats.map((stat) =>
-                          stat.id === item.id
-                            ? { ...stat, label: e.target.value }
-                            : stat,
-                        ),
-                      )
-                    }
-                    placeholder="Label"
-                  />
+                  <div>
+                    <label className={label}>Label</label>
+                    <input
+                      className={input}
+                      value={item.label}
+                      onChange={(event) =>
+                        updateStat(item.id, "label", event.target.value)
+                      }
+                      placeholder="Projects Completed"
+                    />
+                  </div>
                 </div>
               </div>
             ))}
-
-            {stats.length === 0 && (
-              <p className="py-6 text-center text-sm text-gray-400">
-                No statistics added yet.
-              </p>
-            )}
           </div>
         </section>
 
         {/* Add Review */}
+        <section className={card}>
+          <div className="mb-6">
+            <h2 className="text-lg font-bold">Add New Review</h2>
+            <p className={`mt-1 text-sm ${muted}`}>
+              Add a client testimonial and optionally upload a client image.
+            </p>
+          </div>
 
-        <section className="rounded-2xl border border-white/10 bg-[#111B27] p-5 sm:p-7">
-          <h2 className="mb-2 text-xl font-bold">03. Add New Review</h2>
-          <p className="mb-6 text-sm text-gray-400">
-            Add a client testimonial and optional profile image.
-          </p>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div>
+              <label className={label}>Client Name *</label>
+              <input
+                className={input}
+                value={draft.name}
+                onChange={(event) =>
+                  setDraft({ ...draft, name: event.target.value })
+                }
+                placeholder="Enter client name"
+              />
+            </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <input
-              className={input}
-              value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              placeholder="Client Name"
-            />
+            <div>
+              <label className={label}>Client Role *</label>
+              <input
+                className={input}
+                value={draft.role}
+                onChange={(event) =>
+                  setDraft({ ...draft, role: event.target.value })
+                }
+                placeholder="CEO, Founder, Manager..."
+              />
+            </div>
 
-            <input
-              className={input}
-              value={draft.role}
-              onChange={(e) => setDraft({ ...draft, role: e.target.value })}
-              placeholder="Client Role"
-            />
+            <div className="md:col-span-2">
+              <label className={label}>Review Text *</label>
+              <textarea
+                className={`${input} min-h-32 resize-y`}
+                value={draft.text}
+                onChange={(event) =>
+                  setDraft({ ...draft, text: event.target.value })
+                }
+                placeholder="Enter the client's feedback..."
+                rows={4}
+              />
+            </div>
 
-            <textarea
-              className={`${input} resize-y md:col-span-2`}
-              rows={4}
-              value={draft.text}
-              onChange={(e) => setDraft({ ...draft, text: e.target.value })}
-              placeholder="Review Text"
-            />
+            <div className="md:col-span-2">
+              <label className={label}>Client Image URL</label>
+              <input
+                className={input}
+                value={draft.image}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    image: event.target.value,
+                    imageFile: null,
+                    imagePreview: "",
+                  })
+                }
+                placeholder="https://example.com/client.jpg"
+              />
+            </div>
 
-            <div className="rounded-xl border border-white/10 bg-[#16212C] p-4 md:col-span-2">
+            <div className="md:col-span-2">
+              <label className={label}>Upload Image From Your Computer</label>
+
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#111B27]">
+                <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#16212C]">
                   {draft.imagePreview || draft.image ? (
-                    <img
+                    <Image
                       src={draft.imagePreview || draft.image}
-                      alt="Review"
-                      className="h-full w-full object-cover"
+                      alt="Review preview"
+                      fill
+                      sizes="80px"
+                      unoptimized
+                      className="object-cover"
                     />
                   ) : (
-                    <ImagePlus className="text-gray-500" size={24} />
+                    <ImagePlus size={25} className={muted} />
                   )}
                 </div>
 
-                <div className="min-w-0 flex-1 space-y-3">
-                  <input
-                    className={input}
-                    value={draft.image}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        image: e.target.value,
-                        imageFile: null,
-                        imagePreview: "",
-                      })
-                    }
-                    placeholder="Image URL (optional)"
-                  />
-
+                <div>
                   <label className={`${smallButton} cursor-pointer`}>
-                    <Upload size={16} />
-                    Upload from PC
+                    <Upload size={17} />
+                    Choose Image
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-
-                        if (!file.type.startsWith("image/")) {
-                          toast.error("Please select an image file");
-                          e.target.value = "";
-                          return;
-                        }
-
-                        const reader = new FileReader();
-
-                        reader.onload = () =>
-                          setDraft({
-                            ...draft,
-                            image: "",
-                            imageFile: file,
-                            imagePreview: reader.result || "",
-                          });
-
-                        reader.onerror = () =>
-                          toast.error("Failed to preview image");
-
-                        reader.readAsDataURL(file);
-                        e.target.value = "";
-                      }}
+                      onChange={chooseDraftImage}
                     />
                   </label>
+
+                  <p className={`mt-2 text-xs ${muted}`}>
+                    Images only. Maximum file size: 5MB.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-5 flex justify-end">
-            <button onClick={addReview} className={button}>
-              <Plus size={17} />
-              Add Review
+          <div className="mt-6 flex justify-end">
+            <button
+              type="button"
+              onClick={addReview}
+              disabled={saving || uploadingDraft}
+              className={button}
+            >
+              <Plus size={18} />
+              {saving ? "Saving..." : "Add Review & Save"}
             </button>
           </div>
         </section>
 
-        {/* Reviews List */}
+        {/* Existing Reviews */}
+        <section className={card}>
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-bold">Manage Reviews</h2>
+              <p className={`mt-1 text-sm ${muted}`}>
+                Edit, reorder, or remove existing client reviews.
+              </p>
+            </div>
 
-        <section className="rounded-2xl border border-white/10 bg-[#111B27] p-5 sm:p-7">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold">04. Reviews List</h2>
-            <p className="mt-1 text-sm text-gray-400">
-              Search, edit, reorder and delete reviews.
-            </p>
+            <div className="relative w-full sm:max-w-xs">
+              <Search
+                size={18}
+                className={`absolute top-1/2 left-3 -translate-y-1/2 ${muted}`}
+              />
+
+              <input
+                className={`${input} pl-10`}
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setVisible(20);
+                }}
+                placeholder="Search reviews..."
+              />
+            </div>
           </div>
 
-          <div className="relative mb-5">
-            <Search
-              size={17}
-              className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-500"
-            />
+          {filteredReviews.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-300 px-5 py-12 text-center dark:border-white/10">
+              <MessageSquareQuote
+                size={32}
+                className={`mx-auto mb-3 ${muted}`}
+              />
+              <p className="font-medium">No reviews found</p>
+              <p className={`mt-1 text-sm ${muted}`}>
+                Add a review or try a different search.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredReviews.slice(0, visible).map((item, index) => {
+                const isOpen = openId === item.id;
+                const imageSource = item.imagePreview || item.image;
 
-            <input
-              className={`${input} pl-11`}
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setVisible(20);
-              }}
-              placeholder="Search reviews..."
-            />
-          </div>
+                return (
+                  <div
+                    key={item.id}
+                    className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#16212C]"
+                  >
+                    <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#111B27]">
+                          {imageSource ? (
+                            <Image
+                              src={imageSource}
+                              alt={item.name || "Client"}
+                              fill
+                              sizes="48px"
+                              unoptimized
+                              className="object-cover"
+                            />
+                          ) : (
+                            <ImagePlus size={19} className={muted} />
+                          )}
+                        </div>
 
-          <div className="space-y-4">
-            {filteredReviews.slice(0, visible).map((item) => {
-              const isOpen = openId === item.id;
-              const index = reviews.findIndex(
-                (review) => review.id === item.id,
-              );
-
-              return (
-                <div
-                  key={item.id}
-                  className="overflow-hidden rounded-xl border border-white/10 bg-[#16212C]"
-                >
-                  <div className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#111B27]">
-                        {item.imagePreview || item.image ? (
-                          <img
-                            src={item.imagePreview || item.image}
-                            alt={item.name || "Client"}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <MessageSquareQuote
-                            size={20}
-                            className="text-[#48C5C5]"
-                          />
-                        )}
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate font-semibold">
+                            {item.name || "Unnamed Client"}
+                          </h3>
+                          <p className={`mt-1 truncate text-sm ${muted}`}>
+                            {item.role || "No role provided"}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="min-w-0">
-                        <h3 className="truncate font-semibold">
-                          {item.name || "Untitled Review"}
-                        </h3>
-                        <p className="text-sm text-gray-400">
-                          {item.role || "No role"}
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-xs text-gray-500">
-                          {item.text}
-                        </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          className={smallButton}
+                          onClick={() => moveReview(index, -1)}
+                          disabled={index === 0}
+                          aria-label="Move review up"
+                        >
+                          <ArrowUp size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className={smallButton}
+                          onClick={() => moveReview(index, 1)}
+                          disabled={index === filteredReviews.length - 1}
+                          aria-label="Move review down"
+                        >
+                          <ArrowDown size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className={smallButton}
+                          onClick={() => setOpenId(isOpen ? null : item.id)}
+                          aria-label={
+                            isOpen ? "Collapse review" : "Edit review"
+                          }
+                        >
+                          {isOpen ? (
+                            <ChevronUp size={17} />
+                          ) : (
+                            <ChevronDown size={17} />
+                          )}
+                          {isOpen ? "Close" : "Edit"}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-100 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
+                          onClick={() => deleteReview(item.id)}
+                        >
+                          <Trash2 size={16} />
+                          Delete
+                        </button>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setOpenId(isOpen ? null : item.id)}
-                        className={smallButton}
-                      >
-                        {isOpen ? (
-                          <ChevronUp size={16} />
-                        ) : (
-                          <ChevronDown size={16} />
-                        )}
-                        {isOpen ? "Close" : "Edit"}
-                      </button>
+                    {!isOpen && (
+                      <div className="border-t border-gray-200 px-4 py-3 dark:border-white/10">
+                        <p className={`line-clamp-2 text-sm ${muted}`}>
+                          {item.text || "No review text provided."}
+                        </p>
+                      </div>
+                    )}
 
-                      <button
-                        disabled={index === 0}
-                        onClick={() => {
-                          const updated = [...reviews];
-                          [updated[index - 1], updated[index]] = [
-                            updated[index],
-                            updated[index - 1],
-                          ];
-                          setReviews(updated);
-                        }}
-                        className={smallButton}
-                        aria-label="Move review up"
-                      >
-                        <ArrowUp size={16} />
-                      </button>
+                    {isOpen && (
+                      <div className="space-y-5 border-t border-gray-200 p-4 dark:border-white/10">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                          <div>
+                            <label className={label}>Client Name</label>
+                            <input
+                              className={input}
+                              value={item.name}
+                              onChange={(event) =>
+                                updateReview(
+                                  item.id,
+                                  "name",
+                                  event.target.value,
+                                )
+                              }
+                              placeholder="Client name"
+                            />
+                          </div>
 
-                      <button
-                        disabled={index === reviews.length - 1}
-                        onClick={() => {
-                          const updated = [...reviews];
-                          [updated[index + 1], updated[index]] = [
-                            updated[index],
-                            updated[index + 1],
-                          ];
-                          setReviews(updated);
-                        }}
-                        className={smallButton}
-                        aria-label="Move review down"
-                      >
-                        <ArrowDown size={16} />
-                      </button>
+                          <div>
+                            <label className={label}>Client Role</label>
+                            <input
+                              className={input}
+                              value={item.role}
+                              onChange={(event) =>
+                                updateReview(
+                                  item.id,
+                                  "role",
+                                  event.target.value,
+                                )
+                              }
+                              placeholder="Client role"
+                            />
+                          </div>
 
-                      <button
-                        onClick={() => {
-                          setReviews((prev) =>
-                            prev.filter((review) => review.id !== item.id),
-                          );
-                          if (openId === item.id) setOpenId(null);
-                          toast.success(
-                            "Review removed. Save to apply changes.",
-                          );
-                        }}
-                        className="rounded-xl border border-red-500/20 bg-red-500/5 p-2.5 text-red-400 hover:bg-red-500 hover:text-white"
-                        aria-label="Delete review"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
+                          <div className="md:col-span-2">
+                            <label className={label}>Review Text</label>
+                            <textarea
+                              className={`${input} min-h-32 resize-y`}
+                              value={item.text}
+                              onChange={(event) =>
+                                updateReview(
+                                  item.id,
+                                  "text",
+                                  event.target.value,
+                                )
+                              }
+                              placeholder="Client feedback..."
+                              rows={4}
+                            />
+                          </div>
 
-                  {isOpen && (
-                    <div className="border-t border-white/10 bg-[#111B27] p-4">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <input
-                          className={input}
-                          value={item.name}
-                          onChange={(e) =>
-                            setReviews((prev) =>
-                              prev.map((review) =>
-                                review.id === item.id
-                                  ? { ...review, name: e.target.value }
-                                  : review,
-                              ),
-                            )
-                          }
-                          placeholder="Client Name"
-                        />
+                          <div className="md:col-span-2">
+                            <label className={label}>Image URL</label>
+                            <input
+                              className={input}
+                              value={item.image}
+                              onChange={(event) =>
+                                setReviews((previous) =>
+                                  previous.map((review) =>
+                                    review.id === item.id
+                                      ? {
+                                          ...review,
+                                          image: event.target.value,
+                                          imageFile: null,
+                                          imagePreview: "",
+                                        }
+                                      : review,
+                                  ),
+                                )
+                              }
+                              placeholder="https://example.com/client.jpg"
+                            />
+                          </div>
 
-                        <input
-                          className={input}
-                          value={item.role}
-                          onChange={(e) =>
-                            setReviews((prev) =>
-                              prev.map((review) =>
-                                review.id === item.id
-                                  ? { ...review, role: e.target.value }
-                                  : review,
-                              ),
-                            )
-                          }
-                          placeholder="Client Role"
-                        />
+                          <div className="md:col-span-2">
+                            <label className={label}>Change Client Image</label>
 
-                        <textarea
-                          className={`${input} resize-y md:col-span-2`}
-                          rows={4}
-                          value={item.text}
-                          onChange={(e) =>
-                            setReviews((prev) =>
-                              prev.map((review) =>
-                                review.id === item.id
-                                  ? { ...review, text: e.target.value }
-                                  : review,
-                              ),
-                            )
-                          }
-                          placeholder="Review Text"
-                        />
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#111B27]">
+                                {item.imagePreview || item.image ? (
+                                  <Image
+                                    src={item.imagePreview || item.image}
+                                    alt={item.name || "Client"}
+                                    fill
+                                    sizes="80px"
+                                    unoptimized
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <ImagePlus size={25} className={muted} />
+                                )}
+                              </div>
 
-                        <div className="rounded-xl border border-white/10 bg-[#16212C] p-4 md:col-span-2">
-                          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#111B27]">
-                              {item.imagePreview || item.image ? (
-                                <img
-                                  src={item.imagePreview || item.image}
-                                  alt={item.name || "Client"}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <ImagePlus
-                                  className="text-gray-500"
-                                  size={24}
-                                />
-                              )}
-                            </div>
-
-                            <div className="min-w-0 flex-1 space-y-3">
-                              <input
-                                className={input}
-                                value={item.image}
-                                onChange={(e) =>
-                                  setReviews((prev) =>
-                                    prev.map((review) =>
-                                      review.id === item.id
-                                        ? {
-                                            ...review,
-                                            image: e.target.value,
-                                            imageFile: null,
-                                            imagePreview: "",
-                                          }
-                                        : review,
-                                    ),
-                                  )
-                                }
-                                placeholder="Image URL"
-                              />
-
-                              <label
-                                className={`${smallButton} cursor-pointer`}
-                              >
-                                <Upload size={16} />
-                                Upload from PC
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (!file) return;
-
-                                    if (!file.type.startsWith("image/")) {
-                                      toast.error(
-                                        "Please select an image file",
-                                      );
-                                      e.target.value = "";
-                                      return;
+                              <div>
+                                <label
+                                  className={`${smallButton} cursor-pointer`}
+                                >
+                                  <Upload size={17} />
+                                  Choose Image
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(event) =>
+                                      chooseReviewImage(event, item.id)
                                     }
+                                  />
+                                </label>
 
-                                    const reader = new FileReader();
-
-                                    reader.onload = () =>
-                                      setReviews((prev) =>
-                                        prev.map((review) =>
-                                          review.id === item.id
-                                            ? {
-                                                ...review,
-                                                image: "",
-                                                imageFile: file,
-                                                imagePreview:
-                                                  reader.result || "",
-                                              }
-                                            : review,
-                                        ),
-                                      );
-
-                                    reader.onerror = () =>
-                                      toast.error("Failed to preview image");
-
-                                    reader.readAsDataURL(file);
-                                    e.target.value = "";
-                                  }}
-                                />
-                              </label>
+                                <p className={`mt-2 text-xs ${muted}`}>
+                                  Images only. Maximum file size: 5MB.
+                                </p>
+                              </div>
                             </div>
                           </div>
                         </div>
+
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            className={button}
+                            onClick={() => saveAll()}
+                            disabled={saving}
+                          >
+                            <Save size={17} />
+                            {saving ? "Saving..." : "Save Changes"}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                );
+              })}
+
+              {visible < filteredReviews.length && (
+                <div className="flex justify-center pt-3">
+                  <button
+                    type="button"
+                    className={smallButton}
+                    onClick={() => setVisible((previous) => previous + 20)}
+                  >
+                    Load More Reviews
+                  </button>
                 </div>
-              );
-            })}
-
-            {filteredReviews.length === 0 && (
-              <div className="rounded-xl border border-dashed border-white/10 py-12 text-center">
-                <Search className="mx-auto text-gray-500" size={26} />
-                <p className="mt-3 font-medium">No reviews found</p>
-                <p className="mt-1 text-sm text-gray-400">
-                  Try another search or add a review.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {visible < filteredReviews.length && (
-            <div className="mt-5 flex justify-center">
-              <button
-                onClick={() => setVisible(visible + 20)}
-                className={smallButton}
-              >
-                Load More Reviews
-                <ChevronDown size={16} />
-              </button>
+              )}
             </div>
           )}
         </section>
 
-        {/* Save All */}
-
-        <div className="flex flex-col justify-between gap-4 rounded-2xl border border-white/10 bg-[#111B27] p-5 sm:flex-row sm:items-center sm:p-6">
+        {/* Bottom Save */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]">
           <div>
-            <h3 className="font-semibold">Save your changes</h3>
-            <p className="mt-1 text-sm text-gray-400">
-              Save section content, statistics and reviews together.
+            <h3 className="font-semibold">Ready to save your changes?</h3>
+            <p className={`mt-1 text-sm ${muted}`}>
+              Save the section content, statistics, and reviews together.
             </p>
           </div>
 
-          <button onClick={saveAll} disabled={saving} className={button}>
+          <button
+            type="button"
+            className={button}
+            onClick={() => saveAll()}
+            disabled={saving}
+          >
             <Save size={18} />
             {saving ? "Saving Changes..." : "Save All Changes"}
           </button>
