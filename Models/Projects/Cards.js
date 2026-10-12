@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const LargeProjectSchema = new mongoose.Schema(
+const Cards = new mongoose.Schema(
   {
     tag: {
       type: String,
@@ -26,5 +26,5 @@ const LargeProjectSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-export default mongoose.models.LargeProject ||
-  mongoose.model("LargeProject", LargeProjectSchema);
+export default mongoose.models.Cards ||
+  mongoose.model("Cards", Cards);
