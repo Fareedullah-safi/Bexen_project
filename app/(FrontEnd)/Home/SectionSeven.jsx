@@ -12,6 +12,8 @@ function AnimatedNumber({ value }) {
 
     if (!element) return;
 
+    let animationFrame;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return;
@@ -21,17 +23,18 @@ function AnimatedNumber({ value }) {
 
         const animate = (currentTime) => {
           const progress = Math.min((currentTime - startTime) / duration, 1);
+
           const easeOut = 1 - Math.pow(1 - progress, 4);
           const currentValue = value * easeOut;
 
           setNumber(Number(currentValue.toFixed(1)));
 
           if (progress < 1) {
-            requestAnimationFrame(animate);
+            animationFrame = requestAnimationFrame(animate);
           }
         };
 
-        requestAnimationFrame(animate);
+        animationFrame = requestAnimationFrame(animate);
         observer.disconnect();
       },
       {
@@ -41,43 +44,74 @@ function AnimatedNumber({ value }) {
 
     observer.observe(element);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(animationFrame);
+    };
   }, [value]);
 
   return <span ref={ref}>{number}</span>;
 }
 
 export default function SectionSeven() {
-  const stats = [
-    {
-      number: 93,
-      suffix: "%",
-      title: "Projects Completed.",
-    },
-    {
-      number: 20,
-      suffix: "M",
-      title: "Reach Worldwide",
-    },
-    {
-      number: 8.5,
-      suffix: "X",
-      title: "Faster Growth",
-    },
-    {
-      number: 100,
-      suffix: "+",
-      title: "Awards Archived",
-    },
-  ];
+  const [stats, setStats] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const response = await fetch("/api/homepage/reviews-section");
+
+        if (!response.ok) {
+          throw new Error("Failed to load stats");
+        }
+
+        const result = await response.json();
+
+        if (result.success && Array.isArray(result.data?.stats)) {
+          setStats(
+            result.data.stats.map((stat) => {
+              const match = String(stat.value || "").match(
+                /^(\d+(?:\.\d+)?)(.*)$/,
+              );
+
+              return {
+                number: match ? Number(match[1]) : 0,
+                suffix: match ? match[2] : "",
+                title: stat.label || "",
+              };
+            }),
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load stats:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadStats();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <section className="relative z-20 -mt-20 w-full px-4 py-16 sm:px-6 md:px-10 lg:px-12 xl:px-16">
+        <div className="mx-auto flex min-h-52 w-full max-w-7xl items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#1E8A8A]/20 border-t-[#1E8A8A]" />
+        </div>
+      </section>
+    );
+  }
+
+  if (stats.length === 0) return null;
 
   return (
-    <section className="w-full relative z-20 -mt-20 px-4 py-16 sm:px-6 md:px-10 lg:px-12 xl:px-16">
+    <section className="relative z-20 -mt-20 w-full px-4 py-16 sm:px-6 md:px-10 lg:px-12 xl:px-16">
       <div className="mx-auto w-full max-w-7xl">
         <div className="grid grid-cols-1 overflow-hidden rounded-3xl border border-white/15 bg-[#1E8A8A] shadow-2xl sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat, index) => (
             <div
-              key={stat.title}
+              key={stat.title || index}
               data-wow-duration="0.8s"
               data-wow-delay={`${index * 0.12}s`}
               className="wow animate__animated animate__fadeInUp group relative flex min-h-52 cursor-pointer flex-col justify-between overflow-hidden border-b border-white/15 px-6 py-7 transition-all duration-500 hover:bg-[#0C1E21]/15 sm:px-8 lg:min-h-60 lg:border-r lg:border-b-0 lg:last:border-r-0"
@@ -88,7 +122,7 @@ export default function SectionSeven() {
               {/* Top */}
               <div className="relative flex items-start justify-between">
                 <span className="text-sm font-semibold tracking-wider text-white/70">
-                  0{index + 1}
+                  {String(index + 1).padStart(2, "0")}
                 </span>
 
                 <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 transition-all duration-500 group-hover:rotate-45 group-hover:bg-white/20">

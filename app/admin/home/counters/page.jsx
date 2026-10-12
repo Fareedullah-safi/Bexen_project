@@ -179,9 +179,7 @@ export default function ReviewsAdminPanel() {
           text: review.text,
           image: review.imageFile
             ? await uploadImage(review.imageFile)
-            : review.image?.trim()
-              ? await uploadImage(review.image.trim())
-              : "",
+            : review.image?.trim() || "",
         })),
       );
 

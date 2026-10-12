@@ -1,15 +1,39 @@
+// lib/mongodb.js
+
 import mongoose from "mongoose";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
-export default function connectDB() {
-  if (!MONGODB_URI) {
-    throw new Error("MONGODB_URI is missing in .env.local");
+if (!MONGODB_URI) {
+  throw new Error("Please add MONGODB_URI to .env.local");
+}
+
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = {
+    connection: null,
+    promise: null,
+  };
+}
+
+async function connectDB() {
+  if (cached.connection) {
+    return cached.connection;
   }
 
-  mongoose.connect(MONGODB_URI);
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGODB_URI).then((mongoose) => mongoose);
+  }
 
-  console.log("MongoDB connected successfully");
+  try {
+    cached.connection = await cached.promise;
+  } catch (error) {
+    cached.promise = null;
+    throw error;
+  }
 
-  return mongoose.connection;
+  return cached.connection;
 }
+
+export default connectDB;

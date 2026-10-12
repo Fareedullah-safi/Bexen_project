@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/Lib/mongoDB";
 import ReviewSection from "@/Models/counters/ReviewSection";
+import cloudinary from "@/Lib/cloudinary";
 
 export async function GET() {
   try {
@@ -87,27 +88,69 @@ export async function POST(req) {
   }
 }
 
-
 export async function DELETE(req) {
   try {
-    const { reviewId, publicId } = await req.json();
-
     await connectDB();
 
-    if (publicId) {
-      await cloudinary.uploader.destroy(publicId);
+    const { reviewId, publicId } = await req.json();
+
+    if (!reviewId) {
+      return NextResponse.json(
+        { success: false, message: "Review ID is required" },
+        { status: 400 },
+      );
     }
 
-    await ReviewsSection.updateOne(
-      {},
-      { $pull: { reviews: { _id: reviewId } } }
-    );
+    const reviewSection = await ReviewSection.findOne();
 
-    return Response.json({ success: true });
+    if (!reviewSection) {
+      return NextResponse.json(
+        { success: false, message: "Review section not found" },
+        { status: 404 },
+      );
+    }
+
+    const review = reviewSection.reviews.id(reviewId);
+
+    if (!review) {
+      return NextResponse.json(
+        { success: false, message: "Review not found" },
+        { status: 404 },
+      );
+    }
+
+    const imagePublicId = publicId || review.publicId;
+
+    if (imagePublicId) {
+      const result = await cloudinary.uploader.destroy(imagePublicId, {
+        resource_type: "image",
+      });
+
+      if (result.result !== "ok" && result.result !== "not found") {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Cloudinary image could not be deleted",
+            result: result.result,
+          },
+          { status: 500 },
+        );
+      }
+    }
+
+    reviewSection.reviews.pull({ _id: reviewId });
+    await reviewSection.save();
+
+    return NextResponse.json({
+      success: true,
+      message: "Review deleted successfully",
+    });
   } catch (error) {
-    return Response.json(
+    console.error("Review delete error:", error);
+
+    return NextResponse.json(
       { success: false, message: error.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
