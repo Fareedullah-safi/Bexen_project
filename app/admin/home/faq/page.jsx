@@ -1,9 +1,11 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import { HelpCircle, ImagePlus, Moon, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 const defaultFormData = {
   headingLineOne: "",
@@ -34,6 +36,7 @@ export default function FaqAdminPanel() {
   const [savedImagePublicId, setSavedImagePublicId] = useState("");
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const previewImage = previewUrl || formData.imageURL;
 
@@ -73,6 +76,12 @@ export default function FaqAdminPanel() {
     getFaqData();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
   function updateField(field, value) {
     setFormData((current) => ({
       ...current,
@@ -97,10 +106,9 @@ export default function FaqAdminPanel() {
       return;
     }
 
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-
     setSelectedImage(file);
     setPreviewUrl(URL.createObjectURL(file));
+    setImageError(false);
     event.target.value = "";
   }
 
@@ -112,10 +120,9 @@ export default function FaqAdminPanel() {
       imageURL: value,
     }));
 
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-
     setSelectedImage(null);
     setPreviewUrl("");
+    setImageError(false);
   }
 
   async function handleAllUpdates() {
@@ -189,10 +196,9 @@ export default function FaqAdminPanel() {
       setSavedImageURL(newImageURL);
       setSavedImagePublicId(newPublicId);
 
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-
       setPreviewUrl("");
       setSelectedImage(null);
+      setImageError(false);
 
       toast.success("FAQ updated successfully.");
 
@@ -224,7 +230,7 @@ export default function FaqAdminPanel() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F4F7F7] px-4 py-8 text-slate-900 sm:px-6 lg:px-8 dark:bg-[#0C1420] dark:text-white">
+    <main className="min-h-screen bg-[var(--background)] px-4 py-8 text-[var(--foreground)] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <header
           className={`${cardClass} flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between`}
@@ -266,11 +272,8 @@ export default function FaqAdminPanel() {
         </header>
 
         {isFetching ? (
-          <section className={`${cardClass} py-12 text-center`}>
-            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-[#1E8A8A]/20 border-t-[#1E8A8A]" />
-            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-              Loading FAQ data...
-            </p>
+          <section className={`${cardClass} flex min-h-40 items-center justify-center`}>
+            <Spinner />
           </section>
         ) : (
           <>
@@ -315,18 +318,25 @@ export default function FaqAdminPanel() {
 
                   <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 sm:items-center dark:border-white/10 dark:bg-[#16212C]">
                     <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-br from-[#dce8e4] via-[#aabdb6] to-[#607b73] p-6 text-center text-white dark:border-white/10 dark:from-[#304541] dark:via-[#273a38] dark:to-[#172522]">
-                      {previewImage ? (
+                      {previewImage && !imageError ? (
                         <img
+                          key={previewImage}
                           src={previewImage}
                           alt="FAQ background preview"
                           className="absolute inset-0 h-full w-full object-cover"
+                          onError={() => setImageError(true)}
+                          onLoad={() => setImageError(false)}
                         />
                       ) : (
                         <div className="relative rounded-xl bg-black/15 px-5 py-4 backdrop-blur-sm">
                           <ImagePlus size={30} className="mx-auto mb-2" />
-                          <p className="text-sm font-semibold">Image Preview</p>
+                          <p className="text-sm font-semibold">
+                            {imageError ? "Image unavailable" : "Image Preview"}
+                          </p>
                           <p className="mt-1 text-xs text-white/85">
-                            Choose an image to preview it here
+                            {imageError
+                              ? "Check the image URL and try again"
+                              : "Choose an image to preview it here"}
                           </p>
                         </div>
                       )}
@@ -423,7 +433,7 @@ export default function FaqAdminPanel() {
               <div className="space-y-4">
                 {formData.faqs.map((faq, index) => (
                   <article
-                    key={faq.id}
+                    key={faq.id || faq._id || index}
                     className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-white/10 dark:bg-[#16212C]"
                   >
                     <div className="mb-4 flex items-center gap-3">
@@ -495,7 +505,7 @@ export default function FaqAdminPanel() {
                 disabled={isSaving}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167575] focus-visible:ring-4 focus-visible:ring-[#1E8A8A]/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Save size={18} />
+                {isSaving ? <Spinner /> : <Save size={18} />}
                 {isSaving ? "Saving Changes..." : "Update Changes"}
               </button>
             </footer>

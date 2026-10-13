@@ -9,6 +9,19 @@ import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 function IconPicker({ icon, onChange }) {
   const fileRef = useRef(null);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [icon.preview]);
+
+  useEffect(() => {
+    return () => {
+      if (icon.preview?.startsWith("blob:")) {
+        URL.revokeObjectURL(icon.preview);
+      }
+    };
+  }, [icon.preview]);
 
   const chooseFile = (e) => {
     const file = e.target.files?.[0];
@@ -100,11 +113,13 @@ function IconPicker({ icon, onChange }) {
 
       <div className="mt-3 flex items-center gap-3">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-          {icon.preview ? (
+          {icon.preview && !imageError ? (
             <img
               src={icon.preview}
               alt="Icon preview"
               className="h-full w-full object-contain p-2"
+              onError={() => setImageError(true)}
+              onLoad={() => setImageError(false)}
             />
           ) : (
             <ImagePlus size={22} className="text-[var(--accent)]" />
@@ -352,7 +367,7 @@ export default function Features() {
 
   if (fetching) {
     return (
-      <div className="flex w-full items-center justify-center py-20">
+      <div className="flex w-full items-center justify-center h-[85vh]">
         <Spinner />
       </div>
     );
@@ -498,7 +513,7 @@ export default function Features() {
           disabled={loading}
           className="mt-6 flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-8 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading && <Spinner size={16} />}
+          {loading && <Spinner />}
           {loading ? "Saving..." : "Save Changes"}
         </button>
       </div>

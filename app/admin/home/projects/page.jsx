@@ -16,25 +16,25 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 /* =========================================================
 1. STYLES
 ========================================================= */
 
 const panelClass =
-  "rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]";
+  "rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8";
 
 const inputClass =
-  "w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-sm text-[#0C1E21] outline-none transition placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 dark:border-white/10 dark:bg-[#0C1E21] dark:text-white";
+  "w-full rounded-2xl border border-[var(--border)] bg-[var(--background)] px-4 py-3.5 text-sm text-[var(--foreground)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10";
 
-const labelClass =
-  "mb-2 block text-sm font-semibold text-[#0C1E21] dark:text-gray-200";
+const labelClass = "mb-2 block text-sm font-semibold text-[var(--foreground)]";
 
 const saveButtonClass =
   "flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-8 text-sm font-semibold text-white transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:opacity-60";
 
 const moveButtonClass =
-  "flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-40 dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400";
+  "flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-40";
 
 /* =========================================================
 2. CONSTANTS
@@ -109,10 +109,14 @@ function formatProjectFromApi(project) {
 function ProjectImage({ source, alt }) {
   const [failedSource, setFailedSource] = useState("");
 
+  useEffect(() => {
+    setFailedSource("");
+  }, [source]);
+
   const showImage = Boolean(source) && failedSource !== source;
 
   return (
-    <div className="flex h-44 items-center justify-center overflow-hidden bg-gray-50 dark:bg-[#0C1E21]">
+    <div className="flex h-44 items-center justify-center overflow-hidden bg-[var(--background)]">
       {showImage ? (
         <img
           src={source}
@@ -121,11 +125,11 @@ function ProjectImage({ source, alt }) {
           onError={() => setFailedSource(source)}
         />
       ) : (
-        <div className="flex flex-col items-center text-gray-400">
+        <div className="flex flex-col items-center text-[var(--muted)]">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
             <ImagePlus size={24} />
           </div>
-          <p className="mt-2 text-xs font-medium text-[#0C1E21] dark:text-white">
+          <p className="mt-2 text-xs font-medium text-[var(--foreground)]">
             {source
               ? "Could not load image. Check the URL."
               : "No image selected"}
@@ -156,15 +160,15 @@ function ProjectCard({
   const imageSource = project.imagePreview || project.image;
 
   return (
-    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5 sm:p-6 dark:border-white/10 dark:bg-[#0C1E21]">
-      <div className="mb-5 flex items-center justify-between gap-3 border-b border-gray-200 pb-4 dark:border-white/10">
+    <div className="rounded-3xl border border-[var(--border)] bg-[var(--background)] p-5 sm:p-6">
+      <div className="mb-5 flex items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A] text-sm font-bold text-white">
             {String(index + 1).padStart(2, "0")}
           </span>
 
           <div className="min-w-0">
-            <p className="truncate text-base font-bold text-[#0C1E21] dark:text-white">
+            <p className="truncate text-base font-bold text-[var(--foreground)]">
               {project.title || "Untitled Project"}
             </p>
             <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
@@ -199,7 +203,7 @@ function ProjectCard({
             title="Delete project"
             disabled={busy}
             onClick={() => onDelete(project)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-red-500 transition hover:bg-red-500 hover:text-white disabled:opacity-60 dark:bg-[#111b1d]"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface)] text-red-500 transition hover:bg-red-500 hover:text-white disabled:opacity-60"
           >
             {isDeleting ? (
               <LoaderCircle size={16} className="animate-spin" />
@@ -221,7 +225,7 @@ function ProjectCard({
                 onChange(project.clientKey, { tag: e.target.value })
               }
               placeholder="e.g. Connect, Business"
-              className={`${inputClass} !bg-white dark:!bg-[#111b1d]`}
+              className={inputClass}
             />
           </div>
 
@@ -235,7 +239,7 @@ function ProjectCard({
               }
               rows={3}
               placeholder="e.g. Event Management Platform"
-              className={`${inputClass} resize-y !bg-white dark:!bg-[#111b1d]`}
+              className={`${inputClass} resize-y`}
             />
           </div>
         </div>
@@ -243,7 +247,7 @@ function ProjectCard({
         <div>
           <label className={labelClass}>Large Cover Image</label>
 
-          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#111b1d]">
+          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
             <ProjectImage
               source={imageSource}
               alt={project.title || "Large project"}
@@ -253,7 +257,7 @@ function ProjectCard({
               <div className="relative">
                 <LinkIcon
                   size={15}
-                  className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400"
+                  className="absolute top-1/2 left-4 -translate-y-1/2 text-[var(--muted)]"
                 />
                 <input
                   type="url"
@@ -263,18 +267,20 @@ function ProjectCard({
                     onImageUrlChange(project.clientKey, e.target.value)
                   }
                   placeholder="Paste image URL..."
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pr-4 pl-10 text-xs text-[#0C1E21] outline-none focus:border-[#1E8A8A] dark:border-white/10 dark:bg-[#0C1E21] dark:text-white"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] py-2.5 pr-4 pl-10 text-xs text-[var(--foreground)] outline-none focus:border-[#1E8A8A]"
                 />
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
-                <span className="text-[10px] font-bold text-gray-400">OR</span>
-                <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+                <div className="h-px flex-1 bg-[var(--border)]" />
+                <span className="text-[10px] font-bold text-[var(--muted)]">
+                  OR
+                </span>
+                <div className="h-px flex-1 bg-[var(--border)]" />
               </div>
 
               <label
-                className={`flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-2.5 text-xs font-semibold text-white transition hover:bg-[#1E8A8A] dark:bg-white/10 dark:hover:bg-[#1E8A8A] ${
+                className={`flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-2.5 text-xs font-semibold text-white transition hover:bg-[#1E8A8A] ${
                   busy ? "cursor-not-allowed opacity-60" : "cursor-pointer"
                 }`}
               >
@@ -294,7 +300,7 @@ function ProjectCard({
             </div>
           </div>
 
-          <p className="mt-2 flex items-start gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-2 flex items-start gap-1.5 text-xs text-[var(--muted)]">
             <Info size={13} className="mt-0.5 shrink-0" />
             Recommended: 999 × 666 — Large Display · Max 5MB
           </p>
@@ -619,10 +625,10 @@ export default function ProjectsAdmin() {
         </div>
 
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#0C1E21] dark:text-white">
+          <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)]">
             Proud Projects
           </h1>
-          <p className="mt-1 text-base text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-base text-[var(--muted)]">
             Manage the project showcase section on your homepage.
           </p>
         </div>
@@ -636,7 +642,7 @@ export default function ProjectsAdmin() {
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
                 01
               </span>
-              <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
+              <h2 className="text-lg font-bold text-[var(--foreground)]">
                 Section Header Content
               </h2>
             </div>
@@ -680,8 +686,8 @@ export default function ProjectsAdmin() {
             ))}
           </div>
 
-          <div className="mt-6 rounded-2xl bg-[#ECF0F0] p-6 text-[#102326] dark:bg-[#0C1E21] dark:text-white">
-            <span className="inline-flex bg-[#ECF0F0] px-3 py-1 text-xs font-bold text-zinc-950 dark:bg-[#111b1d] dark:text-white">
+          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-6 text-[var(--foreground)]">
+            <span className="inline-flex rounded-lg bg-[var(--surface)] px-3 py-1 text-xs font-bold text-[var(--foreground)]">
               {header.badgeText || "PROUD PROJECTS"}
             </span>
 
@@ -694,13 +700,13 @@ export default function ProjectsAdmin() {
               </span>
             </p>
 
-            <p className="mt-2 max-w-lg text-sm text-zinc-600 dark:text-gray-400">
+            <p className="mt-2 max-w-lg text-sm text-[var(--muted)]">
               {header.description ||
                 "We work closely with our clients to understand their unique needs and craft tailored solutions."}
             </p>
           </div>
 
-          <div className="mt-6 flex justify-end border-t border-gray-200 pt-6 dark:border-white/10">
+          <div className="mt-6 flex justify-end border-t border-[var(--border)] pt-6">
             <button
               type="button"
               disabled={savingHeader || headerCooldown}
@@ -729,7 +735,7 @@ export default function ProjectsAdmin() {
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
                 02
               </span>
-              <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
+              <h2 className="text-lg font-bold text-[var(--foreground)]">
                 Large Projects
               </h2>
             </div>
@@ -740,13 +746,12 @@ export default function ProjectsAdmin() {
           </div>
 
           {loadingProjects ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500">
-              <LoaderCircle size={18} className="animate-spin" />
-              Loading projects...
+            <div className="flex items-center justify-center py-16">
+              <Spinner />
             </div>
           ) : projectsError ? (
-            <div className="rounded-2xl bg-gray-50 p-6 text-center dark:bg-[#0C1E21]">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="rounded-2xl bg-[var(--background)] p-6 text-center">
+              <p className="text-sm text-[var(--muted)]">
                 Could not load projects.
               </p>
               <button
@@ -760,7 +765,7 @@ export default function ProjectsAdmin() {
           ) : (
             <>
               {projects.length === 0 && (
-                <p className="rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-500 dark:bg-[#0C1E21] dark:text-gray-400">
+                <p className="rounded-2xl bg-[var(--background)] p-6 text-center text-sm text-[var(--muted)]">
                   No projects yet. Add one below.
                 </p>
               )}
@@ -787,13 +792,13 @@ export default function ProjectsAdmin() {
                 type="button"
                 disabled={busy}
                 onClick={addProject}
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 py-4 text-sm font-semibold text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-60 dark:border-white/15 dark:text-gray-400"
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] py-4 text-sm font-semibold text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-60"
               >
                 <Plus size={18} />
                 Add New Large Project
               </button>
 
-              <div className="mt-6 flex justify-end border-t border-gray-200 pt-6 dark:border-white/10">
+              <div className="mt-6 flex justify-end border-t border-[var(--border)] pt-6">
                 <button
                   type="button"
                   disabled={busy || projects.length === 0}

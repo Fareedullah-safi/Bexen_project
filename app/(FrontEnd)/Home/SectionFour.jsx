@@ -26,9 +26,19 @@ export default function SectionFour() {
   }, []);
 
   const getImageUrl = (image, fallback) => {
-    if (typeof image === "string" && image) return image;
-    if (image?.url) return image.url;
-    return fallback;
+    let url = "";
+
+    if (typeof image === "string" && image) {
+      url = image;
+    } else if (image?.url) {
+      url = image.url;
+    } else {
+      url = fallback;
+    }
+
+    return typeof url === "string"
+      ? url.replace(/^http:\/\//, "https://")
+      : fallback;
   };
 
   const mainImage = getImageUrl(
@@ -156,7 +166,7 @@ export default function SectionFour() {
 
           {/* BOTTOM CARDS */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {/* CARD */}
+            {/* TESTIMONIAL CARD */}
             <div
               className="wow animate__animated animate__fadeInUp flex min-h-47.5 flex-col justify-between rounded-2xl bg-[#1E8A8A] p-5 text-white sm:min-h-52.5 md:p-6"
               data-wow-duration="0.9s"

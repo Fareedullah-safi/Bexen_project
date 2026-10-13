@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import axios from "axios";
 import {
   ArrowDown,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 export default function ReviewsAdminPanel() {
   const input =
@@ -318,6 +318,7 @@ export default function ReviewsAdminPanel() {
     };
 
     reader.readAsDataURL(file);
+    event.target.value = "";
   };
 
   // Choose an image for an existing review
@@ -355,6 +356,7 @@ export default function ReviewsAdminPanel() {
     };
 
     reader.readAsDataURL(file);
+    event.target.value = "";
   };
 
   // Update a review field
@@ -443,17 +445,14 @@ export default function ReviewsAdminPanel() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 text-[#0C1E21] dark:bg-[#16212C] dark:text-white">
-        <div className="flex items-center gap-3">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#1E8A8A]/20 border-t-[#1E8A8A]" />
-          <p className="text-sm font-medium">Loading reviews...</p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)] text-[var(--foreground)]">
+        <Spinner />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-6 text-[#0C1E21] sm:px-6 lg:px-8 dark:bg-[#16212C] dark:text-white">
+    <div className="min-h-screen bg-[var(--background)] px-4 py-6 text-[var(--foreground)] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
         <div className="sticky top-3 z-30 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
@@ -741,13 +740,16 @@ export default function ReviewsAdminPanel() {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                 <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#16212C]">
                   {draft.imagePreview || draft.image ? (
-                    <Image
+                    <img
                       src={draft.imagePreview || draft.image}
                       alt="Review preview"
-                      fill
-                      sizes="80px"
-                      unoptimized
-                      className="object-cover"
+                      className="h-full w-full object-cover"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                      }}
+                      onLoad={(event) => {
+                        event.currentTarget.style.display = "block";
+                      }}
                     />
                   ) : (
                     <ImagePlus size={25} className={muted} />
@@ -841,13 +843,16 @@ export default function ReviewsAdminPanel() {
                       <div className="flex min-w-0 flex-1 items-center gap-3">
                         <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#111B27]">
                           {imageSource ? (
-                            <Image
+                            <img
                               src={imageSource}
                               alt={item.name || "Client"}
-                              fill
-                              sizes="48px"
-                              unoptimized
-                              className="object-cover"
+                              className="h-full w-full object-cover"
+                              onError={(event) => {
+                                event.currentTarget.style.display = "none";
+                              }}
+                              onLoad={(event) => {
+                                event.currentTarget.style.display = "block";
+                              }}
                             />
                           ) : (
                             <ImagePlus size={19} className={muted} />
@@ -1001,13 +1006,18 @@ export default function ReviewsAdminPanel() {
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                               <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#111B27]">
                                 {item.imagePreview || item.image ? (
-                                  <Image
+                                  <img
                                     src={item.imagePreview || item.image}
                                     alt={item.name || "Client"}
-                                    fill
-                                    sizes="80px"
-                                    unoptimized
-                                    className="object-cover"
+                                    className="h-full w-full object-cover"
+                                    onError={(event) => {
+                                      event.currentTarget.style.display =
+                                        "none";
+                                    }}
+                                    onLoad={(event) => {
+                                      event.currentTarget.style.display =
+                                        "block";
+                                    }}
                                   />
                                 ) : (
                                   <ImagePlus size={25} className={muted} />

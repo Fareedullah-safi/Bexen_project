@@ -1,7 +1,6 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ImagePlus,
   Link as LinkIcon,
@@ -11,8 +10,10 @@ import {
   RotateCcw,
   CheckCircle2,
   FileImage,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 const initialData = {
   experienceNumber: "13+",
@@ -45,20 +46,43 @@ const requiredFields = [
   ["clientRole", "Client Role"],
 ];
 
+const isFile = (value) => typeof File !== "undefined" && value instanceof File;
+
+const isSupportedImage = (file) =>
+  ["image/jpeg", "image/png", "image/webp"].includes(file.type);
+
 export default function AboutUs() {
   const [formData, setFormData] = useState(initialData);
+
   const [imageIds, setImageIds] = useState({
     mainImage: "",
     clientImage: "",
   });
+
   const [previews, setPreviews] = useState({
     mainImage: "",
     clientImage: "",
   });
+
+  const [imageErrors, setImageErrors] = useState({
+    mainImage: false,
+    clientImage: false,
+  });
+
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasSavedData, setHasSavedData] = useState(false);
   const [isDark, setIsDark] = useState(true);
+
+  const fileInputRefs = useRef({});
+  const previewUrls = useRef(new Set());
+
+  const revokePreview = (url) => {
+    if (url && previewUrls.current.has(url)) {
+      URL.revokeObjectURL(url);
+      previewUrls.current.delete(url);
+    }
+  };
 
   useEffect(() => {
     const updateTheme = () => {
@@ -114,11 +138,19 @@ export default function AboutUs() {
             clientImage: getImageUrl(data.clientImage),
           });
 
+          setImageErrors({
+            mainImage: false,
+            clientImage: false,
+          });
+
           setHasSavedData(true);
         }
       } catch (error) {
         console.error("About Us GET Error:", error);
-        if (active) toast.error("Failed to load saved About Us data");
+
+        if (active) {
+          toast.error(error.message || "Failed to load saved About Us data");
+        }
       } finally {
         if (active) setIsFetching(false);
       }
@@ -128,6 +160,16 @@ export default function AboutUs() {
 
     return () => {
       active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      previewUrls.current.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+
+      previewUrls.current.clear();
     };
   }, []);
 
@@ -145,7 +187,7 @@ export default function AboutUs() {
 
     if (!file) return;
 
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    if (!isSupportedImage(file)) {
       toast.error("Only JPG, PNG, and WEBP images are allowed");
       e.target.value = "";
       return;
@@ -157,6 +199,11 @@ export default function AboutUs() {
       return;
     }
 
+    const previewUrl = URL.createObjectURL(file);
+
+    previewUrls.current.add(previewUrl);
+    revokePreview(previews[field]);
+
     setFormData((prev) => ({
       ...prev,
       [field]: file,
@@ -164,16 +211,25 @@ export default function AboutUs() {
 
     setPreviews((prev) => ({
       ...prev,
-      [field]: URL.createObjectURL(file),
+      [field]: previewUrl,
+    }));
+
+    setImageErrors((prev) => ({
+      ...prev,
+      [field]: false,
     }));
 
     setImageIds((prev) => ({
       ...prev,
       [field]: "",
     }));
+
+    e.target.value = "";
   };
 
   const handleImageUrl = (field, value) => {
+    revokePreview(previews[field]);
+
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -181,7 +237,12 @@ export default function AboutUs() {
 
     setPreviews((prev) => ({
       ...prev,
-      [field]: value,
+      [field]: value.trim(),
+    }));
+
+    setImageErrors((prev) => ({
+      ...prev,
+      [field]: false,
     }));
 
     setImageIds((prev) => ({
@@ -191,6 +252,8 @@ export default function AboutUs() {
   };
 
   const removeImage = (field) => {
+    revokePreview(previews[field]);
+
     setFormData((prev) => ({
       ...prev,
       [field]: "",
@@ -201,10 +264,19 @@ export default function AboutUs() {
       [field]: "",
     }));
 
+    setImageErrors((prev) => ({
+      ...prev,
+      [field]: false,
+    }));
+
     setImageIds((prev) => ({
       ...prev,
       [field]: "",
     }));
+
+    if (fileInputRefs.current[field]) {
+      fileInputRefs.current[field].value = "";
+    }
   };
 
   const validateForm = () => {
@@ -217,11 +289,10 @@ export default function AboutUs() {
 
     for (const field of ["mainImage", "clientImage"]) {
       const image = formData[field];
+      const label = field === "mainImage" ? "Main Image" : "Client Image";
 
       if (!image) {
-        toast.error(
-          `${field === "mainImage" ? "Main Image" : "Client Image"} is required`,
-        );
+        toast.error(`${label} is required`);
         return false;
       }
 
@@ -233,9 +304,7 @@ export default function AboutUs() {
             throw new Error("Invalid protocol");
           }
         } catch {
-          toast.error(
-            `Enter a valid URL or upload the ${field === "mainImage" ? "Main Image" : "Client Image"} from your PC`,
-          );
+          toast.error(`Enter a valid URL or upload the ${label} from your PC`);
           return false;
         }
       }
@@ -267,20 +336,23 @@ export default function AboutUs() {
   const handleSave = async (e) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    if (isSaving || !validateForm()) return;
 
     setIsSaving(true);
 
     try {
       const images = {
         mainImage: {
-          url: typeof formData.mainImage === "string" ? formData.mainImage : "",
+          url:
+            typeof formData.mainImage === "string"
+              ? formData.mainImage.trim()
+              : "",
           publicId: imageIds.mainImage,
         },
         clientImage: {
           url:
             typeof formData.clientImage === "string"
-              ? formData.clientImage
+              ? formData.clientImage.trim()
               : "",
           publicId: imageIds.clientImage,
         },
@@ -289,12 +361,12 @@ export default function AboutUs() {
       const uploadData = new FormData();
       let hasFiles = false;
 
-      if (formData.mainImage instanceof File) {
+      if (isFile(formData.mainImage)) {
         uploadData.append("mainImage", formData.mainImage);
         hasFiles = true;
       }
 
-      if (formData.clientImage instanceof File) {
+      if (isFile(formData.clientImage)) {
         uploadData.append("clientImage", formData.clientImage);
         hasFiles = true;
       }
@@ -314,20 +386,18 @@ export default function AboutUs() {
           throw new Error(uploadResult.message || "Image upload failed");
         }
 
-        if (formData.mainImage instanceof File) {
+        if (isFile(formData.mainImage)) {
           images.mainImage = uploadResult.images?.mainImage;
         }
 
-        if (formData.clientImage instanceof File) {
+        if (isFile(formData.clientImage)) {
           images.clientImage = uploadResult.images?.clientImage;
         }
 
-        if (formData.mainImage instanceof File && !images.mainImage?.url) {
-          throw new Error("Main Image upload did not return a URL");
-        }
-
-        if (formData.clientImage instanceof File && !images.clientImage?.url) {
-          throw new Error("Client Image upload did not return a URL");
+        if (!images.mainImage?.url || !images.clientImage?.url) {
+          throw new Error(
+            "Image upload did not return the required image URLs",
+          );
         }
       }
 
@@ -362,11 +432,17 @@ export default function AboutUs() {
 
       const savedData = result.data || payload;
 
+      const mainImageUrl = getImageUrl(savedData.mainImage);
+      const clientImageUrl = getImageUrl(savedData.clientImage);
+
+      revokePreview(previews.mainImage);
+      revokePreview(previews.clientImage);
+
       setFormData({
         ...initialData,
         ...savedData,
-        mainImage: getImageUrl(savedData.mainImage),
-        clientImage: getImageUrl(savedData.clientImage),
+        mainImage: mainImageUrl,
+        clientImage: clientImageUrl,
       });
 
       setImageIds({
@@ -375,8 +451,13 @@ export default function AboutUs() {
       });
 
       setPreviews({
-        mainImage: getImageUrl(savedData.mainImage),
-        clientImage: getImageUrl(savedData.clientImage),
+        mainImage: mainImageUrl,
+        clientImage: clientImageUrl,
+      });
+
+      setImageErrors({
+        mainImage: false,
+        clientImage: false,
       });
 
       setHasSavedData(true);
@@ -397,7 +478,7 @@ export default function AboutUs() {
     ? "border-[#263442] bg-[#111a23]"
     : "border-[#e4e7ec] bg-white";
 
-  const inputClass = `w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-[#1E8A8A] focus:ring-2 focus:ring-[#1E8A8A]/20 ${
+  const inputClass = `w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-[#35B5B5] focus:ring-2 focus:ring-[#1E8A8A]/20 ${
     isDark
       ? "border-[#263442] bg-[#16212c] text-[#f2f4f7] placeholder:text-gray-500"
       : "border-[#e4e7ec] bg-white text-[#101828] placeholder:text-gray-400"
@@ -449,18 +530,34 @@ export default function AboutUs() {
               : "border-[#e4e7ec] bg-[#f8fafc]"
           }`}
         >
-          <div className="relative h-52 w-full">
-            <Image
-              src={previews[field]}
-              alt={label}
-              fill
-              sizes="(max-width: 640px) 100vw, 50vw"
-              unoptimized={
-                previews[field].startsWith("blob:") ||
-                previews[field].startsWith("data:")
-              }
-              className="rounded-lg object-contain"
-            />
+          <div className="relative flex h-52 w-full items-center justify-center overflow-hidden rounded-lg">
+            {imageErrors[field] ? (
+              <div className="flex flex-col items-center gap-2 px-4 text-center">
+                <AlertCircle size={30} className="text-amber-500" />
+                <p className="text-sm font-medium">Image could not be loaded</p>
+                <p className={`text-xs ${mutedTextClass}`}>
+                  Check the URL or choose another image.
+                </p>
+              </div>
+            ) : (
+              <img
+                src={previews[field]}
+                alt={label}
+                className="h-full w-full object-contain"
+                onError={() => {
+                  setImageErrors((prev) => ({
+                    ...prev,
+                    [field]: true,
+                  }));
+                }}
+                onLoad={() => {
+                  setImageErrors((prev) => ({
+                    ...prev,
+                    [field]: false,
+                  }));
+                }}
+              />
+            )}
           </div>
 
           <button
@@ -472,9 +569,17 @@ export default function AboutUs() {
             <Trash2 size={17} />
           </button>
 
-          <div className="mt-3 flex items-center gap-2 text-xs text-emerald-500">
-            <CheckCircle2 size={15} />
-            Image selected
+          <div
+            className={`mt-3 flex items-center gap-2 text-xs ${
+              imageErrors[field] ? "text-amber-500" : "text-emerald-500"
+            }`}
+          >
+            {imageErrors[field] ? (
+              <AlertCircle size={15} />
+            ) : (
+              <CheckCircle2 size={15} />
+            )}
+            {imageErrors[field] ? "Image unavailable" : "Image selected"}
           </div>
         </div>
       ) : (
@@ -485,7 +590,7 @@ export default function AboutUs() {
               : "border-[#d0d5dd] bg-[#f8fafc]"
           }`}
         >
-          <span className="mb-3 rounded-xl bg-[#1E8A8A]/15 p-4 text-[#1E8A8A]">
+          <span className="mb-3 rounded-xl bg-[#1E8A8A]/15 p-4 text-[#35B5B5]">
             <ImagePlus size={27} />
           </span>
 
@@ -502,6 +607,9 @@ export default function AboutUs() {
           </span>
 
           <input
+            ref={(node) => {
+              fileInputRefs.current[field] = node;
+            }}
             type="file"
             accept="image/jpeg,image/png,image/webp"
             className="hidden"
@@ -532,7 +640,7 @@ export default function AboutUs() {
       <div
         className={`flex min-h-[85vh] items-center justify-center ${pageClass}`}
       >
-        <LoaderCircle size={34} className="animate-spin text-[#1E8A8A]" />
+        <Spinner />
       </div>
     );
   }
@@ -542,7 +650,7 @@ export default function AboutUs() {
       <div className="mx-auto max-w-6xl">
         <header className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <div className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-[0.2em] text-[#1E8A8A] uppercase">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold tracking-[0.2em] text-[#35B5B5] uppercase">
               <span className="h-2 w-2 rounded-full bg-[#1E8A8A]" />
               Homepage Management
             </div>
@@ -583,10 +691,12 @@ export default function AboutUs() {
             className={`overflow-hidden rounded-2xl border shadow-xl shadow-black/5 ${cardClass}`}
           >
             <div
-              className={`border-b px-5 py-5 sm:px-7 ${isDark ? "border-[#263442]" : "border-[#e4e7ec]"}`}
+              className={`border-b px-5 py-5 sm:px-7 ${
+                isDark ? "border-[#263442]" : "border-[#e4e7ec]"
+              }`}
             >
               <div className="flex items-center gap-3">
-                <span className="rounded-xl bg-[#1E8A8A]/15 p-3 text-[#1E8A8A]">
+                <span className="rounded-xl bg-[#1E8A8A]/15 p-3 text-[#35B5B5]">
                   <FileImage size={21} />
                 </span>
 
@@ -643,10 +753,12 @@ export default function AboutUs() {
             className={`overflow-hidden rounded-2xl border shadow-xl shadow-black/5 ${cardClass}`}
           >
             <div
-              className={`border-b px-5 py-5 sm:px-7 ${isDark ? "border-[#263442]" : "border-[#e4e7ec]"}`}
+              className={`border-b px-5 py-5 sm:px-7 ${
+                isDark ? "border-[#263442]" : "border-[#e4e7ec]"
+              }`}
             >
               <div className="flex items-center gap-3">
-                <span className="rounded-xl bg-[#1E8A8A]/15 p-3 text-[#1E8A8A]">
+                <span className="rounded-xl bg-[#1E8A8A]/15 p-3 text-[#35B5B5]">
                   <ImagePlus size={21} />
                 </span>
 
@@ -669,7 +781,9 @@ export default function AboutUs() {
             className={`overflow-hidden rounded-2xl border shadow-xl shadow-black/5 ${cardClass}`}
           >
             <div
-              className={`border-b px-5 py-5 sm:px-7 ${isDark ? "border-[#263442]" : "border-[#e4e7ec]"}`}
+              className={`border-b px-5 py-5 sm:px-7 ${
+                isDark ? "border-[#263442]" : "border-[#e4e7ec]"
+              }`}
             >
               <div>
                 <h2 className="font-semibold">Client Information</h2>

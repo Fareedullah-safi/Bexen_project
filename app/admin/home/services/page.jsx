@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 /* ==================== Image Picker Component ==================== */
 function ImagePicker({ value, onChange, disabled }) {
@@ -23,22 +24,21 @@ function ImagePicker({ value, onChange, disabled }) {
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    setError(false);
+
     if (value instanceof File) {
       const url = URL.createObjectURL(value);
       setPreview(url);
-      setError(false);
 
       return () => URL.revokeObjectURL(url);
     }
 
     if (typeof value === "string" && value) {
       setPreview(value);
-      setError(false);
       return;
     }
 
     setPreview("");
-    setError(false);
   }, [value]);
 
   function handleUrlChange(e) {
@@ -78,9 +78,9 @@ function ImagePicker({ value, onChange, disabled }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#111b1d]">
+    <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
       {preview && !error ? (
-        <div className="relative flex h-52 items-center justify-center bg-gray-50 p-4 dark:bg-[#0C1E21]">
+        <div className="relative flex h-52 items-center justify-center bg-[var(--background)] p-4">
           <div className="relative h-full w-full">
             <Image
               src={preview}
@@ -102,7 +102,7 @@ function ImagePicker({ value, onChange, disabled }) {
             onClick={removeImage}
             disabled={disabled}
             title="Remove image"
-            className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:opacity-40 dark:bg-[#111b1d]"
+            className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface)] text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:opacity-40"
           >
             <Trash2 size={16} />
           </button>
@@ -114,12 +114,12 @@ function ImagePicker({ value, onChange, disabled }) {
           )}
         </div>
       ) : (
-        <div className="flex h-52 flex-col items-center justify-center bg-gray-50 text-gray-400 dark:bg-[#0C1E21]">
+        <div className="flex h-52 flex-col items-center justify-center bg-[var(--background)] text-[var(--muted)]">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
             <ImagePlus size={28} />
           </div>
 
-          <p className="mt-3 text-sm font-medium text-[#0C1E21] dark:text-white">
+          <p className="mt-3 text-sm font-medium text-[var(--foreground)]">
             {error ? "Unable to load image" : "No image selected"}
           </p>
         </div>
@@ -129,7 +129,7 @@ function ImagePicker({ value, onChange, disabled }) {
         <div className="relative">
           <LinkIcon
             size={15}
-            className="absolute top-1/2 left-4 -translate-y-1/2 text-gray-400"
+            className="absolute top-1/2 left-4 -translate-y-1/2 text-[var(--muted)]"
           />
 
           <input
@@ -142,16 +142,16 @@ function ImagePicker({ value, onChange, disabled }) {
                 ? "Remove file to use a URL"
                 : "Paste image URL..."
             }
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pr-4 pl-10 text-sm text-[#0C1E21] transition outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-[#0C1E21] dark:text-white"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] py-3 pr-4 pl-10 text-sm text-[var(--foreground)] transition outline-none placeholder:text-[var(--muted)] focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
-          <span className="text-[11px] font-bold tracking-wider text-gray-400">
+          <div className="h-px flex-1 bg-[var(--border)]" />
+          <span className="text-[11px] font-bold tracking-wider text-[var(--muted)]">
             OR
           </span>
-          <div className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+          <div className="h-px flex-1 bg-[var(--border)]" />
         </div>
 
         <input
@@ -166,7 +166,7 @@ function ImagePicker({ value, onChange, disabled }) {
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={disabled}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-3 text-sm font-semibold text-white transition hover:bg-[#1E8A8A] disabled:opacity-40 dark:bg-white/10 dark:hover:bg-[#1E8A8A]"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-3 text-sm font-semibold text-white transition hover:bg-[#1E8A8A] disabled:opacity-40"
         >
           <Upload size={16} />
           Upload from PC
@@ -287,14 +287,12 @@ export default function SolutionsAdmin() {
       return toast.error("You must have at least one card");
     }
 
-    // A: Remove a locally added card that was never saved to DB
     if (String(cardId).startsWith("new-")) {
       setSolutions((prev) => prev.filter((c) => c.id !== cardId));
       toast.success("Card removed");
       return;
     }
 
-    // B: Delete the saved card using its MongoDB ID
     try {
       setDeletingId(cardId);
 
@@ -403,17 +401,16 @@ export default function SolutionsAdmin() {
   }
 
   const inputClass =
-    "w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-sm text-[#0C1E21] outline-none transition placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-4 focus:ring-[#1E8A8A]/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-[#0C1E21] dark:text-white";
+    "w-full rounded-2xl border border-[var(--border)] bg-[var(--background)] px-4 py-3.5 text-sm text-[var(--foreground)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-60";
 
   const labelClass =
-    "mb-2 block text-sm font-semibold text-[#0C1E21] dark:text-gray-200";
+    "mb-2 block text-sm font-semibold text-[var(--foreground)]";
 
   if (isLoading) {
     return (
-      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-white dark:bg-[#0b1117]">
-        <Loader2 size={32} className="animate-spin text-[#1E8A8A]" />
-
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
+        <Spinner />
+        <p className="text-sm font-medium text-[var(--muted)]">
           Loading solutions...
         </p>
       </div>
@@ -421,7 +418,7 @@ export default function SolutionsAdmin() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-white text-[#0C1E21] dark:bg-[#0b1117] dark:text-white">
+    <div className="min-h-screen w-full bg-[var(--background)] text-[var(--foreground)]">
       <div className="w-full">
         {/* Header */}
         <div className="mb-10 flex items-center gap-4">
@@ -430,11 +427,11 @@ export default function SolutionsAdmin() {
           </div>
 
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-[#0C1E21] dark:text-white">
+            <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)]">
               Solutions Slider
             </h1>
 
-            <p className="mt-1 text-base text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-base text-[var(--muted)]">
               Manage Section Five — solutions cards and heading.
             </p>
           </div>
@@ -442,13 +439,13 @@ export default function SolutionsAdmin() {
 
         <form onSubmit={handleSave} className="space-y-6">
           {/* 01 Section Header */}
-          <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
             <div className="mb-6 flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
                 01
               </span>
 
-              <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
+              <h2 className="text-lg font-bold text-[var(--foreground)]">
                 Section Header
               </h2>
             </div>
@@ -505,14 +502,14 @@ export default function SolutionsAdmin() {
           </div>
 
           {/* 02 Solutions Cards */}
-          <div className="rounded-3xl border border-gray-200 bg-white p-7 shadow-sm sm:p-8 dark:border-white/10 dark:bg-[#111b1d]">
+          <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
                   02
                 </span>
 
-                <h2 className="text-lg font-bold text-[#0C1E21] dark:text-white">
+                <h2 className="text-lg font-bold text-[var(--foreground)]">
                   Solutions Cards
                 </h2>
               </div>
@@ -526,7 +523,7 @@ export default function SolutionsAdmin() {
               {solutions.map((item, index) => (
                 <div
                   key={item.id}
-                  className="rounded-3xl border border-gray-200 bg-gray-50 p-5 sm:p-6 dark:border-white/10 dark:bg-[#0C1E21]"
+                  className="rounded-3xl border border-[var(--border)] bg-[var(--background)] p-5 sm:p-6"
                 >
                   {/* Card Action Bar */}
                   <div className="mb-5 flex items-center justify-between gap-3">
@@ -535,7 +532,7 @@ export default function SolutionsAdmin() {
                         {String(index + 1).padStart(2, "0")}
                       </span>
 
-                      <p className="truncate text-sm font-semibold text-[#0C1E21] dark:text-white">
+                      <p className="truncate text-sm font-semibold text-[var(--foreground)]">
                         {item.title || `Solution ${index + 1}`}
                       </p>
                     </div>
@@ -548,7 +545,7 @@ export default function SolutionsAdmin() {
                           index === 0 || isSaving || deletingId === item.id
                         }
                         title="Move up"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30 dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30"
                       >
                         <ArrowUp size={16} />
                       </button>
@@ -562,7 +559,7 @@ export default function SolutionsAdmin() {
                           deletingId === item.id
                         }
                         title="Move down"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30 dark:border-white/10 dark:bg-[#111b1d] dark:text-gray-400"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30"
                       >
                         <ArrowDown size={16} />
                       </button>
@@ -572,7 +569,7 @@ export default function SolutionsAdmin() {
                         onClick={() => handleDeleteCard(item.id)}
                         disabled={isSaving || deletingId === item.id}
                         title="Delete card"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white disabled:opacity-40 dark:bg-[#111b1d]"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface)] text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white disabled:opacity-40"
                       >
                         {deletingId === item.id ? (
                           <Loader2
@@ -598,7 +595,7 @@ export default function SolutionsAdmin() {
                           }
                           disabled={isSaving || deletingId === item.id}
                           placeholder="e.g. Business Strategy Development"
-                          className={`${inputClass} !bg-white dark:!bg-[#111b1d]`}
+                          className={inputClass}
                         />
                       </div>
 
@@ -617,7 +614,7 @@ export default function SolutionsAdmin() {
                           disabled={isSaving || deletingId === item.id}
                           rows={5}
                           placeholder="Enter short card description..."
-                          className={`${inputClass} resize-y !bg-white dark:!bg-[#111b1d]`}
+                          className={`${inputClass} resize-y`}
                         />
                       </div>
                     </div>
@@ -640,7 +637,7 @@ export default function SolutionsAdmin() {
               type="button"
               onClick={addSolution}
               disabled={isSaving || !!deletingId}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 py-4 text-sm font-semibold text-gray-500 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-40 dark:border-white/15 dark:text-gray-400"
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] py-4 text-sm font-semibold text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-40"
             >
               <Plus size={18} />
               Add New Solution
@@ -648,7 +645,7 @@ export default function SolutionsAdmin() {
           </div>
 
           {/* Save Footer */}
-          <div className="flex justify-end rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#111b1d]">
+          <div className="flex justify-end rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
             <button
               type="submit"
               disabled={isSaving || !!deletingId}
