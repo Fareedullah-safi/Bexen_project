@@ -5,45 +5,16 @@ import { HelpCircle, ImagePlus, Moon, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 
-const initialFaqs = [
-  {
-    id: "faq-1",
-    question: "What services does Bexon offer to clients?",
-    answer:
-      "Getting started is easy! Simply reach out to us through our contact form or give us a call, and we'll schedule a consultation to discuss your project and how we can best assist you.",
-  },
-  {
-    id: "faq-2",
-    question: "How do I get started with Corporate Business?",
-    answer: "",
-  },
-  {
-    id: "faq-3",
-    question: "How do you ensure the success of a project?",
-    answer: "",
-  },
-  {
-    id: "faq-4",
-    question: "How long will it take to complete my project?",
-    answer: "",
-  },
-  {
-    id: "faq-5",
-    question: "Can I track the progress of my project?",
-    answer: "",
-  },
-];
-
 const defaultFormData = {
-  headingLineOne: "Need Help? Start",
-  headingLineTwo: "Here...",
+  headingLineOne: "",
+  headingLineTwo: "",
   imageURL: "",
   imagePublicId: "",
-  callHeadingLineOne: "Get Started",
-  callHeadingLineTwo: "Free Call?",
-  phoneNumber: "1-888-452-1505",
-  phoneHref: "tel:18884521505",
-  faqs: initialFaqs,
+  callHeadingLineOne: "",
+  callHeadingLineTwo: "",
+  phoneNumber: "",
+  phoneHref: "",
+  faqs: [],
 };
 
 const inputClass =
@@ -75,17 +46,20 @@ export default function FaqAdminPanel() {
           const data = res.data.data;
 
           const loadedData = {
-            ...defaultFormData,
-            ...data,
-            faqs:
-              Array.isArray(data.faqs) && data.faqs.length > 0
-                ? data.faqs
-                : initialFaqs,
+            headingLineOne: data.headingLineOne || "",
+            headingLineTwo: data.headingLineTwo || "",
+            imageURL: data.imageURL || "",
+            imagePublicId: data.imagePublicId || "",
+            callHeadingLineOne: data.callHeadingLineOne || "",
+            callHeadingLineTwo: data.callHeadingLineTwo || "",
+            phoneNumber: data.phoneNumber || "",
+            phoneHref: data.phoneHref || "",
+            faqs: Array.isArray(data.faqs) ? data.faqs : [],
           };
 
           setFormData(loadedData);
-          setSavedImageURL(loadedData.imageURL || "");
-          setSavedImagePublicId(loadedData.imagePublicId || "");
+          setSavedImageURL(loadedData.imageURL);
+          setSavedImagePublicId(loadedData.imagePublicId);
         }
       } catch (error) {
         toast.error(
@@ -106,7 +80,7 @@ export default function FaqAdminPanel() {
     }));
   }
 
-  async function handleImageSelect(event) {
+  function handleImageSelect(event) {
     const file = event.target.files?.[0];
 
     if (!file) return;
@@ -152,22 +126,23 @@ export default function FaqAdminPanel() {
     try {
       let updatedData = { ...formData };
 
-      const imageUrlChanged =
-        formData.imageURL.trim() !== savedImageURL;
+      const imageUrlChanged = formData.imageURL.trim() !== savedImageURL;
 
-      // Upload the selected image or a newly entered image URL.
       if (selectedImage || imageUrlChanged) {
         if (!selectedImage && !formData.imageURL.trim()) {
           updatedData.imageURL = "";
           updatedData.imagePublicId = "";
         } else {
-          const body = selectedImage
-            ? (() => {
-                const form = new FormData();
-                form.append("file", selectedImage);
-                return form;
-              })()
-            : { imageUrl: formData.imageURL.trim() };
+          let body;
+
+          if (selectedImage) {
+            body = new FormData();
+            body.append("file", selectedImage);
+          } else {
+            body = {
+              imageUrl: formData.imageURL.trim(),
+            };
+          }
 
           const uploadResponse = await axios.post(
             "/api/homepage/faq/upload",
@@ -180,7 +155,7 @@ export default function FaqAdminPanel() {
 
           if (!secureUrl || !publicId) {
             throw new Error(
-              "Image upload succeeded without returning its secure URL and public ID.",
+              "Cloudinary did not return the secure URL and public ID.",
             );
           }
 
@@ -192,11 +167,7 @@ export default function FaqAdminPanel() {
         }
       }
 
-      // Save the FAQ data after the image upload succeeds.
-      const saveResponse = await axios.put(
-        "/api/homepage/faq",
-        updatedData,
-      );
+      const saveResponse = await axios.put("/api/homepage/faq", updatedData);
 
       if (!saveResponse.data.success) {
         throw new Error(
@@ -206,15 +177,17 @@ export default function FaqAdminPanel() {
 
       const savedData = saveResponse.data.data || updatedData;
 
-      setFormData((current) => ({
-        ...current,
+      setFormData({
+        ...defaultFormData,
         ...savedData,
-      }));
+        faqs: Array.isArray(savedData.faqs) ? savedData.faqs : [],
+      });
 
-      setSavedImageURL(savedData.imageURL || updatedData.imageURL || "");
-      setSavedImagePublicId(
-        savedData.imagePublicId || updatedData.imagePublicId || "",
-      );
+      const newImageURL = savedData.imageURL || "";
+      const newPublicId = savedData.imagePublicId || "";
+
+      setSavedImageURL(newImageURL);
+      setSavedImagePublicId(newPublicId);
 
       if (previewUrl) URL.revokeObjectURL(previewUrl);
 
@@ -223,11 +196,9 @@ export default function FaqAdminPanel() {
 
       toast.success("FAQ updated successfully.");
 
-      // Delete the previous Cloudinary image after saving its replacement.
-      const newPublicId = savedData.imagePublicId || updatedData.imagePublicId;
-
       if (
         savedImagePublicId &&
+        newPublicId &&
         newPublicId !== savedImagePublicId
       ) {
         try {
@@ -264,13 +235,9 @@ export default function FaqAdminPanel() {
               aria-label="Breadcrumb"
             >
               Admin
-              <span className="px-2 text-slate-300 dark:text-slate-600">
-                /
-              </span>
+              <span className="px-2 text-slate-300 dark:text-slate-600">/</span>
               Homepage
-              <span className="px-2 text-slate-300 dark:text-slate-600">
-                /
-              </span>
+              <span className="px-2 text-slate-300 dark:text-slate-600">/</span>
               <span className="text-slate-700 dark:text-slate-200">
                 FAQ Section
               </span>
@@ -357,9 +324,7 @@ export default function FaqAdminPanel() {
                       ) : (
                         <div className="relative rounded-xl bg-black/15 px-5 py-4 backdrop-blur-sm">
                           <ImagePlus size={30} className="mx-auto mb-2" />
-                          <p className="text-sm font-semibold">
-                            Image Preview
-                          </p>
+                          <p className="text-sm font-semibold">Image Preview</p>
                           <p className="mt-1 text-xs text-white/85">
                             Choose an image to preview it here
                           </p>

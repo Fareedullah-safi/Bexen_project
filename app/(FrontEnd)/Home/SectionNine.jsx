@@ -2,38 +2,35 @@
 
 import Image from "next/image";
 import { Minus, PhoneCallIcon, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 
 export default function SectionNine() {
   const [open, setOpen] = useState(null);
+  const [faqData, setFaqData] = useState(null);
 
-  const faqs = [
-    {
-      question: "What services does Bexon offer to clients?",
-      answer:
-        "Getting started is easy! Simply reach out to us through our contact form or give us a call, and we'll schedule a consultation to discuss your project and how we can best assist you.",
-    },
-    {
-      question: "How do I get started with Corporate Business?",
-      answer:
-        "Getting started is easy! Simply reach out to us through our contact form or give us a call, and we'll schedule a consultation to discuss your project and how we can best assist you.",
-    },
-    {
-      question: "How do you ensure the success of a project?",
-      answer:
-        "Our team keeps you informed throughout the process, ensuring quality control, clear communication, and timely delivery from beginning to end.",
-    },
-    {
-      question: "How long will it take to complete my project?",
-      answer:
-        "The timeline depends on the size and complexity of your project. After understanding your requirements, we provide a clear estimated timeline.",
-    },
-    {
-      question: "Can I track the progress of my project?",
-      answer:
-        "Yes, our team keeps you updated throughout the project so you can easily follow the progress and stay informed about important milestones.",
-    },
-  ];
+  useEffect(() => {
+    async function getFaqData() {
+      try {
+        const res = await axios.get("/api/homepage/faq");
+
+        if (res.data.success && res.data.data) {
+          setFaqData(res.data.data);
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load FAQ data:",
+          error.response?.data?.message || error.message,
+        );
+      }
+    }
+
+    getFaqData();
+  }, []);
+
+  if (!faqData) return null;
+
+  const faqs = Array.isArray(faqData.faqs) ? faqData.faqs : [];
 
   return (
     <section className="min-h-screen w-full bg-[#ECF0F0] px-6 py-16 lg:px-12">
@@ -44,12 +41,15 @@ export default function SectionNine() {
             className="wow animate__animated animate__fadeInLeft relative h-140 w-full overflow-hidden rounded-2xl"
             data-wow-duration="1s"
           >
-            <Image
-              alt="Company pic"
-              fill
-              src="https://themejunction.net/html/bexon/demo/assets/images/faq/faq.webp"
-              className="object-cover transition-transform duration-700 hover:scale-105"
-            />
+            {faqData.imageURL && (
+              <Image
+                alt="Company pic"
+                fill
+                src={faqData.imageURL}
+                className="object-cover transition-transform duration-700 hover:scale-105"
+                sizes="(max-width: 1024px) 100vw, 50vw"
+              />
+            )}
 
             <div className="absolute inset-0 bg-linear-to-t from-[#0C1E21]/60 via-transparent to-transparent" />
 
@@ -57,9 +57,9 @@ export default function SectionNine() {
               className="wow animate__animated animate__fadeInUp absolute top-8 left-8 z-10 text-4xl leading-tight font-medium text-white md:text-5xl"
               data-wow-delay="0.3s"
             >
-              Need Help? Start
+              {faqData.headingLineOne}
               <br />
-              Here...
+              {faqData.headingLineTwo}
             </h2>
           </div>
 
@@ -70,9 +70,9 @@ export default function SectionNine() {
           >
             <div className="w-60 rounded-2xl bg-[#1E8A8A] px-6 py-6 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
               <p className="text-2xl font-bold text-white">
-                Get Started
+                {faqData.callHeadingLineOne}
                 <br />
-                Free Call?
+                {faqData.callHeadingLineTwo}
               </p>
 
               <div className="mt-5 flex flex-col gap-3">
@@ -80,13 +80,18 @@ export default function SectionNine() {
                   <PhoneCallIcon size={20} />
                 </div>
 
-                <a
-                  href="tel:18884521505"
-                  className="group/phone relative w-fit text-xl font-semibold text-white"
-                >
-                  1-888-452-1505
-                  <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-cyan-500 transition-all duration-300 group-hover/phone:w-full" />
-                </a>
+                {faqData.phoneNumber && (
+                  <a
+                    href={
+                      faqData.phoneHref ||
+                      `tel:${faqData.phoneNumber.replace(/[^\d+]/g, "")}`
+                    }
+                    className="group/phone relative w-fit text-xl font-semibold text-white"
+                  >
+                    {faqData.phoneNumber}
+                    <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-cyan-500 transition-all duration-300 group-hover/phone:w-full" />
+                  </a>
+                )}
               </div>
             </div>
           </div>
@@ -99,13 +104,14 @@ export default function SectionNine() {
 
             return (
               <div
-                key={index}
+                key={faq._id || faq.id || index}
                 className="wow animate__animated animate__fadeInRight mb-3 overflow-hidden rounded-xl bg-white shadow-sm"
                 data-wow-delay={`${index * 0.1}s`}
               >
                 <button
                   type="button"
                   onClick={() => setOpen(isOpen ? null : index)}
+                  aria-expanded={isOpen}
                   className="flex w-full cursor-pointer items-center justify-between gap-5 px-6 py-6 text-left"
                 >
                   <span className="text-lg font-semibold text-[#102326] md:text-xl">
