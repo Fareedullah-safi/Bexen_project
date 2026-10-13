@@ -1,15 +1,37 @@
-import { HelpCircle, ImagePlus, Moon, Save, Upload } from "lucide-react";
+"use client";
 
-const faqs = [
+import { useState } from "react";
+import { HelpCircle, ImagePlus, Moon, Save, Upload } from "lucide-react";
+import { toast } from "sonner";
+import axios from "axios";
+
+const initialFaqs = [
   {
+    id: "faq-1",
     question: "What services does Bexon offer to clients?",
     answer:
       "Getting started is easy! Simply reach out to us through our contact form or give us a call, and we'll schedule a consultation to discuss your project and how we can best assist you.",
   },
-  { question: "How do I get started with Corporate Business?", answer: "" },
-  { question: "How do you ensure the success of a project?", answer: "" },
-  { question: "How long will it take to complete my project?", answer: "" },
-  { question: "Can I track the progress of my project?", answer: "" },
+  {
+    id: "faq-2",
+    question: "How do I get started with Corporate Business?",
+    answer: "",
+  },
+  {
+    id: "faq-3",
+    question: "How do you ensure the success of a project?",
+    answer: "",
+  },
+  {
+    id: "faq-4",
+    question: "How long will it take to complete my project?",
+    answer: "",
+  },
+  {
+    id: "faq-5",
+    question: "Can I track the progress of my project?",
+    answer: "",
+  },
 ];
 
 const inputClass =
@@ -22,6 +44,96 @@ const labelClass =
   "mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300";
 
 export default function FaqAdminPanel() {
+  const [formData, setFormData] = useState({
+    headingLineOne: "Need Help? Start",
+    headingLineTwo: "Here...",
+    imageURL: "",
+    callHeadingLineOne: "Get Started",
+    callHeadingLineTwo: "Free Call?",
+    phoneNumber: "1-888-452-1505",
+    phoneHref: "tel:18884521505",
+    faqs: initialFaqs,
+  });
+
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const previewImage = previewUrl || formData.imageURL;
+
+  const [uploading, setUploading] = useState(false);
+
+  async function uploadImage() {
+    if (!selectedImage && !formData.imageURL.trim()) {
+      toast.error("Choose a file or enter an image URL.");
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      let res;
+
+      if (selectedImage) {
+        const body = new FormData();
+        body.append("file", selectedImage);
+        res = await axios.post("/api/cloudinary-upload", body);
+      } else {
+        res = await axios.post("/api/cloudinary-upload", {
+          imageUrl: formData.imageURL.trim(),
+        });
+      }
+
+      const { url, publicId } = res.data;
+
+      setFormData((current) => ({
+        ...current,
+        imageURL: url,
+        imagePublicId: publicId,
+      }));
+
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setSelectedImage(null);
+      setPreviewUrl("");
+      toast.success("Image uploaded to Cloudinary.");
+      console.log("Cloudinary URL:", url);
+    } catch (error) {
+      toast.error(
+        error.response?.data?.error || error.message || "Upload failed.",
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleImageSelect(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+
+    setSelectedImage(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    event.target.value = "";
+  }
+
+  function handleImageUrlChange(event) {
+    setFormData((current) => ({
+      ...current,
+      imageURL: event.target.value,
+    }));
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+
+    setSelectedImage(null);
+    setPreviewUrl("");
+  }
+
+  function handleAllUpdates() {
+    console.log("Current form data:", {
+      ...formData,
+      imageFile: selectedImage,
+    });
+  }
+
   return (
     <main className="min-h-screen bg-[#F4F7F7] px-4 py-8 text-slate-900 sm:px-6 lg:px-8 dark:bg-[#0C1420] dark:text-white">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -46,6 +158,7 @@ export default function FaqAdminPanel() {
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A]/10 text-[#1E8A8A] dark:bg-[#1E8A8A]/20 dark:text-[#62cccc]">
                 <HelpCircle size={22} />
               </div>
+
               <div>
                 <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
                   FAQ Section
@@ -57,11 +170,9 @@ export default function FaqAdminPanel() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-600 dark:border-white/10 dark:bg-[#16212C] dark:text-slate-300">
-              <Moon size={16} className="text-[#1E8A8A] dark:text-[#62cccc]" />
-              Dark theme
-            </div>
+          <div className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-600 dark:border-white/10 dark:bg-[#16212C] dark:text-slate-300">
+            <Moon size={16} className="text-[#1E8A8A] dark:text-[#62cccc]" />
+            Dark theme
           </div>
         </header>
 
@@ -81,26 +192,52 @@ export default function FaqAdminPanel() {
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <label>
               <span className={labelClass}>Heading — line one</span>
-              <input className={inputClass} defaultValue="Need Help? Start" />
+              <input
+                className={inputClass}
+                value={formData.headingLineOne}
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    headingLineOne: event.target.value,
+                  }))
+                }
+              />
             </label>
 
             <label>
               <span className={labelClass}>Heading — line two</span>
-              <input className={inputClass} defaultValue="Here..." />
+              <input
+                className={inputClass}
+                value={formData.headingLineTwo}
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    headingLineTwo: event.target.value,
+                  }))
+                }
+              />
             </label>
 
             <div className="sm:col-span-2">
               <span className={labelClass}>Background image</span>
 
               <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 sm:items-center dark:border-white/10 dark:bg-[#16212C]">
-                <div className="flex aspect-[16/9] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-br from-[#dce8e4] via-[#aabdb6] to-[#607b73] p-6 text-center text-white dark:border-white/10 dark:from-[#304541] dark:via-[#273a38] dark:to-[#172522]">
-                  <div className="rounded-xl bg-black/15 px-5 py-4 backdrop-blur-sm">
-                    <ImagePlus size={30} className="mx-auto mb-2" />
-                    <p className="text-sm font-semibold">Image Preview</p>
-                    <p className="mt-1 text-xs text-white/85">
-                      No image selected
-                    </p>
-                  </div>
+                <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-br from-[#dce8e4] via-[#aabdb6] to-[#607b73] p-6 text-center text-white dark:border-white/10 dark:from-[#304541] dark:via-[#273a38] dark:to-[#172522]">
+                  {previewImage ? (
+                    <img
+                      src={previewImage}
+                      alt="Selected FAQ background"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="relative rounded-xl bg-black/15 px-5 py-4 backdrop-blur-sm">
+                      <ImagePlus size={30} className="mx-auto mb-2" />
+                      <p className="text-sm font-semibold">Image Preview</p>
+                      <p className="mt-1 text-xs text-white/85">
+                        Choose an image to preview it here
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -109,36 +246,85 @@ export default function FaqAdminPanel() {
                     <input
                       className={inputClass}
                       placeholder="https://... or /images/help.jpg"
+                      value={formData.imageURL}
+                      onChange={handleImageUrlChange}
                     />
                   </label>
 
                   <label className="inline-flex min-h-11 w-fit cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/10 dark:bg-[#111B27] dark:text-slate-300 dark:hover:border-[#38a3a3] dark:hover:text-[#62cccc]">
                     <Upload size={17} />
                     Choose Image
-                    <input type="file" accept="image/*" className="sr-only" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={handleImageSelect}
+                    />
                   </label>
+
+                  {selectedImage && (
+                    <p className="text-xs break-all text-slate-500 dark:text-slate-400">
+                      Selected: {selectedImage.name}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
 
             <label>
               <span className={labelClass}>Call card — line one</span>
-              <input className={inputClass} defaultValue="Get Started" />
+              <input
+                className={inputClass}
+                value={formData.callHeadingLineOne}
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    callHeadingLineOne: event.target.value,
+                  }))
+                }
+              />
             </label>
 
             <label>
               <span className={labelClass}>Call card — line two</span>
-              <input className={inputClass} defaultValue="Free Call?" />
+              <input
+                className={inputClass}
+                value={formData.callHeadingLineTwo}
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    callHeadingLineTwo: event.target.value,
+                  }))
+                }
+              />
             </label>
 
             <label>
               <span className={labelClass}>Phone number</span>
-              <input className={inputClass} defaultValue="1-888-452-1505" />
+              <input
+                className={inputClass}
+                value={formData.phoneNumber}
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    phoneNumber: event.target.value,
+                  }))
+                }
+              />
             </label>
 
             <label>
               <span className={labelClass}>Phone link</span>
-              <input className={inputClass} defaultValue="tel:18884521505" />
+              <input
+                className={inputClass}
+                value={formData.phoneHref}
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    phoneHref: event.target.value,
+                  }))
+                }
+              />
             </label>
           </div>
         </section>
@@ -155,9 +341,9 @@ export default function FaqAdminPanel() {
           </div>
 
           <div className="space-y-4">
-            {faqs.map((faq, index) => (
+            {formData.faqs.map((faq, index) => (
               <article
-                key={faq.question}
+                key={faq.id}
                 className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-white/10 dark:bg-[#16212C]"
               >
                 <div className="mb-4 flex items-center gap-3">
@@ -174,8 +360,17 @@ export default function FaqAdminPanel() {
                     <span className={labelClass}>Question</span>
                     <input
                       className={inputClass}
-                      defaultValue={faq.question}
-                      placeholder="Enter a question..."
+                      value={faq.question}
+                      onChange={(event) =>
+                        setFormData((current) => ({
+                          ...current,
+                          faqs: current.faqs.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, question: event.target.value }
+                              : item,
+                          ),
+                        }))
+                      }
                     />
                   </label>
 
@@ -183,9 +378,19 @@ export default function FaqAdminPanel() {
                     <span className={labelClass}>Answer</span>
                     <textarea
                       className={`${inputClass} min-h-24 resize-y`}
-                      defaultValue={faq.answer}
+                      value={faq.answer}
                       placeholder="Write an answer..."
                       rows={3}
+                      onChange={(event) =>
+                        setFormData((current) => ({
+                          ...current,
+                          faqs: current.faqs.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? { ...item, answer: event.target.value }
+                              : item,
+                          ),
+                        }))
+                      }
                     />
                   </label>
                 </div>
@@ -194,22 +399,26 @@ export default function FaqAdminPanel() {
           </div>
         </section>
 
-        <footer className="sticky bottom-4 z-10 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/40">
+        <footer className="sticky bottom-4 z-10 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
           <div>
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              Ready to update the FAQ section?
+              Ready to review your changes?
             </p>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Review your content before applying your changes.
+              For practice, this button logs your data in the browser console.
             </p>
           </div>
 
           <button
             type="button"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1E8A8A]/40 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167575] focus-visible:ring-4 focus-visible:ring-[#1E8A8A]/20 focus-visible:outline-none"
+            onClick={handleAllUpdates}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167575] focus-visible:ring-4 focus-visible:ring-[#1E8A8A]/20 focus-visible:outline-none"
           >
             <Save size={18} />
             Update Changes
+          </button>
+          <button type="button" onClick={uploadImage} disabled={uploading}>
+            {uploading ? "Uploading..." : "Upload to Cloudinary"}
           </button>
         </footer>
       </div>
