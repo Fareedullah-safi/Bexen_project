@@ -1,11 +1,22 @@
 "use client";
 
+import axios from "axios";
 import { ArrowRight, Box, ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export default function SectionTen() {
   const [serviceOpen, setServiceOpen] = useState(false);
   const [service, setService] = useState("Choose an option");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    service: "",
+    message: "",
+  });
 
   const services = [
     "Business Strategy",
@@ -24,7 +35,7 @@ export default function SectionTen() {
       phone: "P: +1 (009) 544-7818",
       email: "M: support@bexon.com",
       position:
-        "left-[20%] top-[42%] sm:left-[23%] sm:top-[43%] md:left-[24%] md:top-[42%] lg:left-[20%] lg:top-[45%]",
+        "left-[20%] top-[42%] sm:left-[23%] sm:top-[43%] md:left-[24%] md:top-[42%] lg:left-[70%] lg:top-[60%]",
     },
     {
       id: 2,
@@ -45,6 +56,70 @@ export default function SectionTen() {
         "left-[34%] top-[68%] sm:left-[36%] sm:top-[68%] md:left-[36%] md:top-[68%] lg:left-[31%] lg:top-[72%]",
     },
   ];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (isSubmitting) return;
+
+    if (!formData.fullName.trim()) {
+      alert("Please enter your full name.");
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      alert("Please enter your email address.");
+      return;
+    }
+
+    if (!formData.phone.trim()) {
+      alert("Please enter your phone number.");
+      return;
+    }
+
+    if (!formData.service) {
+      alert("Please choose a service.");
+      setServiceOpen(true);
+      return;
+    }
+
+    if (!formData.message.trim()) {
+      alert("Please enter your message.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const res = await axios.post("/api/homepage/contact", formData);
+
+      if (res.data.success) {
+        toast.success(
+          res.data.message || "Your message was sent successfully.",
+        );
+
+        setFormData({
+          fullName: "",
+          email: "",
+          phone: "",
+          service: "",
+          message: "",
+        });
+
+        setService("Choose an option");
+        setServiceOpen(false);
+      }
+    } catch (error) {
+      console.error("Contact submission failed:", error);
+
+      alert(
+        error.response?.data?.message ||
+          "Failed to send your message. Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <section className="w-full bg-[#e7eded] px-4 py-6 sm:py-10 md:py-12 lg:py-16">
@@ -143,7 +218,7 @@ export default function SectionTen() {
 
               {/* FORM */}
 
-              <form className="mt-7 sm:mt-9 md:mt-10">
+              <form onSubmit={handleSubmit} className="mt-7 sm:mt-9 md:mt-10">
                 <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2 sm:gap-x-7 sm:gap-y-7 md:gap-y-8">
                   {/* NAME */}
 
@@ -161,7 +236,17 @@ export default function SectionTen() {
 
                     <input
                       id="fullName"
+                      name="fullName"
                       type="text"
+                      autoComplete="name"
+                      required
+                      value={formData.fullName}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          fullName: e.target.value,
+                        })
+                      }
                       className="mt-2 w-full border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
@@ -182,7 +267,17 @@ export default function SectionTen() {
 
                     <input
                       id="email"
+                      name="email"
                       type="email"
+                      autoComplete="email"
+                      required
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          email: e.target.value,
+                        })
+                      }
                       className="mt-2 w-full border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
@@ -203,20 +298,37 @@ export default function SectionTen() {
 
                     <input
                       id="phone"
+                      name="phone"
                       type="tel"
+                      autoComplete="tel"
+                      required
+                      value={formData.phone}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          phone: e.target.value,
+                        })
+                      }
                       className="mt-2 w-full border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
 
                   {/* SERVICE */}
+
                   <div className="group relative">
-                    <label className="block text-xs text-white/60 transition-colors duration-300 group-focus-within:text-[#58eee0] sm:text-sm md:text-base">
-                      Choose a service
+                    <label
+                      id="service-label"
+                      className="block text-xs text-white/60 transition-colors duration-300 group-focus-within:text-[#58eee0] sm:text-sm md:text-base"
+                    >
+                      Choose a service *
                     </label>
 
                     <button
                       type="button"
-                      onClick={() => setServiceOpen(!serviceOpen)}
+                      aria-labelledby="service-label"
+                      aria-expanded={serviceOpen}
+                      aria-haspopup="listbox"
+                      onClick={() => setServiceOpen((prev) => !prev)}
                       className="mt-1 flex w-full items-center justify-between border-b border-white/10 bg-transparent pb-2.5 text-left text-sm text-white transition-all duration-300 focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     >
                       <span
@@ -240,17 +352,26 @@ export default function SectionTen() {
                     </button>
 
                     {/* DROPDOWN */}
+
                     <div
-                      className={`absolute top-full left-0 z-50 mt-2 w-full origin-top overflow-hidden rounded-xl bg-white shadow-2xl transition-all duration-300 sm:max-h-[320px] sm:overflow-y-auto ${
+                      role="listbox"
+                      aria-labelledby="service-label"
+                      className={`absolute top-full left-0 z-50 mt-2 w-full origin-top overflow-hidden rounded-xl bg-white shadow-2xl transition-all duration-300 ${
                         serviceOpen
                           ? "visible scale-y-100 opacity-100"
-                          : "invisible scale-y-95 opacity-0"
+                          : "pointer-events-none invisible scale-y-95 opacity-0"
                       }`}
                     >
                       <button
                         type="button"
+                        role="option"
+                        aria-selected={!formData.service}
                         onClick={() => {
                           setService("Choose an option");
+                          setFormData((prev) => ({
+                            ...prev,
+                            service: "",
+                          }));
                           setServiceOpen(false);
                         }}
                         className="w-full bg-[#dce8e9] px-4 py-3 text-left text-sm font-semibold text-[#102326] transition hover:bg-[#cfdfe0] sm:px-6 sm:py-4 sm:text-base"
@@ -262,8 +383,14 @@ export default function SectionTen() {
                         <button
                           key={item}
                           type="button"
+                          role="option"
+                          aria-selected={formData.service === item}
                           onClick={() => {
                             setService(item);
+                            setFormData((prev) => ({
+                              ...prev,
+                              service: item,
+                            }));
                             setServiceOpen(false);
                           }}
                           style={{
@@ -271,7 +398,7 @@ export default function SectionTen() {
                               ? `${index * 40}ms`
                               : "0ms",
                           }}
-                          className={`cursor-pointer w-full px-4 py-3 text-left text-sm whitespace-normal text-[#102326] transition-all duration-300 hover:bg-[#1E8A8A] hover:text-white sm:px-6 sm:py-3.5 sm:text-base md:text-lg ${
+                          className={`w-full cursor-pointer px-4 py-3 text-left text-sm whitespace-normal text-[#102326] transition-all duration-300 hover:bg-[#1E8A8A] hover:text-white sm:px-6 sm:py-3.5 sm:text-base md:text-lg ${
                             serviceOpen
                               ? "translate-x-0 opacity-100"
                               : "-translate-x-3 opacity-0"
@@ -299,7 +426,16 @@ export default function SectionTen() {
 
                     <textarea
                       id="message"
+                      name="message"
                       rows={3}
+                      required
+                      value={formData.message}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          message: e.target.value,
+                        })
+                      }
                       className="mt-2 w-full resize-none border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
@@ -311,11 +447,12 @@ export default function SectionTen() {
                   data-wow-duration="0.8s"
                   data-wow-delay="0.45s"
                   type="submit"
-                  className="wow animate__animated animate__fadeInUp group/button mt-7 flex h-12 w-full max-w-[190px] cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#1E8A8A] py-1 pr-1 pl-4 text-xs font-semibold text-white transition-all duration-300 hover:-translate-y-1 hover:bg-[#167575] hover:shadow-xl hover:shadow-[#1E8A8A]/20 sm:mt-8 sm:h-13 sm:text-sm"
+                  disabled={isSubmitting}
+                  className="wow animate__animated animate__fadeInUp group/button mt-7 flex h-12 w-full max-w-[190px] cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#1E8A8A] py-1 pr-1 pl-4 text-xs font-semibold text-white transition-all duration-300 hover:-translate-y-1 hover:bg-[#167575] hover:shadow-xl hover:shadow-[#1E8A8A]/20 disabled:cursor-not-allowed disabled:opacity-60 sm:mt-8 sm:h-13 sm:text-sm"
                 >
                   <span className="overflow-hidden leading-none">
-                    <span className="block transition-transform duration-400 [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5">
-                      Send Message
+                    <span className="block">
+                      {isSubmitting ? "Sending..." : "Send Message"}
                     </span>
                   </span>
 
