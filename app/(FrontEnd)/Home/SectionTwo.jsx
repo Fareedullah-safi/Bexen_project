@@ -1,11 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Box } from "lucide-react";
-import { GoLightBulb } from "react-icons/go";
 import Loader from "@/app/Components/Loader";
-
-const FALLBACK_ICON = GoLightBulb;
 
 export default function SectionTwoSectionTwo() {
   const [data, setData] = useState(null);
@@ -85,14 +83,16 @@ export default function SectionTwoSectionTwo() {
                 data-wow-duration="0.9s"
                 data-wow-delay={`${0.2 + index * 0.2}s`}
               >
-                {iconUrl ? (
-                  <img
-                    src={iconUrl}
-                    alt={card.title}
-                    className="h-20 w-20 object-contain"
-                  />
-                ) : (
-                  <FALLBACK_ICON className="h-20 w-20 text-[#1E8A8A] transition-all duration-500 group-hover:text-white" />
+                {iconUrl && (
+                  <div className="relative h-20 w-20">
+                    <Image
+                      src={iconUrl}
+                      alt={card.title || "Feature icon"}
+                      fill
+                      sizes="80px"
+                      className="object-contain"
+                    />
+                  </div>
                 )}
 
                 <h2 className="mt-8 text-xl font-bold text-zinc-950 transition-colors duration-500 group-hover:text-white">

@@ -1,40 +1,35 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import Loader from "@/app/Components/Loader";
 
 export default function BrandLogos() {
-  const logos = [
-    "https://themejunction.net/html/bexon/demo/assets/images/brands/brand-1.webp",
-    "https://themejunction.net/html/bexon/demo/assets/images/brands/brand-2.webp",
-    "https://themejunction.net/html/bexon/demo/assets/images/brands/brand-3.webp",
-    "https://themejunction.net/html/bexon/demo/assets/images/brands/brand-4.webp",
-    "https://themejunction.net/html/bexon/demo/assets/images/brands/brand-5.webp",
-    "https://themejunction.net/html/bexon/demo/assets/images/brands/brand-6.webp",
-  ];
-
   const [dbLogos, setDbLogos] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const dataLogos = async () => {
       try {
-        const res = await fetch("/api/homepage/brand-logos/postlogoDB");
+        const res = await fetch("/api/homepage/brand-logos/postlogoDB", {
+          cache: "no-store",
+        });
+
         const data = await res.json();
 
-        console.log("API DATA:", data);
+        if (!res.ok) {
+          throw new Error(data?.message || "Failed to load brand logos");
+        }
 
         const uploadedLogos =
           data?.data?.flatMap(
-            (item) => item?.logos?.map((logo) => logo.url) || [],
+            (item) => item?.logos?.map((logo) => logo?.url).filter(Boolean) || []
           ) || [];
 
-        console.log("DB LOGOS:", uploadedLogos);
-
-        setDbLogos([...logos, ...uploadedLogos]);
+        setDbLogos(uploadedLogos);
       } catch (error) {
         console.error("Failed to load brand logos:", error);
-        setDbLogos(logos);
+        setDbLogos([]);
       } finally {
         setLoading(false);
       }
@@ -74,52 +69,62 @@ export default function BrandLogos() {
           </h2>
         </div>
 
-        <div
-          className="wow animate__animated animate__fadeInUp mt-14 w-full overflow-hidden"
-          data-wow-duration="1s"
-          data-wow-delay="0.3s"
-        >
+        {dbLogos.length > 0 && (
           <div
-            className="flex w-max"
-            style={{
-              animation: "logoScroll 20s linear infinite",
-            }}
+            className="wow animate__animated animate__fadeInUp mt-14 w-full overflow-hidden"
+            data-wow-duration="1s"
+            data-wow-delay="0.3s"
           >
-            <div className="flex shrink-0 gap-3 pr-3 sm:gap-4 sm:pr-4 md:gap-5 md:pr-5 lg:gap-6 lg:pr-6">
-              {dbLogos.map((logo, index) => (
-                <div
-                  key={`first-${index}`}
-                  className="wow animate__animated animate__fadeIn flex h-20 w-32 shrink-0 items-center justify-center rounded-xl bg-white px-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg sm:h-30 sm:w-40 sm:px-5 md:h-35 md:w-44 md:px-5 lg:h-40 lg:w-48 lg:px-6"
-                  data-wow-duration="0.7s"
-                  data-wow-delay={`${0.1 + (index % 6) * 0.1}s`}
-                >
-                  <img
-                    src={logo}
-                    alt={`Company logo ${index + 1}`}
-                    className="h-auto max-h-12 w-auto max-w-[75%] object-contain opacity-60 transition-all duration-300 hover:opacity-100 sm:max-h-14 sm:max-w-[78%] md:max-h-16 md:max-w-[80%] lg:max-h-20 lg:max-w-[85%]"
-                  />
-                </div>
-              ))}
-            </div>
+            <div
+              className="flex w-max"
+              style={{
+                animation: "logoScroll 20s linear infinite",
+              }}
+            >
+              <div className="flex shrink-0 gap-3 pr-3 sm:gap-4 sm:pr-4 md:gap-5 md:pr-5 lg:gap-6 lg:pr-6">
+                {dbLogos.map((logo, index) => (
+                  <div
+                    key={`first-${index}`}
+                    className="wow animate__animated animate__fadeIn flex h-20 w-32 shrink-0 items-center justify-center rounded-xl bg-white px-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg sm:h-30 sm:w-40 sm:px-5 md:h-35 md:w-44 md:px-5 lg:h-40 lg:w-48 lg:px-6"
+                    data-wow-duration="0.7s"
+                    data-wow-delay={`${0.1 + (index % 6) * 0.1}s`}
+                  >
+                    <div className="relative h-full max-h-12 w-full sm:max-h-14 md:max-h-16 lg:max-h-20">
+                      <Image
+                        src={logo}
+                        alt={`Company logo ${index + 1}`}
+                        fill
+                        sizes="(max-width: 640px) 96px, (max-width: 768px) 120px, (max-width: 1024px) 140px, 160px"
+                        className="object-contain opacity-60 transition-all duration-300 hover:opacity-100"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-            <div className="flex shrink-0 gap-6 pr-6">
-              {dbLogos.map((logo, index) => (
-                <div
-                  key={`second-${index}`}
-                  className="wow animate__animated animate__fadeIn flex h-20 w-32 shrink-0 items-center justify-center rounded-xl bg-white px-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg sm:h-30 sm:w-40 sm:px-5 md:h-35 md:w-44 md:px-5 lg:h-40 lg:w-48 lg:px-6"
-                  data-wow-duration="0.7s"
-                  data-wow-delay={`${0.1 + (index % 6) * 0.1}s`}
-                >
-                  <img
-                    src={logo}
-                    alt={`Company logo ${index + 1}`}
-                    className="h-auto w-full max-w-35 object-contain opacity-60 transition-all duration-300 hover:opacity-100"
-                  />
-                </div>
-              ))}
+              <div className="flex shrink-0 gap-6 pr-6">
+                {dbLogos.map((logo, index) => (
+                  <div
+                    key={`second-${index}`}
+                    className="wow animate__animated animate__fadeIn flex h-20 w-32 shrink-0 items-center justify-center rounded-xl bg-white px-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg sm:h-30 sm:w-40 sm:px-5 md:h-35 md:w-44 md:px-5 lg:h-40 lg:w-48 lg:px-6"
+                    data-wow-duration="0.7s"
+                    data-wow-delay={`${0.1 + (index % 6) * 0.1}s`}
+                  >
+                    <div className="relative h-full max-h-12 w-full sm:max-h-14 md:max-h-16 lg:max-h-20">
+                      <Image
+                        src={logo}
+                        alt={`Company logo ${index + 1}`}
+                        fill
+                        sizes="(max-width: 640px) 96px, (max-width: 768px) 120px, (max-width: 1024px) 140px, 160px"
+                        className="object-contain opacity-60 transition-all duration-300 hover:opacity-100"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       <style jsx>{`

@@ -8,6 +8,7 @@ import axios from "axios";
 export default function SectionNine() {
   const [open, setOpen] = useState(null);
   const [faqData, setFaqData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function getFaqData() {
@@ -22,11 +23,23 @@ export default function SectionNine() {
           "Failed to load FAQ data:",
           error.response?.data?.message || error.message,
         );
+      } finally {
+        setIsLoading(false);
       }
     }
 
     getFaqData();
   }, []);
+
+  if (isLoading) {
+    return (
+      <section className="min-h-screen w-full bg-[#ECF0F0] px-6 py-16 lg:px-12">
+        <div className="flex min-h-52 items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#1E8A8A]/20 border-t-[#1E8A8A]" />
+        </div>
+      </section>
+    );
+  }
 
   if (!faqData) return null;
 
@@ -43,58 +56,67 @@ export default function SectionNine() {
           >
             {faqData.imageURL && (
               <Image
-                alt="Company pic"
-                fill
                 src={faqData.imageURL}
-                className="object-cover transition-transform duration-700 hover:scale-105"
+                alt={faqData.headingLineOne || "Company"}
+                fill
                 sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover transition-transform duration-700 hover:scale-105"
               />
             )}
 
             <div className="absolute inset-0 bg-linear-to-t from-[#0C1E21]/60 via-transparent to-transparent" />
 
-            <h2
-              className="wow animate__animated animate__fadeInUp absolute top-8 left-8 z-10 text-4xl leading-tight font-medium text-white md:text-5xl"
-              data-wow-delay="0.3s"
-            >
-              {faqData.headingLineOne}
-              <br />
-              {faqData.headingLineTwo}
-            </h2>
+            {(faqData.headingLineOne || faqData.headingLineTwo) && (
+              <h2
+                className="wow animate__animated animate__fadeInUp absolute top-8 left-8 z-10 text-4xl leading-tight font-medium text-white md:text-5xl"
+                data-wow-delay="0.3s"
+              >
+                {faqData.headingLineOne}
+                {faqData.headingLineOne && faqData.headingLineTwo && <br />}
+                {faqData.headingLineTwo}
+              </h2>
+            )}
           </div>
 
           {/* Get Started Box */}
-          <div
-            className="wow animate__animated animate__fadeInUp absolute right-0 bottom-0 z-20 rounded-tl-[35px] bg-[#ECF0F0] pt-4 pb-0 pl-4"
-            data-wow-delay="0.5s"
-          >
-            <div className="w-60 rounded-2xl bg-[#1E8A8A] px-6 py-6 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
-              <p className="text-2xl font-bold text-white">
-                {faqData.callHeadingLineOne}
-                <br />
-                {faqData.callHeadingLineTwo}
-              </p>
-
-              <div className="mt-5 flex flex-col gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0C1E21] text-white transition-transform duration-300 hover:rotate-12">
-                  <PhoneCallIcon size={20} />
-                </div>
+          {(faqData.callHeadingLineOne ||
+            faqData.callHeadingLineTwo ||
+            faqData.phoneNumber) && (
+            <div
+              className="wow animate__animated animate__fadeInUp absolute right-0 bottom-0 z-20 rounded-tl-[35px] bg-[#ECF0F0] pt-4 pb-0 pl-4"
+              data-wow-delay="0.5s"
+            >
+              <div className="w-60 rounded-2xl bg-[#1E8A8A] px-6 py-6 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
+                {(faqData.callHeadingLineOne || faqData.callHeadingLineTwo) && (
+                  <p className="text-2xl font-bold text-white">
+                    {faqData.callHeadingLineOne}
+                    {faqData.callHeadingLineOne &&
+                      faqData.callHeadingLineTwo && <br />}
+                    {faqData.callHeadingLineTwo}
+                  </p>
+                )}
 
                 {faqData.phoneNumber && (
-                  <a
-                    href={
-                      faqData.phoneHref ||
-                      `tel:${faqData.phoneNumber.replace(/[^\d+]/g, "")}`
-                    }
-                    className="group/phone relative w-fit text-xl font-semibold text-white"
-                  >
-                    {faqData.phoneNumber}
-                    <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-cyan-500 transition-all duration-300 group-hover/phone:w-full" />
-                  </a>
+                  <div className="mt-5 flex flex-col gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0C1E21] text-white transition-transform duration-300 hover:rotate-12">
+                      <PhoneCallIcon size={20} />
+                    </div>
+
+                    <a
+                      href={
+                        faqData.phoneHref ||
+                        `tel:${faqData.phoneNumber.replace(/[^\d+]/g, "")}`
+                      }
+                      className="group/phone relative w-fit text-xl font-semibold text-white"
+                    >
+                      {faqData.phoneNumber}
+                      <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-cyan-500 transition-all duration-300 group-hover/phone:w-full" />
+                    </a>
+                  </div>
                 )}
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* FAQ */}
@@ -138,12 +160,9 @@ export default function SectionNine() {
                   }`}
                 >
                   <div className="overflow-hidden px-6">
-                    {/* Dotted Line */}
                     <div className="flex items-center gap-2">
                       <span className="h-1 w-1 rounded-full bg-[#1E8A8A]" />
-
                       <div className="flex-1 border-t border-dashed border-zinc-300" />
-
                       <span className="h-1 w-1 rounded-full bg-[#1E8A8A]" />
                     </div>
 

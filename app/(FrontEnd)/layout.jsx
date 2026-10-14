@@ -7,10 +7,7 @@ export default function FrontEndLayout({ children }) {
   return (
     <>
       <WowAnimation />
-      <NavBar />
       {children}
-      <SectionTwelve />
-      <Footer />
     </>
   );
 }

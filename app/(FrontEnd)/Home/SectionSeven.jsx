@@ -13,8 +13,9 @@ function AnimatedNumber({ value }) {
     if (!element) return;
 
     let animationFrame;
+    let observer;
 
-    const observer = new IntersectionObserver(
+    observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return;
 
@@ -60,7 +61,9 @@ export default function SectionSeven() {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const response = await fetch("/api/homepage/reviews-section");
+        const response = await fetch("/api/homepage/reviews-section", {
+          cache: "no-store",
+        });
 
         if (!response.ok) {
           throw new Error("Failed to load stats");
@@ -70,21 +73,24 @@ export default function SectionSeven() {
 
         if (result.success && Array.isArray(result.data?.stats)) {
           setStats(
-            result.data.stats.map((stat) => {
-              const match = String(stat.value || "").match(
-                /^(\d+(?:\.\d+)?)(.*)$/,
-              );
+            result.data.stats
+              .map((stat) => {
+                const match = String(stat.value || "").match(
+                  /^(\d+(?:\.\d+)?)(.*)$/,
+                );
 
-              return {
-                number: match ? Number(match[1]) : 0,
-                suffix: match ? match[2] : "",
-                title: stat.label || "",
-              };
-            }),
+                return {
+                  number: match ? Number(match[1]) : 0,
+                  suffix: match ? match[2] : "",
+                  title: stat.label || "",
+                };
+              })
+              .filter((stat) => stat.title || stat.number || stat.suffix),
           );
         }
       } catch (error) {
         console.error("Failed to load stats:", error);
+        setStats([]);
       } finally {
         setIsLoading(false);
       }

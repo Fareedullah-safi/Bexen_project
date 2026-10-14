@@ -12,7 +12,7 @@ export default function HomePage() {
   useEffect(() => {
     const getSlides = async () => {
       try {
-        const res = await fetch("/api/homepage");
+        const res = await fetch("/api/homepage/slides");
         const data = await res.json();
 
         if (!res.ok) {
@@ -44,7 +44,7 @@ export default function HomePage() {
     }
 
     try {
-      const res = await fetch("/api/homepage", {
+      const res = await fetch("/api/homepage/slides", {
         method: "POST",
         body: formData,
       });
@@ -66,7 +66,7 @@ export default function HomePage() {
   // Remove image
   const removeImage = async (id) => {
     try {
-      const res = await fetch("/api/homepage", {
+      const res = await fetch("/api/homepage/slides", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

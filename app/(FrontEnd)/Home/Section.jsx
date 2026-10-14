@@ -15,7 +15,7 @@ export default function Section() {
   useEffect(() => {
     const getSlides = async () => {
       try {
-        const res = await fetch("/api/homepage");
+        const res = await fetch("/api/homepage/slides");
         const data = await res.json();
 
         if (!res.ok) {

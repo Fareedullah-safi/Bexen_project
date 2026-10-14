@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import axios from "axios";
 import { ArrowRight, Box, ChevronDown } from "lucide-react";
 import { useState } from "react";
@@ -27,35 +28,8 @@ export default function SectionTen() {
     "Marketing Strategy",
   ];
 
-  const regions = [
-    {
-      id: 1,
-      title: "Head office:",
-      address: "993 Renner Burg, West Rond, MT 94251-030, USA.",
-      phone: "P: +1 (009) 544-7818",
-      email: "M: support@bexon.com",
-      position:
-        "left-[20%] top-[42%] sm:left-[23%] sm:top-[43%] md:left-[24%] md:top-[42%] lg:left-[70%] lg:top-[60%]",
-    },
-    {
-      id: 2,
-      title: "Regional office:",
-      address: "Hessisch Lichtenau 37235, Kassel, Germany.",
-      phone: "P: +1 (009) 880-1810",
-      email: "M: support@bexon.com",
-      position:
-        "left-[55%] top-[32%] sm:left-[54%] sm:top-[34%] md:left-[54%] md:top-[33%] lg:left-[52%] lg:top-[38%]",
-    },
-    {
-      id: 3,
-      title: "Regional office:",
-      address: "32 Altamira, State of Pará, Brazil.",
-      phone: "P: +1 (009) 544-7818",
-      email: "M: support@bexon.com",
-      position:
-        "left-[34%] top-[68%] sm:left-[36%] sm:top-[68%] md:left-[36%] md:top-[68%] lg:left-[31%] lg:top-[72%]",
-    },
-  ];
+  // Office locations will be loaded from the API when available.
+  const [regions, setRegions] = useState([]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,28 +37,28 @@ export default function SectionTen() {
     if (isSubmitting) return;
 
     if (!formData.fullName.trim()) {
-      alert("Please enter your full name.");
+      toast.error("Please enter your full name.");
       return;
     }
 
     if (!formData.email.trim()) {
-      alert("Please enter your email address.");
+      toast.error("Please enter your email address.");
       return;
     }
 
     if (!formData.phone.trim()) {
-      alert("Please enter your phone number.");
+      toast.error("Please enter your phone number.");
       return;
     }
 
     if (!formData.service) {
-      alert("Please choose a service.");
+      toast.error("Please choose a service.");
       setServiceOpen(true);
       return;
     }
 
     if (!formData.message.trim()) {
-      alert("Please enter your message.");
+      toast.error("Please enter your message.");
       return;
     }
 
@@ -108,11 +82,13 @@ export default function SectionTen() {
 
         setService("Choose an option");
         setServiceOpen(false);
+      } else {
+        toast.error(res.data.message || "Failed to send your message.");
       }
     } catch (error) {
       console.error("Contact submission failed:", error);
 
-      alert(
+      toast.error(
         error.response?.data?.message ||
           "Failed to send your message. Please try again.",
       );
@@ -123,7 +99,19 @@ export default function SectionTen() {
 
   return (
     <section className="w-full bg-[#e7eded] px-4 py-6 sm:py-10 md:py-12 lg:py-16">
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#081f22] [background-image:url('https://themejunction.net/html/bexon/demo/assets/images/bg/map.svg')] [background-size:170%_auto] [background-position:center_8%] bg-no-repeat sm:rounded-[28px] sm:[background-size:130%_auto] sm:[background-position:center_5%] md:[background-size:110%_auto] md:[background-position:center_8%] lg:rounded-[30px] lg:[background-size:64%_auto] lg:[background-position:left_center]">
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#081f22] sm:rounded-[28px] lg:rounded-[30px]">
+        {/* Optimized map background */}
+        <div className="absolute inset-0">
+          <Image
+            src="https://themejunction.net/html/bexon/demo/assets/images/bg/map.svg"
+            alt=""
+            fill
+            sizes="(max-width: 639px) 100vw, (max-width: 1023px) 100vw, 50vw"
+            className="object-cover object-center opacity-30 lg:object-contain lg:object-left"
+            priority={false}
+          />
+        </div>
+
         <div className="absolute inset-0 bg-[#081f22]/90" />
 
         <div className="pointer-events-none absolute top-10 -left-40 h-87.5 w-87.5 rounded-full bg-[#1E8A8A]/14 blur-[120px] sm:h-[420px] sm:w-[420px] md:h-[450px] md:w-[450px] md:blur-[150px]" />
@@ -140,14 +128,13 @@ export default function SectionTen() {
 
         <div className="relative z-10 flex flex-col lg:grid lg:grid-cols-[1fr_1fr]">
           {/* MAP */}
-
           <div className="relative min-h-97.5 sm:min-h-117.5 md:min-h-135 lg:min-h-200">
             {regions.map((region, index) => (
               <div
-                key={region.id}
+                key={region.id || region._id || index}
                 data-wow-duration="0.8s"
                 data-wow-delay={`${0.2 + index * 0.15}s`}
-                className={`wow animate__animated animate__fadeIn group absolute ${region.position} z-30`}
+                className={`wow animate__animated animate__fadeIn group absolute ${region.position || ""} z-30`}
               >
                 <span className="absolute -inset-2.5 rounded-full bg-[#1E8A8A]/20 blur-md sm:-inset-3 md:-inset-4" />
 
@@ -155,7 +142,7 @@ export default function SectionTen() {
 
                 <button
                   type="button"
-                  aria-label={region.title}
+                  aria-label={region.title || "Office location"}
                   className="relative h-3 w-3 cursor-pointer rounded-full border border-white bg-white shadow-[0_0_12px_rgba(255,255,255,0.65)] transition-all duration-300 group-hover:scale-125 group-hover:border-[#72f4e8] sm:h-4 sm:w-4 md:h-5 md:w-5 md:shadow-[0_0_18px_rgba(255,255,255,0.7)] lg:h-7 lg:w-7 lg:border-2 lg:shadow-[0_0_22px_rgba(255,255,255,0.7)]"
                 >
                   <span className="absolute inset-0.5 rounded-full bg-[#1E8A8A] opacity-0 transition-opacity duration-300 group-hover:opacity-100 sm:inset-1 lg:inset-1.5" />
@@ -183,21 +170,20 @@ export default function SectionTen() {
               </div>
             ))}
 
-            <div
-              data-wow-duration="0.8s"
-              className="wow animate__animated animate__fadeIn absolute bottom-6 left-5 hidden items-center gap-2 text-[10px] font-medium tracking-[0.18em] text-white/35 sm:flex md:bottom-8 md:left-8 md:text-xs lg:bottom-8 lg:left-10"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-[#1E8A8A] sm:h-2 sm:w-2" />
-              GLOBAL PRESENCE
-            </div>
+            {regions.length > 0 && (
+              <div
+                data-wow-duration="0.8s"
+                className="wow animate__animated animate__fadeIn absolute bottom-6 left-5 hidden items-center gap-2 text-[10px] font-medium tracking-[0.18em] text-white/35 sm:flex md:bottom-8 md:left-8 md:text-xs lg:bottom-8 lg:left-10"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-[#1E8A8A] sm:h-2 sm:w-2" />
+                GLOBAL PRESENCE
+              </div>
+            )}
           </div>
 
           {/* CONTACT FORM */}
-
           <div className="relative z-40 flex w-full items-center justify-center px-3 pb-5 sm:px-6 sm:pb-8 md:px-8 md:pb-10 lg:px-10 lg:py-10 xl:px-12">
             <div className="w-full max-w-[650px] rounded-[22px] border border-white/10 bg-black/[0.04] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.3)] backdrop-blur-2xl sm:rounded-[26px] sm:p-7 md:p-9 lg:p-10 xl:p-11">
-              {/* BADGE */}
-
               <span
                 data-wow-duration="0.8s"
                 className="wow animate__animated animate__fadeInDown inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-bold tracking-wide text-white sm:px-4 sm:py-2 sm:text-xs md:text-sm"
@@ -205,8 +191,6 @@ export default function SectionTen() {
                 <Box size={16} className="text-[#1E8A8A] sm:size-[17px]" />
                 GET IN TOUCH
               </span>
-
-              {/* HEADING */}
 
               <h1
                 data-wow-duration="0.9s"
@@ -216,12 +200,9 @@ export default function SectionTen() {
                 Drop Us a <span className="text-[#1E8A8A]">Line.</span>
               </h1>
 
-              {/* FORM */}
-
               <form onSubmit={handleSubmit} className="mt-7 sm:mt-9 md:mt-10">
                 <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2 sm:gap-x-7 sm:gap-y-7 md:gap-y-8">
                   {/* NAME */}
-
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.15s"
@@ -242,17 +223,13 @@ export default function SectionTen() {
                       required
                       value={formData.fullName}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          fullName: e.target.value,
-                        })
+                        setFormData({ ...formData, fullName: e.target.value })
                       }
                       className="mt-2 w-full border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
 
                   {/* EMAIL */}
-
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.2s"
@@ -273,17 +250,13 @@ export default function SectionTen() {
                       required
                       value={formData.email}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          email: e.target.value,
-                        })
+                        setFormData({ ...formData, email: e.target.value })
                       }
                       className="mt-2 w-full border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
 
                   {/* PHONE */}
-
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.25s"
@@ -304,17 +277,13 @@ export default function SectionTen() {
                       required
                       value={formData.phone}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          phone: e.target.value,
-                        })
+                        setFormData({ ...formData, phone: e.target.value })
                       }
                       className="mt-2 w-full border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
 
                   {/* SERVICE */}
-
                   <div className="group relative">
                     <label
                       id="service-label"
@@ -351,8 +320,6 @@ export default function SectionTen() {
                       />
                     </button>
 
-                    {/* DROPDOWN */}
-
                     <div
                       role="listbox"
                       aria-labelledby="service-label"
@@ -368,10 +335,7 @@ export default function SectionTen() {
                         aria-selected={!formData.service}
                         onClick={() => {
                           setService("Choose an option");
-                          setFormData((prev) => ({
-                            ...prev,
-                            service: "",
-                          }));
+                          setFormData((prev) => ({ ...prev, service: "" }));
                           setServiceOpen(false);
                         }}
                         className="w-full bg-[#dce8e9] px-4 py-3 text-left text-sm font-semibold text-[#102326] transition hover:bg-[#cfdfe0] sm:px-6 sm:py-4 sm:text-base"
@@ -411,7 +375,6 @@ export default function SectionTen() {
                   </div>
 
                   {/* MESSAGE */}
-
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.35s"
@@ -431,17 +394,12 @@ export default function SectionTen() {
                       required
                       value={formData.message}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          message: e.target.value,
-                        })
+                        setFormData({ ...formData, message: e.target.value })
                       }
                       className="mt-2 w-full resize-none border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
                 </div>
-
-                {/* BUTTON */}
 
                 <button
                   data-wow-duration="0.8s"
