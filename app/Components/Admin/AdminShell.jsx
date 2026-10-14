@@ -54,7 +54,7 @@ const navigation = [
           { name: "Projects", href: "/admin/home/projects" },
           { name: "Counters", href: "/admin/home/counters" },
           { name: "FAQ", href: "/admin/home/faq" },
-          { name: "Inquiry Form", href: "/admin/home/inquiry-form" },
+          { name: "Articles Section", href: "/admin/home/articles-section" },
         ],
       },
 
