@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import {
+  BookOpen,
   Plus,
   Trash2,
   ImagePlus,
@@ -14,24 +15,42 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import { toast } from "sonner";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
+
+/* ============ CONSTANTS ============ */
+
+const months = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
 
 const emptyPost = {
   day: "",
-  month: "",
+  month: "OCT",
   image: "",
   category: "",
-  author: "",
+  author: "Admin",
   title: "",
   link: "",
 };
 
-const defaults = [
+const defaultPosts = [
   {
     id: 1,
     day: "24",
     month: "OCT",
-    image:
-      "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f",
     category: "BUSINESS",
     author: "Admin",
     title: "How to Build a Successful Business Strategy",
@@ -41,422 +60,717 @@ const defaults = [
     id: 2,
     day: "18",
     month: "OCT",
-    image:
-      "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1497366754035-f200968a6e72",
     category: "MARKETING",
     author: "Admin",
-    title: "Digital Marketing Strategies for Modern Brands",
-    link: "/blog/digital-marketing",
+    title: "Simple Marketing Tips for Growing Brands",
+    link: "/blog/marketing-tips",
   },
   {
     id: 3,
     day: "12",
     month: "OCT",
-    image:
-      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c",
     category: "TECHNOLOGY",
     author: "Admin",
-    title: "The Future of Technology in Business",
-    link: "/blog/future-technology",
+    title: "The Future of Modern Technology",
+    link: "/blog/modern-technology",
   },
 ];
+
+/* ============ SHARED TAILWIND STYLES ============ */
+
+const inputClass =
+  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-[#1e8a8a] dark:border-[#263442] dark:bg-[#16212c] dark:text-gray-100";
+
+const labelClass =
+  "mb-2 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200";
+
+const cardClass =
+  "rounded-2xl border border-gray-200 bg-white p-5 dark:border-[#263442] dark:bg-[#111a23]";
+
+/* ============ PURE HELPER FUNCTIONS ============ */
+/* These don't use state, so they live outside the component. */
+
+function validLink(value = "") {
+  const link = value.trim();
+
+  if (link.startsWith("/")) return !link.startsWith("//") && !/\s/.test(link);
+
+  try {
+    const url = new URL(link);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function validImageUrl(value = "") {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+function isValidImageFile(file) {
+  const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+  if (!allowed.includes(file.type))
+    return "Choose a JPG, PNG, WEBP, or GIF image.";
+  if (file.size > 5 * 1024 * 1024) return "Image must be smaller than 5 MB.";
+
+  return null;
+}
+
+function validatePost(post, hasSelectedFile = false) {
+  const result = {};
+
+  if (post.title.trim().length < 3 || post.title.trim().length > 120)
+    result.title = "Title must be 3–120 characters.";
+
+  if (!hasSelectedFile && !validImageUrl(post.image))
+    result.image = "Choose an image or enter a valid image URL.";
+
+  if (!/^\d{1,2}$/.test(post.day) || +post.day < 1 || +post.day > 31)
+    result.day = "Enter a day from 1 to 31.";
+
+  if (!months.includes(post.month.toUpperCase().trim()))
+    result.month = "Select a valid month.";
+
+  if (!post.category.trim() || post.category.trim().length > 40)
+    result.category = "Category is required (max 40 characters).";
+
+  if (!post.author.trim() || post.author.trim().length > 60)
+    result.author = "Author is required (max 60 characters).";
+
+  if (!validLink(post.link)) result.link = "Enter a valid article link.";
+
+  return result;
+}
+
+async function uploadImage(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch("/api/homepage/articles-section/upload", {
+    method: "POST",
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.url) {
+    throw new Error(data.message || "Image upload failed.");
+  }
+
+  return data.url;
+}
+
+/* ============ SMALL REUSABLE UI PIECES ============ */
+
+function ErrorText({ children }) {
+  if (!children) return null;
+  return <p className="mt-1 text-xs text-red-500">{children}</p>;
+}
+
+function ImagePreview({ src, alt }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className="flex h-36 w-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-400 sm:w-64 dark:border-[#263442] dark:bg-[#16212c]">
+        <div className="text-center">
+          <ImagePlus size={24} className="mx-auto mb-2" />
+          Image preview unavailable
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setFailed(true)}
+      className="h-36 w-full rounded-xl border border-gray-200 object-cover sm:w-64 dark:border-[#263442]"
+    />
+  );
+}
+
+// A labeled text input. Used everywhere instead of repeating the same markup.
+function Field({ label, icon: Icon, error, className = "", ...props }) {
+  return (
+    <div className={className}>
+      <label className={labelClass}>
+        {Icon && <Icon size={15} />}
+        {label}
+      </label>
+      <input className={inputClass} {...props} />
+      <ErrorText>{error}</ErrorText>
+    </div>
+  );
+}
+
+// A labeled dropdown. Same idea as Field, but for <select>.
+function SelectField({
+  label,
+  icon: Icon,
+  error,
+  options,
+  className = "",
+  ...props
+}) {
+  return (
+    <div className={className}>
+      <label className={labelClass}>
+        {Icon && <Icon size={15} />}
+        {label}
+      </label>
+      <select className={inputClass} {...props}>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+      <ErrorText>{error}</ErrorText>
+    </div>
+  );
+}
+
+// The fields shared by BOTH "Add New Article" and "Edit Article".
+// This one block replaces what used to be written out twice.
+function ArticleFields({ data, onChange, errors }) {
+  return (
+    <>
+      <Field
+        label="Day"
+        icon={CalendarDays}
+        type="number"
+        min="1"
+        max="31"
+        placeholder="24"
+        value={data.day}
+        error={errors.day}
+        onChange={(e) => onChange("day", e.target.value)}
+      />
+
+      <SelectField
+        label="Month"
+        icon={CalendarDays}
+        value={data.month}
+        options={months}
+        error={errors.month}
+        onChange={(e) => onChange("month", e.target.value)}
+      />
+
+      <Field
+        label="Category"
+        icon={Tag}
+        maxLength={40}
+        placeholder="BUSINESS"
+        value={data.category}
+        error={errors.category}
+        onChange={(e) => onChange("category", e.target.value)}
+      />
+
+      <Field
+        label="Author"
+        icon={UserRound}
+        maxLength={60}
+        placeholder="Admin"
+        value={data.author}
+        error={errors.author}
+        onChange={(e) => onChange("author", e.target.value)}
+      />
+
+      <Field
+        label="Article Title"
+        icon={Type}
+        maxLength={120}
+        placeholder="Enter article title"
+        className="sm:col-span-2"
+        value={data.title}
+        error={errors.title}
+        onChange={(e) => onChange("title", e.target.value)}
+      />
+
+      <Field
+        label="Article Link"
+        icon={LinkIcon}
+        placeholder="/blog/my-article or https://example.com/article"
+        className="sm:col-span-2"
+        value={data.link}
+        error={errors.link}
+        onChange={(e) => onChange("link", e.target.value)}
+      />
+    </>
+  );
+}
+
+/* ============ MAIN COMPONENT ============ */
 
 export default function BlogSectionAdmin() {
   const [sectionTitle, setSectionTitle] = useState("The Ultimate");
   const [highlightedTitle, setHighlightedTitle] = useState("Resource.");
-  const [posts, setPosts] = useState(defaults);
+
+  const [posts, setPosts] = useState(defaultPosts);
   const [newPost, setNewPost] = useState(emptyPost);
+
   const [newPreview, setNewPreview] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+
   const [openPosts, setOpenPosts] = useState([1]);
+  const [errors, setErrors] = useState({});
+  const [postErrors, setPostErrors] = useState({});
+
+  const [isUploading, setIsUploading] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
 
   const fileRef = useRef(null);
 
-  const input =
-    "w-full rounded-xl border border-[var(--border,#e4e7ec)] bg-[var(--surface,#fff)] px-4 py-3 text-sm text-[var(--foreground,#101828)] outline-none focus:border-[#1e8a8a]";
-  const label =
-    "mb-2 flex items-center gap-2 text-sm font-medium text-[var(--foreground,#101828)]";
-  const card =
-    "rounded-2xl border border-[var(--border,#e4e7ec)] bg-[var(--surface,#fff)] p-5 sm:p-6";
+  /* ---------- small state updates ---------- */
 
-  function changeNew(field, value) {
-    setNewPost((prev) => ({ ...prev, [field]: value }));
-  }
+  const updateNewPost = (field, value) =>
+    setNewPost((current) => ({ ...current, [field]: value }));
 
-  function changePost(id, field, value) {
-    setPosts((prev) =>
-      prev.map((post) => (post.id === id ? { ...post, [field]: value } : post)),
+  const updatePost = (id, field, value) =>
+    setPosts((current) =>
+      current.map((post) =>
+        post.id === id ? { ...post, [field]: value } : post,
+      ),
     );
-  }
 
-  function changeImageUrl(value) {
-    if (newPreview.startsWith("blob:")) {
-      URL.revokeObjectURL(newPreview);
-    }
+  const togglePost = (id) =>
+    setOpenPosts((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
 
-    setNewPreview("");
-    changeNew("image", value);
-  }
+  /* ---------- image selection (new article: preview only) ---------- */
 
   function chooseImage(event) {
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
 
-    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
-      alert("Choose a valid image up to 5MB.");
-      event.target.value = "";
-      return;
-    }
+    const error = isValidImageFile(file);
+    if (error) return toast.error(error);
 
-    if (newPreview.startsWith("blob:")) {
-      URL.revokeObjectURL(newPreview);
-    }
+    if (newPreview) URL.revokeObjectURL(newPreview);
 
+    setSelectedFile(file);
     setNewPreview(URL.createObjectURL(file));
-    changeNew("image", "");
+    updateNewPost("image", "");
+    setErrors((current) => ({ ...current, image: "" }));
+  }
+
+  /* ---------- image replacement (existing article: uploads immediately) ---------- */
+
+  async function replaceArticleImage(event, postId) {
+    const file = event.target.files?.[0];
     event.target.value = "";
+    if (!file) return;
+
+    const error = isValidImageFile(file);
+    if (error) return toast.error(error);
+
+    setIsUploading(true);
+    const toastId = toast.loading("Uploading replacement image...");
+
+    try {
+      const imageUrl = await uploadImage(file);
+      updatePost(postId, "image", imageUrl);
+      toast.success("Article image updated.", { id: toastId });
+    } catch (err) {
+      toast.error(err.message || "Image upload failed.", { id: toastId });
+    } finally {
+      setIsUploading(false);
+    }
   }
 
-  function addArticle() {
-    if (!newPost.title.trim()) {
-      alert("Please enter an article title.");
+  /* ---------- add / remove articles ---------- */
+
+  async function addArticle() {
+    const result = validatePost(newPost, Boolean(selectedFile));
+    setErrors(result);
+
+    if (Object.keys(result).length > 0) {
+      toast.error("Please complete the required fields.");
       return;
     }
 
-    if (!newPost.image.trim() && !newPreview) {
-      alert("Please add an image URL or choose an image.");
-      return;
-    }
-
-    const id = Date.now();
-
-    setPosts((prev) => [
-      { ...newPost, id, image: newPreview || newPost.image },
-      ...prev,
-    ]);
-
-    setOpenPosts((prev) => [id, ...prev]);
-    setNewPost(emptyPost);
-    setNewPreview("");
-  }
-
-  function deleteArticle(id) {
-    if (!confirm("Delete this article?")) return;
-
-    setPosts((prev) => prev.filter((post) => post.id !== id));
-    setOpenPosts((prev) => prev.filter((postId) => postId !== id));
-  }
-
-  function togglePost(id) {
-    setOpenPosts((prev) =>
-      prev.includes(id)
-        ? prev.filter((postId) => postId !== id)
-        : [...prev, id],
+    setIsUploading(true);
+    const toastId = toast.loading(
+      selectedFile
+        ? "Uploading image and adding article..."
+        : "Adding article...",
     );
+
+    try {
+      const imageUrl = selectedFile
+        ? await uploadImage(selectedFile)
+        : newPost.image.trim();
+      const article = { ...newPost, id: Date.now(), image: imageUrl };
+
+      setPosts((current) => [...current, article]);
+      setOpenPosts((current) => [...current, article.id]);
+
+      if (newPreview) URL.revokeObjectURL(newPreview);
+
+      setNewPost({ ...emptyPost });
+      setSelectedFile(null);
+      setNewPreview("");
+      setErrors({});
+
+      toast.success("Article added successfully.", { id: toastId });
+      
+    } catch (error) {
+      toast.error(error.message || "Could not add article.", { id: toastId });
+    } finally {
+      setIsUploading(false);
+    }
   }
 
-  function getData() {
-    console.log({ sectionTitle, highlightedTitle, posts });
-    alert("Data logged to the browser console.");
+  function removeArticle(id) {
+    setPosts((current) => current.filter((post) => post.id !== id));
+    setOpenPosts((current) => current.filter((item) => item !== id));
+    setPostErrors((current) => {
+      const updated = { ...current };
+      delete updated[id];
+      return updated;
+    });
+    toast.success("Article removed.");
   }
+
+  /* ---------- collect + validate everything ---------- */
+
+ async function getData() {
+    setIsChecking(true);
+
+    try {
+      const headingErrors = {};
+      if (!sectionTitle.trim())
+        headingErrors.sectionTitle = "Enter the section title.";
+      if (!highlightedTitle.trim())
+        headingErrors.highlightedTitle = "Enter the highlighted title.";
+
+      const articleErrors = {};
+      posts.forEach((post) => {
+        const result = validatePost(post);
+        if (Object.keys(result).length > 0) articleErrors[post.id] = result;
+      });
+
+      setErrors(headingErrors);
+      setPostErrors(articleErrors);
+
+      if (
+        Object.keys(headingErrors).length > 0 ||
+        Object.keys(articleErrors).length > 0
+      ) {
+        toast.error("Please fix the errors before continuing.");
+        return;
+      }
+
+      const allData = { sectionTitle, highlightedTitle, posts };
+      console.log("ALL BLOG SECTION DATA:", allData);
+      toast.success("All article data is ready.");
+      
+
+      return allData;
+    } finally {
+      setIsChecking(false);
+    }
+  }
+
+  /* ============ UI ============ */
 
   return (
-    <main className="min-h-screen space-y-6 bg-[var(--background,#f7f9fc)] p-4 pb-28 text-[var(--foreground,#101828)] sm:p-6 sm:pb-28 lg:p-8 lg:pb-28">
-      {/* PAGE HEADER */}
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Blog Section</h1>
-          <p className="mt-1 text-sm text-[var(--muted,#667085)]">
-            Manage your heading and articles.
-          </p>
+    <div className="min-h-screen space-y-5 bg-[#f7f9fc] p-4 text-gray-900 sm:p-6 dark:bg-[#0b1117] dark:text-gray-100">
+      {/* HEADER */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-[#e7f5f5] p-3 text-[#1e8a8a] dark:bg-[#162c32] dark:text-[#35b5b5]">
+            <BookOpen size={23} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold sm:text-2xl">Blog Section</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Manage your blog content.
+            </p>
+          </div>
         </div>
 
-        <span className="rounded-full bg-[#1e8a8a]/10 px-3 py-2 text-sm font-semibold text-[#1e8a8a]">
-          {posts.length} Articles
-        </span>
-      </header>
+        <button
+          type="button"
+          onClick={getData}
+          disabled={isUploading || isChecking}
+          className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#176f6f] disabled:opacity-60"
+        >
+          {isChecking ? <Spinner /> : <Save size={17} />}
+          Get All Data
+        </button>
+      </div>
 
-      {/* 1. SECTION HEADING */}
-      <section className={card}>
-        <h2 className="mb-5 text-lg font-bold">01. Section Heading</h2>
+      {/* SECTION HEADING */}
+      <section className={cardClass}>
+        <h2 className="mb-4 font-bold">Section Heading</h2>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className={label}>
-              <Type size={16} /> Main Title
-            </label>
-            <input
-              className={input}
-              value={sectionTitle}
-              onChange={(e) => setSectionTitle(e.target.value)}
-              placeholder="Main title"
-            />
-          </div>
+          <Field
+            label="Main Title"
+            icon={Type}
+            maxLength={80}
+            placeholder="The Ultimate"
+            value={sectionTitle}
+            error={errors.sectionTitle}
+            onChange={(e) => setSectionTitle(e.target.value)}
+          />
 
-          <div>
-            <label className={label}>
-              <Type size={16} /> Highlighted Title
-            </label>
-            <input
-              className={input}
-              value={highlightedTitle}
-              onChange={(e) => setHighlightedTitle(e.target.value)}
-              placeholder="Highlighted title"
-            />
-          </div>
+          <Field
+            label="Highlighted Title"
+            icon={Type}
+            maxLength={80}
+            placeholder="Resource."
+            value={highlightedTitle}
+            error={errors.highlightedTitle}
+            onChange={(e) => setHighlightedTitle(e.target.value)}
+          />
         </div>
       </section>
 
-      {/* 2. ADD ARTICLE */}
-      <section className={`${card} border-dashed`}>
-        <h2 className="text-lg font-bold">02. Add Article</h2>
-        <p className="mt-1 mb-5 text-sm text-[var(--muted,#667085)]">
-          Create a new article using this form.
-        </p>
+      {/* ADD NEW ARTICLE */}
+      <section className={cardClass}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-bold">Add New Article</h2>
+          <Plus size={19} className="text-[#1e8a8a]" />
+        </div>
 
-        <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-          <div>
-            <label className={label}>
-              <ImagePlus size={16} /> Image Preview
+        <div className="grid gap-4 sm:grid-cols-2">
+          {/* IMAGE */}
+          <div className="sm:col-span-2">
+            <label className={labelClass}>
+              <ImagePlus size={15} />
+              Article Image — Add Working URL
             </label>
 
-            <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border border-[var(--border,#e4e7ec)] bg-[var(--background,#f7f9fc)]">
-              {newPreview || newPost.image ? (
-                <img
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                className={inputClass}
+                value={newPost.image}
+                placeholder="Paste image URL or choose a file"
+                onChange={(event) => {
+                  if (newPreview) URL.revokeObjectURL(newPreview);
+                  setNewPreview("");
+                  setSelectedFile(null);
+                  updateNewPost("image", event.target.value);
+                }}
+              />
+
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={chooseImage}
+                className="hidden"
+              />
+
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={isUploading}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] hover:bg-[#e7f5f5] disabled:opacity-60 dark:hover:bg-[#162c32]"
+              >
+                <ImagePlus size={16} />
+                Choose Image
+              </button>
+            </div>
+
+            <ErrorText>{errors.image}</ErrorText>
+
+            {(newPreview || validImageUrl(newPost.image)) && (
+              <div className="mt-3">
+                <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Image Preview — upload happens when you add the article
+                </p>
+                <ImagePreview
                   src={newPreview || newPost.image}
                   alt="New article preview"
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
-              ) : (
-                <ImagePlus size={38} className="text-[var(--muted,#667085)]" />
-              )}
-            </div>
-
-            <label className={`${label} mt-4`}>
-              <LinkIcon size={16} /> Image URL
-            </label>
-
-            <input
-              className={input}
-              value={newPost.image}
-              onChange={(e) => changeImageUrl(e.target.value)}
-              placeholder="Paste image URL"
-            />
-
-            <label className={`${label} mt-4`}>Upload from PC</label>
-
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={chooseImage}
-            />
-
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#1e8a8a] px-4 py-3 text-sm font-semibold text-[#1e8a8a] transition hover:bg-[#1e8a8a]/5"
-            >
-              <ImagePlus size={18} />
-              Choose Image
-            </button>
-
-            <p className="mt-2 text-xs text-[var(--muted,#667085)]">
-              Select an image up to 5MB. Local preview only.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className={label}>
-                <Type size={16} /> Article Title
-              </label>
-              <input
-                className={input}
-                value={newPost.title}
-                onChange={(e) => changeNew("title", e.target.value)}
-                placeholder="Enter article title"
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={label}>
-                  <CalendarDays size={16} /> Day
-                </label>
-                <input
-                  className={input}
-                  value={newPost.day}
-                  onChange={(e) => changeNew("day", e.target.value)}
-                  placeholder="24"
                 />
               </div>
-
-              <div>
-                <label className={label}>
-                  <CalendarDays size={16} /> Month
-                </label>
-                <input
-                  className={input}
-                  value={newPost.month}
-                  onChange={(e) => changeNew("month", e.target.value)}
-                  placeholder="OCT"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className={label}>
-                <Tag size={16} /> Category
-              </label>
-              <input
-                className={input}
-                value={newPost.category}
-                onChange={(e) => changeNew("category", e.target.value)}
-                placeholder="BUSINESS"
-              />
-            </div>
-
-            <div>
-              <label className={label}>
-                <UserRound size={16} /> Author
-              </label>
-              <input
-                className={input}
-                value={newPost.author}
-                onChange={(e) => changeNew("author", e.target.value)}
-                placeholder="Author name"
-              />
-            </div>
-
-            <div>
-              <label className={label}>
-                <LinkIcon size={16} /> Article Link
-              </label>
-              <input
-                className={input}
-                value={newPost.link}
-                onChange={(e) => changeNew("link", e.target.value)}
-                placeholder="/blog/article-name"
-              />
-            </div>
+            )}
           </div>
+
+          <ArticleFields
+            data={newPost}
+            errors={errors}
+            onChange={updateNewPost}
+          />
         </div>
 
-        <div className="mt-6 flex justify-end border-t border-[var(--border,#e4e7ec)] pt-5">
-          <button
-            type="button"
-            onClick={addArticle}
-            className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#176f6f]"
-          >
-            <Plus size={17} /> Add Article
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={addArticle}
+          disabled={isUploading}
+          className="mt-5 flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#176f6f] disabled:opacity-60"
+        >
+          {isUploading ? <Spinner /> : <Plus size={17} />}
+          {isUploading ? "Adding Article..." : "Add Article"}
+        </button>
       </section>
 
-      {/* 3. ALL ARTICLES */}
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-xl font-bold">03. All Articles</h2>
-          <p className="mt-1 text-sm text-[var(--muted,#667085)]">
-            Edit and manage existing articles.
-          </p>
+      {/* ALL ARTICLES */}
+      <section className={cardClass}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-bold">All Articles</h2>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Click an article to edit its details.
+            </p>
+          </div>
+          <span className="rounded-lg bg-[#e7f5f5] px-3 py-1.5 text-xs font-semibold text-[#1e8a8a] dark:bg-[#162c32] dark:text-[#35b5b5]">
+            {posts.length} Articles
+          </span>
         </div>
 
-        {posts.map((post, index) => {
-          const isOpen = openPosts.includes(post.id);
+        <div className="space-y-3">
+          {posts.map((post, index) => {
+            const isOpen = openPosts.includes(post.id);
+            const articleErrors = postErrors[post.id] || {};
 
-          return (
-            <article key={post.id} className={`${card} overflow-hidden !p-0`}>
-              <div className="flex items-center gap-3 p-4">
-                <img
-                  src={post.image}
-                  alt={post.title}
-                  className="h-16 w-20 rounded-lg object-cover"
-                />
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-[#1e8a8a]">
-                    ARTICLE {index + 1}
-                  </p>
-                  <h3 className="truncate font-semibold">
-                    {post.title || "Untitled Article"}
-                  </h3>
-                  <p className="mt-1 text-xs text-[var(--muted,#667085)]">
-                    {post.category} · {post.author}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  aria-label={isOpen ? "Collapse article" : "Edit article"}
-                  className="rounded-lg border border-[var(--border,#e4e7ec)] p-2"
-                  onClick={() => togglePost(post.id)}
-                >
-                  {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
-
-                <button
-                  type="button"
-                  aria-label="Delete article"
-                  className="rounded-lg border border-red-200 p-2 text-red-500 transition hover:bg-red-50"
-                  onClick={() => deleteArticle(post.id)}
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-
-              {isOpen && (
-                <div className="grid gap-4 border-t border-[var(--border,#e4e7ec)] p-4 sm:grid-cols-2">
-                  {[
-                    ["title", "Article Title"],
-                    ["image", "Image URL"],
-                    ["day", "Day"],
-                    ["month", "Month"],
-                    ["category", "Category"],
-                    ["author", "Author"],
-                    ["link", "Article Link"],
-                  ].map(([field, title]) => (
-                    <div key={field}>
-                      <label className={label}>{title}</label>
-                      <input
-                        className={input}
-                        value={post[field] || ""}
-                        onChange={(e) =>
-                          changePost(post.id, field, e.target.value)
-                        }
-                      />
+            return (
+              <div
+                key={post.id}
+                className="overflow-hidden rounded-xl border border-gray-200 dark:border-[#263442]"
+              >
+                {/* HEADER ROW */}
+                <div className="flex items-center gap-3 p-3">
+                  {validImageUrl(post.image) ? (
+                    <img
+                      src={post.image}
+                      alt={post.title}
+                      className="h-14 w-16 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-14 w-16 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400 dark:bg-[#16212c]">
+                      <ImagePlus size={20} />
                     </div>
-                  ))}
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => togglePost(post.id)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <p className="text-xs font-semibold text-[#1e8a8a]">
+                      {post.category || "UNCATEGORIZED"}
+                    </p>
+                    <p className="mt-1 truncate text-sm font-semibold">
+                      {post.title || `Article ${index + 1}`}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {post.day} {post.month} · {post.author}
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => togglePost(post.id)}
+                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-[#16212c]"
+                    aria-label={isOpen ? "Collapse article" : "Edit article"}
+                  >
+                    {isOpen ? (
+                      <ChevronUp size={19} />
+                    ) : (
+                      <ChevronDown size={19} />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => removeArticle(post.id)}
+                    className="rounded-lg p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    aria-label="Delete article"
+                  >
+                    <Trash2 size={17} />
+                  </button>
                 </div>
-              )}
-            </article>
-          );
-        })}
+
+                {/* EDIT FORM */}
+                {isOpen && (
+                  <div className="grid gap-4 border-t border-gray-200 p-4 sm:grid-cols-2 dark:border-[#263442]">
+                    <div className="sm:col-span-2">
+                      <label className={labelClass}>Article Image</label>
+
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <input
+                          className={inputClass}
+                          value={post.image}
+                          placeholder="Image URL"
+                          onChange={(event) =>
+                            updatePost(post.id, "image", event.target.value)
+                          }
+                        />
+
+                        <label className="flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2 text-sm font-medium text-[#1e8a8a] hover:bg-[#e7f5f5] dark:hover:bg-[#162c32]">
+                          <ImagePlus size={16} />
+                          Replace Image
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            onChange={(event) =>
+                              replaceArticleImage(event, post.id)
+                            }
+                          />
+                        </label>
+                      </div>
+
+                      <ErrorText>{articleErrors.image}</ErrorText>
+
+                      {validImageUrl(post.image) && (
+                        <div className="mt-3">
+                          <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                            Image Preview
+                          </p>
+                          <ImagePreview
+                            src={post.image}
+                            alt={post.title || "Article preview"}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <ArticleFields
+                      data={post}
+                      errors={articleErrors}
+                      onChange={(field, value) =>
+                        updatePost(post.id, field, value)
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </section>
 
-      {/* STICKY BOTTOM ACTION BAR */}
-      <div className="sticky bottom-0 z-40 -mx-4 mt-8 border-t border-[var(--border,#e4e7ec)] bg-[var(--surface,#ffffff)]/95 px-4 py-4 shadow-[0_-8px_25px_rgba(0,0,0,0.04)] backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex items-center justify-between gap-4">
-          <div className="hidden sm:block">
-            <p className="text-sm font-semibold text-[var(--foreground,#101828)]">
-              Blog Section Settings
-            </p>
-            <p className="mt-1 text-xs text-[var(--muted,#667085)]">
-              {posts.length} articles · Review your changes
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={getData}
-            className="ml-auto flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#1e8a8a]/20 transition duration-200 hover:-translate-y-0.5 hover:bg-[#176f6f] active:translate-y-0 sm:w-auto"
-          >
-            <Save size={18} />
-            Get New Data
-          </button>
-        </div>
+      {/* BOTTOM ACTION */}
+      <div className="sticky bottom-3 flex justify-end rounded-xl border border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-[#263442] dark:bg-[#111a23]/95">
+        <button
+          type="button"
+          onClick={getData}
+          disabled={isUploading || isChecking}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#176f6f] disabled:opacity-60 sm:w-auto"
+        >
+          {isChecking ? <Spinner /> : <Save size={17} />}
+          Get All Data
+        </button>
       </div>
-    </main>
+    </div>
   );
 }
