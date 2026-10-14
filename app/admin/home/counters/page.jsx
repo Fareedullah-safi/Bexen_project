@@ -13,6 +13,7 @@ import {
   Search,
   Trash2,
   Upload,
+  LoaderCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -22,11 +23,19 @@ export default function ReviewsAdminPanel() {
   const input =
     "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#0C1E21] outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-2 focus:ring-[#1E8A8A]/10 dark:border-white/10 dark:bg-[#16212C] dark:text-white dark:placeholder:text-gray-500";
 
-  const button =
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#167575] disabled:cursor-not-allowed disabled:opacity-50";
+  // ─── PROFESSIONAL BUTTON STYLES ───
 
+  // Primary action button (Save, Add)
+  const button =
+    "group inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#1E8A8A] to-[#176F6F] px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-[#1E8A8A]/20 transition-all duration-200 hover:shadow-md hover:shadow-[#1E8A8A]/30 hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:shadow-sm disabled:hover:brightness-100 disabled:active:scale-100";
+
+  // Secondary button (Choose, Edit, Move, Add Statistic)
   const smallButton =
-    "inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-600 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:cursor-not-allowed disabled:opacity-30 dark:border-white/10 dark:bg-[#16212C] dark:text-gray-300 dark:hover:text-white";
+    "group inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-[#1E8A8A] hover:bg-[#1E8A8A]/5 hover:text-[#1E8A8A] hover:shadow-md active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:bg-white disabled:hover:text-gray-700 disabled:hover:shadow-sm disabled:active:scale-100 dark:border-white/10 dark:bg-[#16212C] dark:text-gray-300 dark:hover:border-[#1E8A8A]/60 dark:hover:bg-[#1E8A8A]/10 dark:hover:text-white";
+
+  // Danger button (Delete)
+  const dangerButton =
+    "group inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md hover:shadow-red-100 active:scale-[0.97] dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:border-red-400/40 dark:hover:bg-red-500/20 dark:hover:shadow-red-900/30";
 
   const card =
     "rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7 dark:border-white/10 dark:bg-[#111B27]";
@@ -49,30 +58,10 @@ export default function ReviewsAdminPanel() {
   });
 
   const [stats, setStats] = useState([
-    {
-      id: 1,
-      publicId: "",
-      value: "93%",
-      label: "Projects Completed",
-    },
-    {
-      id: 2,
-      publicId: "",
-      value: "20M",
-      label: "Reach Worldwide",
-    },
-    {
-      id: 3,
-      publicId: "",
-      value: "8.5X",
-      label: "Faster Growth",
-    },
-    {
-      id: 4,
-      publicId: "",
-      value: "100+",
-      label: "Awards Archived",
-    },
+    { id: 1, publicId: "", value: "93%", label: "Projects Completed" },
+    { id: 2, publicId: "", value: "20M", label: "Reach Worldwide" },
+    { id: 3, publicId: "", value: "8.5X", label: "Faster Growth" },
+    { id: 4, publicId: "", value: "100+", label: "Awards Archived" },
   ]);
 
   const [reviews, setReviews] = useState([]);
@@ -96,21 +85,16 @@ export default function ReviewsAdminPanel() {
   const [saving, setSaving] = useState(false);
   const [uploadingDraft, setUploadingDraft] = useState(false);
 
-  // Load existing section data
   const loadData = async () => {
     try {
       setLoading(true);
-
       const res = await axios.get("/api/homepage/reviews-section");
 
       if (res.data.success && res.data.data) {
         const data = res.data.data;
 
         if (data.section) {
-          setSection((previous) => ({
-            ...previous,
-            ...data.section,
-          }));
+          setSection((previous) => ({ ...previous, ...data.section }));
         }
 
         if (Array.isArray(data.stats) && data.stats.length > 0) {
@@ -153,7 +137,6 @@ export default function ReviewsAdminPanel() {
     loadData();
   }, []);
 
-  // Upload an image file or image URL
   const uploadImage = async (fileOrUrl) => {
     try {
       const formData = new FormData();
@@ -170,10 +153,7 @@ export default function ReviewsAdminPanel() {
       );
 
       if (res.data.success && res.data.url) {
-        return {
-          image: res.data.url,
-          publicId: res.data.publicId || "",
-        };
+        return { image: res.data.url, publicId: res.data.publicId || "" };
       }
 
       throw new Error(res.data.message || "Image upload failed.");
@@ -183,11 +163,9 @@ export default function ReviewsAdminPanel() {
     }
   };
 
-  // Save section, statistics, and reviews
   const saveAll = async (reviewsToSave = reviews) => {
     try {
       setSaving(true);
-
       const finalReviews = [];
 
       for (const review of reviewsToSave) {
@@ -196,12 +174,10 @@ export default function ReviewsAdminPanel() {
 
         if (review.imageFile) {
           const uploaded = await uploadImage(review.imageFile);
-
           image = uploaded.image;
           publicId = uploaded.publicId;
         } else if (image && !publicId && image.startsWith("http")) {
           const uploaded = await uploadImage(image);
-
           image = uploaded.image;
           publicId = uploaded.publicId;
         }
@@ -256,18 +232,13 @@ export default function ReviewsAdminPanel() {
     }
   };
 
-  // Add a review and save all changes
   const addReview = async () => {
     if (!draft.name.trim() || !draft.role.trim() || !draft.text.trim()) {
       toast.error("Please enter the client's name, role, and review.");
       return;
     }
 
-    const newReview = {
-      ...draft,
-      id: Date.now(),
-    };
-
+    const newReview = { ...draft, id: Date.now() };
     const updatedReviews = [newReview, ...reviews];
 
     setReviews(updatedReviews);
@@ -285,14 +256,11 @@ export default function ReviewsAdminPanel() {
     });
 
     toast.success("Review added. Saving changes...");
-
     await saveAll(updatedReviews);
   };
 
-  // Choose an image for the new review
   const chooseDraftImage = (event) => {
     const file = event.target.files?.[0];
-
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
@@ -308,7 +276,6 @@ export default function ReviewsAdminPanel() {
     }
 
     const reader = new FileReader();
-
     reader.onloadend = () => {
       setDraft((previous) => ({
         ...previous,
@@ -316,15 +283,12 @@ export default function ReviewsAdminPanel() {
         imagePreview: reader.result,
       }));
     };
-
     reader.readAsDataURL(file);
     event.target.value = "";
   };
 
-  // Choose an image for an existing review
   const chooseReviewImage = (event, reviewId) => {
     const file = event.target.files?.[0];
-
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
@@ -340,26 +304,19 @@ export default function ReviewsAdminPanel() {
     }
 
     const reader = new FileReader();
-
     reader.onloadend = () => {
       setReviews((previous) =>
         previous.map((item) =>
           item.id === reviewId
-            ? {
-                ...item,
-                imageFile: file,
-                imagePreview: reader.result,
-              }
+            ? { ...item, imageFile: file, imagePreview: reader.result }
             : item,
         ),
       );
     };
-
     reader.readAsDataURL(file);
     event.target.value = "";
   };
 
-  // Update a review field
   const updateReview = (reviewId, field, value) => {
     setReviews((previous) =>
       previous.map((item) =>
@@ -368,48 +325,31 @@ export default function ReviewsAdminPanel() {
     );
   };
 
-  // Move a review up or down
   const moveReview = (index, direction) => {
     const nextIndex = index + direction;
-
     if (nextIndex < 0 || nextIndex >= reviews.length) return;
 
     const updatedReviews = [...reviews];
     const current = updatedReviews[index];
-
     updatedReviews[index] = updatedReviews[nextIndex];
     updatedReviews[nextIndex] = current;
-
     setReviews(updatedReviews);
   };
 
-  // Delete a review
   const deleteReview = (reviewId) => {
     const updatedReviews = reviews.filter((item) => item.id !== reviewId);
-
     setReviews(updatedReviews);
-
-    if (openId === reviewId) {
-      setOpenId(null);
-    }
-
+    if (openId === reviewId) setOpenId(null);
     toast.success("Review removed. Save your changes to confirm.");
   };
 
-  // Add a statistic
   const addStat = () => {
     setStats((previous) => [
       ...previous,
-      {
-        id: Date.now(),
-        publicId: "",
-        value: "",
-        label: "",
-      },
+      { id: Date.now(), publicId: "", value: "", label: "" },
     ]);
   };
 
-  // Update a statistic
   const updateStat = (statId, field, value) => {
     setStats((previous) =>
       previous.map((item) =>
@@ -418,24 +358,19 @@ export default function ReviewsAdminPanel() {
     );
   };
 
-  // Move a statistic up or down
   const moveStat = (index, direction) => {
     const nextIndex = index + direction;
-
     if (nextIndex < 0 || nextIndex >= stats.length) return;
 
     const updatedStats = [...stats];
     const current = updatedStats[index];
-
     updatedStats[index] = updatedStats[nextIndex];
     updatedStats[nextIndex] = current;
-
     setStats(updatedStats);
   };
 
   const filteredReviews = reviews.filter((item) => {
     const searchText = search.toLowerCase();
-
     return (
       item.name.toLowerCase().includes(searchText) ||
       item.role.toLowerCase().includes(searchText) ||
@@ -475,7 +410,14 @@ export default function ReviewsAdminPanel() {
             disabled={saving}
             className={button}
           >
-            <Save size={18} />
+            {saving ? (
+              <LoaderCircle size={18} className="animate-spin" />
+            ) : (
+              <Save
+                size={18}
+                className="transition-transform group-hover:scale-110"
+              />
+            )}
             {saving ? "Saving Changes..." : "Save All Changes"}
           </button>
         </div>
@@ -521,10 +463,7 @@ export default function ReviewsAdminPanel() {
                 className={input}
                 value={section.badgeText}
                 onChange={(event) =>
-                  setSection({
-                    ...section,
-                    badgeText: event.target.value,
-                  })
+                  setSection({ ...section, badgeText: event.target.value })
                 }
                 placeholder="CLIENTS FEEDBACK"
               />
@@ -536,10 +475,7 @@ export default function ReviewsAdminPanel() {
                 className={input}
                 value={section.highlightWord}
                 onChange={(event) =>
-                  setSection({
-                    ...section,
-                    highlightWord: event.target.value,
-                  })
+                  setSection({ ...section, highlightWord: event.target.value })
                 }
                 placeholder="Stories"
               />
@@ -551,10 +487,7 @@ export default function ReviewsAdminPanel() {
                 className={input}
                 value={section.headingLineOne}
                 onChange={(event) =>
-                  setSection({
-                    ...section,
-                    headingLineOne: event.target.value,
-                  })
+                  setSection({ ...section, headingLineOne: event.target.value })
                 }
                 placeholder="Success Stories Fuel"
               />
@@ -566,10 +499,7 @@ export default function ReviewsAdminPanel() {
                 className={input}
                 value={section.headingLineTwo}
                 onChange={(event) =>
-                  setSection({
-                    ...section,
-                    headingLineTwo: event.target.value,
-                  })
+                  setSection({ ...section, headingLineTwo: event.target.value })
                 }
                 placeholder="our Innovation."
               />
@@ -581,10 +511,7 @@ export default function ReviewsAdminPanel() {
                 className={`${input} min-h-28 resize-y`}
                 value={section.description}
                 onChange={(event) =>
-                  setSection({
-                    ...section,
-                    description: event.target.value,
-                  })
+                  setSection({ ...section, description: event.target.value })
                 }
                 placeholder="Enter section description..."
                 rows={4}
@@ -604,7 +531,10 @@ export default function ReviewsAdminPanel() {
             </div>
 
             <button type="button" onClick={addStat} className={smallButton}>
-              <Plus size={17} />
+              <Plus
+                size={17}
+                className="transition-transform group-hover:rotate-90"
+              />
               Add Statistic
             </button>
           </div>
@@ -625,7 +555,10 @@ export default function ReviewsAdminPanel() {
                       disabled={index === 0}
                       aria-label="Move statistic up"
                     >
-                      <ArrowUp size={16} />
+                      <ArrowUp
+                        size={16}
+                        className="transition-transform group-hover:-translate-y-0.5"
+                      />
                     </button>
 
                     <button
@@ -635,7 +568,10 @@ export default function ReviewsAdminPanel() {
                       disabled={index === stats.length - 1}
                       aria-label="Move statistic down"
                     >
-                      <ArrowDown size={16} />
+                      <ArrowDown
+                        size={16}
+                        className="transition-transform group-hover:translate-y-0.5"
+                      />
                     </button>
                   </div>
                 </div>
@@ -758,7 +694,10 @@ export default function ReviewsAdminPanel() {
 
                 <div>
                   <label className={`${smallButton} cursor-pointer`}>
-                    <Upload size={17} />
+                    <Upload
+                      size={17}
+                      className="transition-transform group-hover:-translate-y-0.5"
+                    />
                     Choose Image
                     <input
                       type="file"
@@ -783,7 +722,14 @@ export default function ReviewsAdminPanel() {
               disabled={saving || uploadingDraft}
               className={button}
             >
-              <Plus size={18} />
+              {saving ? (
+                <LoaderCircle size={18} className="animate-spin" />
+              ) : (
+                <Plus
+                  size={18}
+                  className="transition-transform group-hover:rotate-90"
+                />
+              )}
               {saving ? "Saving..." : "Add Review & Save"}
             </button>
           </div>
@@ -837,7 +783,7 @@ export default function ReviewsAdminPanel() {
                 return (
                   <div
                     key={item.id}
-                    className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-[#16212C]"
+                    className="overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md dark:border-white/10 dark:bg-[#16212C]"
                   >
                     <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
                       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -877,7 +823,10 @@ export default function ReviewsAdminPanel() {
                           disabled={index === 0}
                           aria-label="Move review up"
                         >
-                          <ArrowUp size={16} />
+                          <ArrowUp
+                            size={16}
+                            className="transition-transform group-hover:-translate-y-0.5"
+                          />
                         </button>
 
                         <button
@@ -887,7 +836,10 @@ export default function ReviewsAdminPanel() {
                           disabled={index === filteredReviews.length - 1}
                           aria-label="Move review down"
                         >
-                          <ArrowDown size={16} />
+                          <ArrowDown
+                            size={16}
+                            className="transition-transform group-hover:translate-y-0.5"
+                          />
                         </button>
 
                         <button
@@ -908,10 +860,13 @@ export default function ReviewsAdminPanel() {
 
                         <button
                           type="button"
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-100 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
+                          className={dangerButton}
                           onClick={() => deleteReview(item.id)}
                         >
-                          <Trash2 size={16} />
+                          <Trash2
+                            size={16}
+                            className="transition-transform group-hover:scale-110"
+                          />
                           Delete
                         </button>
                       </div>
@@ -1028,7 +983,10 @@ export default function ReviewsAdminPanel() {
                                 <label
                                   className={`${smallButton} cursor-pointer`}
                                 >
-                                  <Upload size={17} />
+                                  <Upload
+                                    size={17}
+                                    className="transition-transform group-hover:-translate-y-0.5"
+                                  />
                                   Choose Image
                                   <input
                                     type="file"
@@ -1055,7 +1013,17 @@ export default function ReviewsAdminPanel() {
                             onClick={() => saveAll()}
                             disabled={saving}
                           >
-                            <Save size={17} />
+                            {saving ? (
+                              <LoaderCircle
+                                size={17}
+                                className="animate-spin"
+                              />
+                            ) : (
+                              <Save
+                                size={17}
+                                className="transition-transform group-hover:scale-110"
+                              />
+                            )}
                             {saving ? "Saving..." : "Save Changes"}
                           </button>
                         </div>
@@ -1072,6 +1040,10 @@ export default function ReviewsAdminPanel() {
                     className={smallButton}
                     onClick={() => setVisible((previous) => previous + 20)}
                   >
+                    <ChevronDown
+                      size={16}
+                      className="transition-transform group-hover:translate-y-0.5"
+                    />
                     Load More Reviews
                   </button>
                 </div>
@@ -1095,7 +1067,14 @@ export default function ReviewsAdminPanel() {
             onClick={() => saveAll()}
             disabled={saving}
           >
-            <Save size={18} />
+            {saving ? (
+              <LoaderCircle size={18} className="animate-spin" />
+            ) : (
+              <Save
+                size={18}
+                className="transition-transform group-hover:scale-110"
+              />
+            )}
             {saving ? "Saving Changes..." : "Save All Changes"}
           </button>
         </div>

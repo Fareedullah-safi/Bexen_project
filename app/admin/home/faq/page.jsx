@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -264,15 +263,12 @@ export default function FaqAdminPanel() {
               </div>
             </div>
           </div>
-
-          <div className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-600 dark:border-white/10 dark:bg-[#16212C] dark:text-slate-300">
-            <Moon size={16} className="text-[#1E8A8A] dark:text-[#62cccc]" />
-            Dark theme
-          </div>
         </header>
 
         {isFetching ? (
-          <section className={`${cardClass} flex min-h-40 items-center justify-center`}>
+          <section
+            className={`${cardClass} flex min-h-40 items-center justify-center`}
+          >
             <Spinner />
           </section>
         ) : (

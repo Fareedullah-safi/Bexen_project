@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   BookOpen,
   Plus,
@@ -14,6 +14,7 @@ import {
   Link as LinkIcon,
   ChevronDown,
   ChevronUp,
+  LoaderCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import Spinner from "@/app/admin/Components/Admin/Spinner";
@@ -45,39 +46,6 @@ const emptyPost = {
   link: "",
 };
 
-const defaultPosts = [
-  {
-    id: 1,
-    day: "24",
-    month: "OCT",
-    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f",
-    category: "BUSINESS",
-    author: "Admin",
-    title: "How to Build a Successful Business Strategy",
-    link: "/blog/business-strategy",
-  },
-  {
-    id: 2,
-    day: "18",
-    month: "OCT",
-    image: "https://images.unsplash.com/photo-1497366754035-f200968a6e72",
-    category: "MARKETING",
-    author: "Admin",
-    title: "Simple Marketing Tips for Growing Brands",
-    link: "/blog/marketing-tips",
-  },
-  {
-    id: 3,
-    day: "12",
-    month: "OCT",
-    image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c",
-    category: "TECHNOLOGY",
-    author: "Admin",
-    title: "The Future of Modern Technology",
-    link: "/blog/modern-technology",
-  },
-];
-
 /* ============ SHARED TAILWIND STYLES ============ */
 
 const inputClass =
@@ -90,13 +58,10 @@ const cardClass =
   "rounded-2xl border border-gray-200 bg-white p-5 dark:border-[#263442] dark:bg-[#111a23]";
 
 /* ============ PURE HELPER FUNCTIONS ============ */
-/* These don't use state, so they live outside the component. */
 
 function validLink(value = "") {
   const link = value.trim();
-
   if (link.startsWith("/")) return !link.startsWith("//") && !/\s/.test(link);
-
   try {
     const url = new URL(link);
     return url.protocol === "https:" || url.protocol === "http:";
@@ -116,37 +81,27 @@ function validImageUrl(value = "") {
 
 function isValidImageFile(file) {
   const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-
   if (!allowed.includes(file.type))
     return "Choose a JPG, PNG, WEBP, or GIF image.";
   if (file.size > 5 * 1024 * 1024) return "Image must be smaller than 5 MB.";
-
   return null;
 }
 
 function validatePost(post, hasSelectedFile = false) {
   const result = {};
-
   if (post.title.trim().length < 3 || post.title.trim().length > 120)
     result.title = "Title must be 3–120 characters.";
-
   if (!hasSelectedFile && !validImageUrl(post.image))
     result.image = "Choose an image or enter a valid image URL.";
-
   if (!/^\d{1,2}$/.test(post.day) || +post.day < 1 || +post.day > 31)
     result.day = "Enter a day from 1 to 31.";
-
   if (!months.includes(post.month.toUpperCase().trim()))
     result.month = "Select a valid month.";
-
   if (!post.category.trim() || post.category.trim().length > 40)
     result.category = "Category is required (max 40 characters).";
-
   if (!post.author.trim() || post.author.trim().length > 60)
     result.author = "Author is required (max 60 characters).";
-
   if (!validLink(post.link)) result.link = "Enter a valid article link.";
-
   return result;
 }
 
@@ -158,14 +113,37 @@ async function uploadImage(file) {
     method: "POST",
     body: formData,
   });
-
   const data = await response.json();
 
   if (!response.ok || !data.url) {
     throw new Error(data.message || "Image upload failed.");
   }
-
   return data.url;
+}
+
+async function saveBlogSection(payload) {
+  const response = await fetch("/api/homepage/articles-section", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json();
+
+  if (!response.ok || !result.success) {
+    throw new Error(result.message || "Failed to save blog section.");
+  }
+  return result.data || payload;
+}
+
+// Fetch existing data from backend
+async function fetchBlogSection() {
+  const response = await fetch("/api/homepage/articles-section");
+  const result = await response.json();
+
+  if (!response.ok || !result.success) {
+    throw new Error(result.message || "Failed to load blog section.");
+  }
+  return result.data;
 }
 
 /* ============ SMALL REUSABLE UI PIECES ============ */
@@ -199,7 +177,6 @@ function ImagePreview({ src, alt }) {
   );
 }
 
-// A labeled text input. Used everywhere instead of repeating the same markup.
 function Field({ label, icon: Icon, error, className = "", ...props }) {
   return (
     <div className={className}>
@@ -213,7 +190,6 @@ function Field({ label, icon: Icon, error, className = "", ...props }) {
   );
 }
 
-// A labeled dropdown. Same idea as Field, but for <select>.
 function SelectField({
   label,
   icon: Icon,
@@ -240,8 +216,6 @@ function SelectField({
   );
 }
 
-// The fields shared by BOTH "Add New Article" and "Edit Article".
-// This one block replaces what used to be written out twice.
 function ArticleFields({ data, onChange, errors }) {
   return (
     <>
@@ -256,7 +230,6 @@ function ArticleFields({ data, onChange, errors }) {
         error={errors.day}
         onChange={(e) => onChange("day", e.target.value)}
       />
-
       <SelectField
         label="Month"
         icon={CalendarDays}
@@ -265,7 +238,6 @@ function ArticleFields({ data, onChange, errors }) {
         error={errors.month}
         onChange={(e) => onChange("month", e.target.value)}
       />
-
       <Field
         label="Category"
         icon={Tag}
@@ -275,7 +247,6 @@ function ArticleFields({ data, onChange, errors }) {
         error={errors.category}
         onChange={(e) => onChange("category", e.target.value)}
       />
-
       <Field
         label="Author"
         icon={UserRound}
@@ -285,7 +256,6 @@ function ArticleFields({ data, onChange, errors }) {
         error={errors.author}
         onChange={(e) => onChange("author", e.target.value)}
       />
-
       <Field
         label="Article Title"
         icon={Type}
@@ -296,7 +266,6 @@ function ArticleFields({ data, onChange, errors }) {
         error={errors.title}
         onChange={(e) => onChange("title", e.target.value)}
       />
-
       <Field
         label="Article Link"
         icon={LinkIcon}
@@ -313,23 +282,52 @@ function ArticleFields({ data, onChange, errors }) {
 /* ============ MAIN COMPONENT ============ */
 
 export default function BlogSectionAdmin() {
-  const [sectionTitle, setSectionTitle] = useState("The Ultimate");
-  const [highlightedTitle, setHighlightedTitle] = useState("Resource.");
+  // Start with empty state — data comes from backend
+  const [sectionTitle, setSectionTitle] = useState("");
+  const [highlightedTitle, setHighlightedTitle] = useState("");
+  const [posts, setPosts] = useState([]);
 
-  const [posts, setPosts] = useState(defaultPosts);
   const [newPost, setNewPost] = useState(emptyPost);
-
   const [newPreview, setNewPreview] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
 
-  const [openPosts, setOpenPosts] = useState([1]);
+  const [openPosts, setOpenPosts] = useState([]);
   const [errors, setErrors] = useState({});
   const [postErrors, setPostErrors] = useState({});
 
   const [isUploading, setIsUploading] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fileRef = useRef(null);
+
+  /* ---------- LOAD DATA FROM BACKEND ON MOUNT ---------- */
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  async function loadData() {
+    setIsLoading(true);
+    try {
+      const data = await fetchBlogSection();
+
+      if (data) {
+        setSectionTitle(data.sectionTitle || "");
+        setHighlightedTitle(data.highlightedTitle || "");
+        setPosts(
+          (data.posts || []).map((post) => ({
+            ...post,
+            id: post.id || Date.now() + Math.random(),
+          })),
+        );
+      }
+    } catch (error) {
+      toast.error(error.message || "Could not load blog section.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   /* ---------- small state updates ---------- */
 
@@ -368,7 +366,7 @@ export default function BlogSectionAdmin() {
     setErrors((current) => ({ ...current, image: "" }));
   }
 
-  /* ---------- image replacement (existing article: uploads immediately) ---------- */
+  /* ---------- image replacement (uploads immediately) ---------- */
 
   async function replaceArticleImage(event, postId) {
     const file = event.target.files?.[0];
@@ -427,7 +425,7 @@ export default function BlogSectionAdmin() {
       setErrors({});
 
       toast.success("Article added successfully.", { id: toastId });
-      
+      saveData();
     } catch (error) {
       toast.error(error.message || "Could not add article.", { id: toastId });
     } finally {
@@ -444,46 +442,88 @@ export default function BlogSectionAdmin() {
       return updated;
     });
     toast.success("Article removed.");
+    saveData();
   }
 
-  /* ---------- collect + validate everything ---------- */
+  /* ---------- validate + save everything ---------- */
 
- async function getData() {
-    setIsChecking(true);
+  async function saveData() {
+    const headingErrors = {};
+    if (!sectionTitle.trim())
+      headingErrors.sectionTitle = "Enter the section title.";
+    if (!highlightedTitle.trim())
+      headingErrors.highlightedTitle = "Enter the highlighted title.";
+
+    const articleErrors = {};
+    posts.forEach((post) => {
+      const result = validatePost(post);
+      if (Object.keys(result).length > 0) articleErrors[post.id] = result;
+    });
+
+    setErrors(headingErrors);
+    setPostErrors(articleErrors);
+
+    if (
+      Object.keys(headingErrors).length > 0 ||
+      Object.keys(articleErrors).length > 0
+    ) {
+      toast.error("Please fix the errors before continuing.");
+      return;
+    }
+
+    if (posts.length === 0) {
+      toast.error("Add at least one article before saving.");
+      return;
+    }
+
+    setIsSaving(true);
+    const toastId = toast.loading("Saving blog section...");
 
     try {
-      const headingErrors = {};
-      if (!sectionTitle.trim())
-        headingErrors.sectionTitle = "Enter the section title.";
-      if (!highlightedTitle.trim())
-        headingErrors.highlightedTitle = "Enter the highlighted title.";
+      const payload = {
+        sectionTitle: sectionTitle.trim(),
+        highlightedTitle: highlightedTitle.trim(),
+        posts: posts.map((post) => ({
+          id: post.id,
+          day: post.day.trim ? post.day.trim() : post.day,
+          month: post.month,
+          image: post.image.trim(),
+          category: post.category.trim(),
+          author: post.author.trim(),
+          title: post.title.trim(),
+          link: post.link.trim(),
+        })),
+      };
 
-      const articleErrors = {};
-      posts.forEach((post) => {
-        const result = validatePost(post);
-        if (Object.keys(result).length > 0) articleErrors[post.id] = result;
+      const saved = await saveBlogSection(payload);
+
+      if (saved?.sectionTitle) setSectionTitle(saved.sectionTitle);
+      if (saved?.highlightedTitle) setHighlightedTitle(saved.highlightedTitle);
+      if (Array.isArray(saved?.posts)) setPosts(saved.posts);
+
+      toast.success("Blog section saved successfully!", { id: toastId });
+    } catch (error) {
+      toast.error(error.message || "Something went wrong while saving.", {
+        id: toastId,
       });
-
-      setErrors(headingErrors);
-      setPostErrors(articleErrors);
-
-      if (
-        Object.keys(headingErrors).length > 0 ||
-        Object.keys(articleErrors).length > 0
-      ) {
-        toast.error("Please fix the errors before continuing.");
-        return;
-      }
-
-      const allData = { sectionTitle, highlightedTitle, posts };
-      console.log("ALL BLOG SECTION DATA:", allData);
-      toast.success("All article data is ready.");
-      
-
-      return allData;
     } finally {
-      setIsChecking(false);
+      setIsSaving(false);
     }
+  }
+
+  /* ============ LOADING SCREEN ============ */
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f9fc] dark:bg-[#0b1117]">
+        <div className="flex flex-col items-center gap-3">
+          <LoaderCircle size={32} className="animate-spin text-[#1e8a8a]" />
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Loading blog section...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   /* ============ UI ============ */
@@ -506,12 +546,16 @@ export default function BlogSectionAdmin() {
 
         <button
           type="button"
-          onClick={getData}
-          disabled={isUploading || isChecking}
+          onClick={saveData}
+          disabled={isUploading || isSaving}
           className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#176f6f] disabled:opacity-60"
         >
-          {isChecking ? <Spinner /> : <Save size={17} />}
-          Get All Data
+          {isSaving ? (
+            <LoaderCircle size={17} className="animate-spin" />
+          ) : (
+            <Save size={17} />
+          )}
+          {isSaving ? "Saving..." : "Save Changes"}
         </button>
       </div>
 
@@ -529,7 +573,6 @@ export default function BlogSectionAdmin() {
             error={errors.sectionTitle}
             onChange={(e) => setSectionTitle(e.target.value)}
           />
-
           <Field
             label="Highlighted Title"
             icon={Type}
@@ -550,7 +593,6 @@ export default function BlogSectionAdmin() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {/* IMAGE */}
           <div className="sm:col-span-2">
             <label className={labelClass}>
               <ImagePlus size={15} />
@@ -573,9 +615,9 @@ export default function BlogSectionAdmin() {
               <input
                 ref={fileRef}
                 type="file"
+                className="hidden"
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 onChange={chooseImage}
-                className="hidden"
               />
 
               <button
@@ -636,139 +678,147 @@ export default function BlogSectionAdmin() {
           </span>
         </div>
 
-        <div className="space-y-3">
-          {posts.map((post, index) => {
-            const isOpen = openPosts.includes(post.id);
-            const articleErrors = postErrors[post.id] || {};
+        {posts.length === 0 ? (
+          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            No articles yet. Add one above to get started.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {posts.map((post, index) => {
+              const isOpen = openPosts.includes(post.id);
+              const articleErrors = postErrors[post.id] || {};
 
-            return (
-              <div
-                key={post.id}
-                className="overflow-hidden rounded-xl border border-gray-200 dark:border-[#263442]"
-              >
-                {/* HEADER ROW */}
-                <div className="flex items-center gap-3 p-3">
-                  {validImageUrl(post.image) ? (
-                    <img
-                      src={post.image}
-                      alt={post.title}
-                      className="h-14 w-16 shrink-0 rounded-lg object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-14 w-16 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400 dark:bg-[#16212c]">
-                      <ImagePlus size={20} />
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => togglePost(post.id)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <p className="text-xs font-semibold text-[#1e8a8a]">
-                      {post.category || "UNCATEGORIZED"}
-                    </p>
-                    <p className="mt-1 truncate text-sm font-semibold">
-                      {post.title || `Article ${index + 1}`}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {post.day} {post.month} · {post.author}
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => togglePost(post.id)}
-                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-[#16212c]"
-                    aria-label={isOpen ? "Collapse article" : "Edit article"}
-                  >
-                    {isOpen ? (
-                      <ChevronUp size={19} />
+              return (
+                <div
+                  key={post.id}
+                  className="overflow-hidden rounded-xl border border-gray-200 dark:border-[#263442]"
+                >
+                  <div className="flex items-center gap-3 p-3">
+                    {validImageUrl(post.image) ? (
+                      <img
+                        src={post.image}
+                        alt={post.title}
+                        className="h-14 w-16 shrink-0 rounded-lg object-cover"
+                      />
                     ) : (
-                      <ChevronDown size={19} />
+                      <div className="flex h-14 w-16 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400 dark:bg-[#16212c]">
+                        <ImagePlus size={20} />
+                      </div>
                     )}
-                  </button>
 
-                  <button
-                    type="button"
-                    onClick={() => removeArticle(post.id)}
-                    className="rounded-lg p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-                    aria-label="Delete article"
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => togglePost(post.id)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="text-xs font-semibold text-[#1e8a8a]">
+                        {post.category || "UNCATEGORIZED"}
+                      </p>
+                      <p className="mt-1 truncate text-sm font-semibold">
+                        {post.title || `Article ${index + 1}`}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {post.day} {post.month} · {post.author}
+                      </p>
+                    </button>
 
-                {/* EDIT FORM */}
-                {isOpen && (
-                  <div className="grid gap-4 border-t border-gray-200 p-4 sm:grid-cols-2 dark:border-[#263442]">
-                    <div className="sm:col-span-2">
-                      <label className={labelClass}>Article Image</label>
+                    <button
+                      type="button"
+                      onClick={() => togglePost(post.id)}
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-[#16212c]"
+                      aria-label={isOpen ? "Collapse article" : "Edit article"}
+                    >
+                      {isOpen ? (
+                        <ChevronUp size={19} />
+                      ) : (
+                        <ChevronDown size={19} />
+                      )}
+                    </button>
 
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <input
-                          className={inputClass}
-                          value={post.image}
-                          placeholder="Image URL"
-                          onChange={(event) =>
-                            updatePost(post.id, "image", event.target.value)
-                          }
-                        />
+                    <button
+                      type="button"
+                      onClick={() => removeArticle(post.id)}
+                      className="rounded-lg p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                      aria-label="Delete article"
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  </div>
 
-                        <label className="flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2 text-sm font-medium text-[#1e8a8a] hover:bg-[#e7f5f5] dark:hover:bg-[#162c32]">
-                          <ImagePlus size={16} />
-                          Replace Image
+                  {isOpen && (
+                    <div className="grid gap-4 border-t border-gray-200 p-4 sm:grid-cols-2 dark:border-[#263442]">
+                      <div className="sm:col-span-2">
+                        <label className={labelClass}>Article Image</label>
+
+                        <div className="flex flex-col gap-2 sm:flex-row">
                           <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif"
-                            className="hidden"
+                            className={inputClass}
+                            value={post.image}
+                            placeholder="Image URL"
                             onChange={(event) =>
-                              replaceArticleImage(event, post.id)
+                              updatePost(post.id, "image", event.target.value)
                             }
                           />
-                        </label>
+
+                          <label className="flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2 text-sm font-medium text-[#1e8a8a] hover:bg-[#e7f5f5] dark:hover:bg-[#162c32]">
+                            <ImagePlus size={16} />
+                            Replace Image
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept="image/jpeg,image/png,image/webp,image/gif"
+                              onChange={(event) =>
+                                replaceArticleImage(event, post.id)
+                              }
+                            />
+                          </label>
+                        </div>
+
+                        <ErrorText>{articleErrors.image}</ErrorText>
+
+                        {validImageUrl(post.image) && (
+                          <div className="mt-3">
+                            <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Image Preview
+                            </p>
+                            <ImagePreview
+                              src={post.image}
+                              alt={post.title || "Article preview"}
+                            />
+                          </div>
+                        )}
                       </div>
 
-                      <ErrorText>{articleErrors.image}</ErrorText>
-
-                      {validImageUrl(post.image) && (
-                        <div className="mt-3">
-                          <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                            Image Preview
-                          </p>
-                          <ImagePreview
-                            src={post.image}
-                            alt={post.title || "Article preview"}
-                          />
-                        </div>
-                      )}
+                      <ArticleFields
+                        data={post}
+                        errors={articleErrors}
+                        onChange={(field, value) =>
+                          updatePost(post.id, field, value)
+                        }
+                      />
                     </div>
-
-                    <ArticleFields
-                      data={post}
-                      errors={articleErrors}
-                      onChange={(field, value) =>
-                        updatePost(post.id, field, value)
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* BOTTOM ACTION */}
       <div className="sticky bottom-3 flex justify-end rounded-xl border border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-[#263442] dark:bg-[#111a23]/95">
         <button
           type="button"
-          onClick={getData}
-          disabled={isUploading || isChecking}
+          onClick={saveData}
+          disabled={isUploading || isSaving}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#176f6f] disabled:opacity-60 sm:w-auto"
         >
-          {isChecking ? <Spinner /> : <Save size={17} />}
-          Get All Data
+          {isSaving ? (
+            <LoaderCircle size={17} className="animate-spin" />
+          ) : (
+            <Save size={17} />
+          )}
+          {isSaving ? "Saving..." : "Save Changes"}
         </button>
       </div>
     </div>
