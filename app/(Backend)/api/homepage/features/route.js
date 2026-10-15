@@ -232,7 +232,7 @@ export async function DELETE(request) {
     );
 
     if (!updatedData) {
-      return Response.json({ error: "Card not found" }, { status: 404 });
+      return Response.json({ error: "Card not Found" }, { status: 404 });
     }
 
     return Response.json({
