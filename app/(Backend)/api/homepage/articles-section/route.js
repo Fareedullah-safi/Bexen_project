@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import cloudinary from "@/Lib/cloudinary";
-import connectDB from "@/lib/mongoDB";
+import connectDB from "@/Lib/mongoDB";
 import BlogSection from "@/Models/articles-section/BlogSection";
 
 // Configure Cloudinary
