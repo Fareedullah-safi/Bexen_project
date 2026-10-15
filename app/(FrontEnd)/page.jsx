@@ -1,23 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Section from "./Home/Section";
-import SectionTwo from "./Home/SectionTwo";
-import SectionThree from "./Home/SectionThree";
-import SectionFour from "./Home/SectionFour";
-import SectionFive from "./Home/SectionFive";
-import SectionSix from "./Home/SectionSix";
-import SectionSeven from "./Home/SectionSeven";
-import SectionEight from "./Home/SectionEight";
-import SectionNine from "./Home/SectionNine";
-import SectionTen from "./Home/SectionTen";
-import Loader from "@/app/Components/Loader";
-import { NavBar } from "../Components/NavBar";
-import Footer from "../Components/Footer";
-import SectionEleven from "../Components/SectionTwelve";
-import SectionTwelve from "../Components/SectionTwelve";
+import Section from "@/app/(FrontEnd)/Home/Section";
+import SectionThree from "@/app/(FrontEnd)/Home/SectionThree";
+import SectionFour from "@/app/(FrontEnd)/Home/SectionFour";
+import SectionFive from "@/app/(FrontEnd)/Home/SectionFive";
+import SectionSix from "@/app/(FrontEnd)/Home/SectionSix";
+import SectionSeven from "@/app/(FrontEnd)/Home/SectionSeven";
+import SectionEight from "@/app/(FrontEnd)/Home/SectionEight";
+import SectionNine from "@/app/(FrontEnd)/Home/SectionNine";
+import SectionTen from "@/app/(FrontEnd)/Home/SectionTen";
+import SectionEleven from "./Home/SectionEleven";
+import Loader from "../Components/Loader";
+import SectionTwo from "./about/AboutPages/SectionTwo";
 
-export default function HomePage() {
+export default function Page() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,7 +48,6 @@ export default function HomePage() {
 
   return (
     <main className="overflow-x-hidden">
-      <NavBar />
       <Section />
       <SectionTwo />
       <SectionThree />
@@ -63,8 +59,6 @@ export default function HomePage() {
       <SectionNine />
       <SectionTen />
       <SectionEleven />
-      {/* <SectionTwelve /> */}
-      <Footer />
     </main>
   );
 }
