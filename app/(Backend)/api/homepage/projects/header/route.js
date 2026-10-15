@@ -31,3 +31,48 @@ export async function POST(request) {
     );
   }
 }
+
+// get data
+export async function GET() {
+  try {
+    await connectDB();
+
+    const header = await ProjectsHeader.findOne().lean();
+
+    if (!header) {
+      return NextResponse.json(
+        {
+          success: true,
+          header: null,
+          message: "No projects header found.",
+        },
+        { status: 200 },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        header: {
+          badgeText: header.badgeText ?? "",
+          headingLine: header.headingLine ?? "",
+          highlightWord: header.highlightWord ?? "",
+          description: header.description ?? "",
+          buttonText: header.buttonText ?? "",
+          buttonLink: header.buttonLink ?? "/",
+        },
+      },
+      { status: 200 },
+    );
+  } catch (error) {
+    console.error("GET projects header error:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Failed to load projects header.",
+      },
+      { status: 500 },
+    );
+  }
+}

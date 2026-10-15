@@ -1,3 +1,4 @@
+
 "use client";
 
 import axios from "axios";
@@ -41,9 +42,14 @@ const moveButtonClass =
 ========================================================= */
 
 const PROJECTS_API = "/api/homepage/projects/cards";
+const HEADER_API = "/api/homepage/projects/header";
 
 const headerFields = [
-  { name: "badgeText", label: "Badge Text", placeholder: "PROUD PROJECTS" },
+  {
+    name: "badgeText",
+    label: "Badge Text",
+    placeholder: "PROUD PROJECTS",
+  },
   {
     name: "headingLine",
     label: "Heading Line",
@@ -129,6 +135,7 @@ function ProjectImage({ source, alt }) {
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
             <ImagePlus size={24} />
           </div>
+
           <p className="mt-2 text-xs font-medium text-[var(--foreground)]">
             {source
               ? "Could not load image. Check the URL."
@@ -171,6 +178,7 @@ function ProjectCard({
             <p className="truncate text-base font-bold text-[var(--foreground)]">
               {project.title || "Untitled Project"}
             </p>
+
             <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               Tag: {project.tag || "Large"}
             </span>
@@ -218,6 +226,7 @@ function ProjectCard({
         <div className="space-y-4">
           <div>
             <label className={labelClass}>Tag / Category</label>
+
             <input
               value={project.tag}
               disabled={busy}
@@ -231,6 +240,7 @@ function ProjectCard({
 
           <div>
             <label className={labelClass}>Project Title</label>
+
             <textarea
               value={project.title}
               disabled={busy}
@@ -259,6 +269,7 @@ function ProjectCard({
                   size={15}
                   className="absolute top-1/2 left-4 -translate-y-1/2 text-[var(--muted)]"
                 />
+
                 <input
                   type="url"
                   value={project.image}
@@ -286,13 +297,17 @@ function ProjectCard({
               >
                 <Upload size={14} />
                 Upload Image
+
                 <input
                   type="file"
                   accept="image/*"
                   disabled={busy}
                   className="hidden"
                   onChange={(e) => {
-                    onImageFileChange(project.clientKey, e.target.files?.[0]);
+                    onImageFileChange(
+                      project.clientKey,
+                      e.target.files?.[0],
+                    );
                     e.target.value = "";
                   }}
                 />
@@ -324,6 +339,9 @@ export default function ProjectsAdmin() {
     buttonLink: "/",
   });
 
+  const [loadingHeader, setLoadingHeader] = useState(true);
+  const [headerError, setHeaderError] = useState(false);
+
   const [projects, setProjects] = useState([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [projectsError, setProjectsError] = useState(false);
@@ -340,7 +358,62 @@ export default function ProjectsAdmin() {
   const busy = savingProjects || deletingKey !== null;
 
   /* =========================================================
-  LOAD PROJECTS
+  LOAD SAVED HEADER DATA INTO ALL INPUTS
+  ========================================================= */
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadHeader() {
+      setLoadingHeader(true);
+      setHeaderError(false);
+
+      try {
+        const { data } = await axios.get(HEADER_API);
+
+        if (!active) return;
+
+        // Handle common API response formats.
+        const savedHeader =
+          data?.header ??
+          data?.data?.header ??
+          data?.data ??
+          data;
+
+        setHeader({
+          badgeText: savedHeader?.badgeText ?? "",
+          headingLine: savedHeader?.headingLine ?? "",
+          highlightWord: savedHeader?.highlightWord ?? "",
+          description: savedHeader?.description ?? "",
+          buttonText: savedHeader?.buttonText ?? "",
+          buttonLink: savedHeader?.buttonLink ?? "/",
+        });
+      } catch (error) {
+        console.error("Load project header error:", error);
+
+        if (active) {
+          setHeaderError(true);
+          toast.error(
+            error.response?.data?.message ||
+              "Failed to load project header.",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoadingHeader(false);
+        }
+      }
+    }
+
+    loadHeader();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  /* =========================================================
+  LOAD PROJECT CARDS
   ========================================================= */
 
   useEffect(() => {
@@ -362,9 +435,14 @@ export default function ProjectsAdmin() {
         }
       } catch (error) {
         console.error("Load large projects error:", error);
-        if (active) setProjectsError(true);
+
+        if (active) {
+          setProjectsError(true);
+        }
       } finally {
-        if (active) setLoadingProjects(false);
+        if (active) {
+          setLoadingProjects(false);
+        }
       }
     }
 
@@ -385,13 +463,19 @@ export default function ProjectsAdmin() {
 
   function updateHeader(e) {
     const { name, value } = e.target;
-    setHeader((prev) => ({ ...prev, [name]: value }));
+
+    setHeader((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   }
 
   async function saveHeader() {
     if (savingHeader || headerCooldown) return;
 
-    const hasEmptyField = Object.values(header).some((value) => !value.trim());
+    const hasEmptyField = Object.values(header).some(
+      (value) => !value.trim(),
+    );
 
     if (hasEmptyField) {
       toast.error("Please fill in all header fields.");
@@ -399,6 +483,7 @@ export default function ProjectsAdmin() {
     }
 
     const link = header.buttonLink.trim();
+
     const validLink =
       /^\/[a-zA-Z0-9/_-]*$/.test(link) && !link.startsWith("//");
 
@@ -413,7 +498,7 @@ export default function ProjectsAdmin() {
     setHeaderCooldown(true);
 
     try {
-      await axios.post("/api/homepage/projects/header", {
+      await axios.post(HEADER_API, {
         ...header,
         buttonLink: link,
       });
@@ -421,12 +506,50 @@ export default function ProjectsAdmin() {
       toast.success("Header updated successfully.");
     } catch (error) {
       console.error("Save header error:", error);
-      toast.error(error.response?.data?.message || "Failed to save header.");
+
+      toast.error(
+        error.response?.data?.message || "Failed to save header.",
+      );
     } finally {
       setSavingHeader(false);
+
       cooldownTimer.current = setTimeout(() => {
         setHeaderCooldown(false);
       }, 10000);
+    }
+  }
+
+  async function retryLoadHeader() {
+    setLoadingHeader(true);
+    setHeaderError(false);
+
+    try {
+      const { data } = await axios.get(HEADER_API);
+
+      const savedHeader =
+        data?.header ??
+        data?.data?.header ??
+        data?.data ??
+        data;
+
+      setHeader({
+        badgeText: savedHeader?.badgeText ?? "",
+        headingLine: savedHeader?.headingLine ?? "",
+        highlightWord: savedHeader?.highlightWord ?? "",
+        description: savedHeader?.description ?? "",
+        buttonText: savedHeader?.buttonText ?? "",
+        buttonLink: savedHeader?.buttonLink ?? "/",
+      });
+    } catch (error) {
+      console.error("Retry header load error:", error);
+      setHeaderError(true);
+
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to load project header.",
+      );
+    } finally {
+      setLoadingHeader(false);
     }
   }
 
@@ -436,6 +559,7 @@ export default function ProjectsAdmin() {
 
   function addProject() {
     if (requestInProgress.current) return;
+
     setProjects((prev) => [...prev, createEmptyProject()]);
   }
 
@@ -444,7 +568,9 @@ export default function ProjectsAdmin() {
 
     setProjects((prev) =>
       prev.map((project) =>
-        project.clientKey === clientKey ? { ...project, ...changes } : project,
+        project.clientKey === clientKey
+          ? { ...project, ...changes }
+          : project,
       ),
     );
   }
@@ -466,7 +592,9 @@ export default function ProjectsAdmin() {
     }
 
     if (file.size === 0 || file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be larger than 0 bytes and no more than 5MB.");
+      toast.error(
+        "Image must be larger than 0 bytes and no more than 5MB.",
+      );
       return;
     }
 
@@ -481,8 +609,12 @@ export default function ProjectsAdmin() {
     reader.onload = () => {
       setProjects((prev) =>
         prev.map((project) =>
-          project.clientKey === clientKey && project.imageFile === file
-            ? { ...project, imagePreview: reader.result || "" }
+          project.clientKey === clientKey &&
+          project.imageFile === file
+            ? {
+                ...project,
+                imagePreview: reader.result || "",
+              }
             : project,
         ),
       );
@@ -499,7 +631,10 @@ export default function ProjectsAdmin() {
     if (requestInProgress.current) return;
 
     setProjects((prev) => {
-      const index = prev.findIndex((item) => item.clientKey === clientKey);
+      const index = prev.findIndex(
+        (item) => item.clientKey === clientKey,
+      );
+
       const newIndex = index + direction;
 
       if (index < 0 || newIndex < 0 || newIndex >= prev.length) {
@@ -507,7 +642,11 @@ export default function ProjectsAdmin() {
       }
 
       const updated = [...prev];
-      [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
+
+      [updated[index], updated[newIndex]] = [
+        updated[newIndex],
+        updated[index],
+      ];
 
       return updated;
     });
@@ -518,7 +657,9 @@ export default function ProjectsAdmin() {
 
     if (!project._id) {
       setProjects((prev) =>
-        prev.filter((item) => item.clientKey !== project.clientKey),
+        prev.filter(
+          (item) => item.clientKey !== project.clientKey,
+        ),
       );
       return;
     }
@@ -532,13 +673,18 @@ export default function ProjectsAdmin() {
       });
 
       setProjects((prev) =>
-        prev.filter((item) => item.clientKey !== project.clientKey),
+        prev.filter(
+          (item) => item.clientKey !== project.clientKey,
+        ),
       );
 
       toast.success("Project deleted.");
     } catch (error) {
       console.error("Delete project error:", error);
-      toast.error(error.response?.data?.message || "Failed to delete project.");
+
+      toast.error(
+        error.response?.data?.message || "Failed to delete project.",
+      );
     } finally {
       requestInProgress.current = false;
       setDeletingKey(null);
@@ -546,7 +692,13 @@ export default function ProjectsAdmin() {
   }
 
   async function saveProjects() {
-    if (requestInProgress.current || loadingProjects || projectsError) return;
+    if (
+      requestInProgress.current ||
+      loadingProjects ||
+      projectsError
+    ) {
+      return;
+    }
 
     if (projects.length === 0) {
       toast.error("Add at least one project.");
@@ -592,16 +744,21 @@ export default function ProjectsAdmin() {
     setSavingProjects(true);
 
     try {
-      const { data } = await axios.post(PROJECTS_API, formData);
+      const { data } = await axios.post(
+        PROJECTS_API,
+        formData,
+      );
 
       if (!Array.isArray(data?.projects)) {
         throw new Error("Invalid save response");
       }
 
       setProjects(data.projects.map(formatProjectFromApi));
+
       toast.success(data.message || "Projects saved.");
     } catch (error) {
       console.error("Save projects error:", error);
+
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -628,6 +785,7 @@ export default function ProjectsAdmin() {
           <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)]">
             Proud Projects
           </h1>
+
           <p className="mt-1 text-base text-[var(--muted)]">
             Manage the project showcase section on your homepage.
           </p>
@@ -636,12 +794,14 @@ export default function ProjectsAdmin() {
 
       <div className="space-y-8">
         {/* HEADER SECTION */}
+
         <section className={panelClass}>
           <div className="mb-6 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
                 01
               </span>
+
               <h2 className="text-lg font-bold text-[var(--foreground)]">
                 Section Header Content
               </h2>
@@ -652,13 +812,33 @@ export default function ProjectsAdmin() {
             </span>
           </div>
 
+          {headerError && (
+            <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+              <p className="text-sm text-red-500">
+                Could not load saved header data.
+              </p>
+
+              <button
+                type="button"
+                onClick={retryLoadHeader}
+                disabled={loadingHeader}
+                className="text-sm font-semibold text-[#1E8A8A] disabled:opacity-50"
+              >
+                {loadingHeader ? "Loading..." : "Try again"}
+              </button>
+            </div>
+          )}
+
           <div className="grid gap-5 md:grid-cols-2">
             {headerFields.map((field) => (
               <div
                 key={field.name}
                 className={field.textarea ? "md:col-span-2" : ""}
               >
-                <label htmlFor={field.name} className={labelClass}>
+                <label
+                  htmlFor={field.name}
+                  className={labelClass}
+                >
                   {field.label}
                 </label>
 
@@ -668,6 +848,7 @@ export default function ProjectsAdmin() {
                     name={field.name}
                     value={header[field.name]}
                     onChange={updateHeader}
+                    disabled={loadingHeader}
                     placeholder={field.placeholder}
                     rows={3}
                     className={`${inputClass} resize-y`}
@@ -678,6 +859,7 @@ export default function ProjectsAdmin() {
                     name={field.name}
                     value={header[field.name]}
                     onChange={updateHeader}
+                    disabled={loadingHeader}
                     placeholder={field.placeholder}
                     className={inputClass}
                   />
@@ -709,19 +891,31 @@ export default function ProjectsAdmin() {
           <div className="mt-6 flex justify-end border-t border-[var(--border)] pt-6">
             <button
               type="button"
-              disabled={savingHeader || headerCooldown}
+              disabled={
+                loadingHeader ||
+                headerError ||
+                savingHeader ||
+                headerCooldown
+              }
               onClick={saveHeader}
               className={saveButtonClass}
             >
               {savingHeader ? (
                 <>
-                  <LoaderCircle size={18} className="animate-spin" />
+                  <LoaderCircle
+                    size={18}
+                    className="animate-spin"
+                  />
                   Saving...
                 </>
               ) : (
                 <>
                   <Save size={18} />
-                  {headerCooldown ? "Please wait..." : "Change Section Header"}
+                  {loadingHeader
+                    ? "Loading..."
+                    : headerCooldown
+                      ? "Please wait..."
+                      : "Change Section Header"}
                 </>
               )}
             </button>
@@ -729,12 +923,14 @@ export default function ProjectsAdmin() {
         </section>
 
         {/* LARGE PROJECTS SECTION */}
+
         <section className={panelClass}>
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
                 02
               </span>
+
               <h2 className="text-lg font-bold text-[var(--foreground)]">
                 Large Projects
               </h2>
@@ -754,9 +950,12 @@ export default function ProjectsAdmin() {
               <p className="text-sm text-[var(--muted)]">
                 Could not load projects.
               </p>
+
               <button
                 type="button"
-                onClick={() => setReloadProjects((prev) => prev + 1)}
+                onClick={() =>
+                  setReloadProjects((prev) => prev + 1)
+                }
                 className="mt-3 text-sm font-semibold text-[#1E8A8A]"
               >
                 Try again
@@ -801,13 +1000,21 @@ export default function ProjectsAdmin() {
               <div className="mt-6 flex justify-end border-t border-[var(--border)] pt-6">
                 <button
                   type="button"
-                  disabled={busy || projects.length === 0}
+                  disabled={
+                    busy ||
+                    loadingProjects ||
+                    projectsError ||
+                    projects.length === 0
+                  }
                   onClick={saveProjects}
                   className={`${saveButtonClass} w-full sm:w-auto`}
                 >
                   {savingProjects ? (
                     <>
-                      <LoaderCircle size={18} className="animate-spin" />
+                      <LoaderCircle
+                        size={18}
+                        className="animate-spin"
+                      />
                       Saving...
                     </>
                   ) : (

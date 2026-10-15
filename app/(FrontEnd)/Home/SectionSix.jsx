@@ -22,19 +22,13 @@ export default function SectionSix() {
     const loadData = async () => {
       try {
         const [headerRes, projectsRes] = await Promise.all([
-          axios
-            .get("/api/homepage/projects/header")
-            .catch(() => null),
-          axios
-            .get("/api/homepage/projects/cards")
-            .catch(() => null),
+          axios.get("/api/homepage/projects/header").catch(() => null),
+          axios.get("/api/homepage/projects/cards").catch(() => null),
         ]);
 
         if (headerRes?.data) {
           const header =
-            headerRes.data.header ||
-            headerRes.data.data ||
-            headerRes.data;
+            headerRes.data.header || headerRes.data.data || headerRes.data;
 
           setHeaderData({
             badgeText: header.badgeText || "",
@@ -55,15 +49,11 @@ export default function SectionSix() {
               savedProjects
                 .map((project) => ({
                   ...project,
-                  image:
-                    project.image ||
-                    project.imageUrl ||
-                    project.url ||
-                    "",
+                  image: project.image || project.imageUrl || project.url || "",
                   tag: project.tag || "",
                   title: project.title || "",
                 }))
-                .filter((project) => project.image && project.title)
+                .filter((project) => project.image && project.title),
             );
           } else {
             setProjects([]);
@@ -191,15 +181,11 @@ export default function SectionSix() {
                   className="wow animate__animated animate__fadeInLeft text-3xl leading-tight font-medium text-[#102326] sm:text-4xl md:text-5xl lg:text-[48px]"
                 >
                   {headerData.headingLine}
-                  {headerData.headingText || headerData.highlightWord ? (
-                    <br />
-                  ) : null}
-                  {headerData.headingText}{" "}
-                  {headerData.highlightWord && (
-                    <span className="text-[#1E8A8A]">
-                      {headerData.highlightWord}
-                    </span>
-                  )}
+                  {headerData.headingText}
+                  {/* {headerData.headingText}{" "} */}
+                  <span className="text-[#1E8A8A]">
+                    {" " + headerData.highlightWord}
+                  </span>
                 </h1>
               )}
 
@@ -248,20 +234,23 @@ export default function SectionSix() {
         </div>
 
         {/* Projects */}
-        {Array.from({ length: Math.ceil(projects.length / 2) }, (_, rowIndex) => (
-          <div
-            key={rowIndex}
-            className={`${rowIndex === 0 ? "mt-10" : "pt-5"} w-full px-0 sm:px-4 lg:px-8`}
-          >
-            <div className="flex w-full flex-col gap-6 lg:flex-row">
-              {projects
-                .slice(rowIndex * 2, rowIndex * 2 + 2)
-                .map((project, index) =>
-                  renderProject(project, rowIndex * 2 + index)
-                )}
+        {Array.from(
+          { length: Math.ceil(projects.length / 2) },
+          (_, rowIndex) => (
+            <div
+              key={rowIndex}
+              className={`${rowIndex === 0 ? "mt-10" : "pt-5"} w-full px-0 sm:px-4 lg:px-8`}
+            >
+              <div className="flex w-full flex-col gap-6 lg:flex-row">
+                {projects
+                  .slice(rowIndex * 2, rowIndex * 2 + 2)
+                  .map((project, index) =>
+                    renderProject(project, rowIndex * 2 + index),
+                  )}
+              </div>
             </div>
-          </div>
-        ))}
+          ),
+        )}
       </div>
     </section>
   );
