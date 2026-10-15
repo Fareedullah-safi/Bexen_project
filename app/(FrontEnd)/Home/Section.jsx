@@ -23,7 +23,7 @@ export default function Section() {
         }
 
         const imageData =
-          data.slides?.map((slide) => slide.image) || [];
+          data.slides?.map((slide) => slide.image).filter(Boolean) || [];
 
         setImages(imageData);
 
@@ -116,7 +116,7 @@ export default function Section() {
         {image && (
           <div
             key={imageKey}
-            className="wow animate__animated animate__fadeIn h-full w-full"
+            className="wow animate__animated animate__fadeIn relative h-full w-full"
             data-wow-duration="1.2s"
           >
             <Image
@@ -124,6 +124,7 @@ export default function Section() {
               alt="Nature Image"
               fill
               priority
+              sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 32px), calc(100vw - 32px)"
               className="rounded-lg object-cover"
             />
           </div>
@@ -132,7 +133,7 @@ export default function Section() {
         {loading && !image && <Loader />}
 
         {!loading && !image && (
-          <div className="flex h-full w-full items-center justify-center rounded-lg bg-[var(--surface)] text-sm text-[var(--muted)]">
+          <div className="flex h-full w-full items-center justify-center rounded-lg bg-[#F7F9FC] text-sm text-[var(--muted)]">
             No slider images available.
           </div>
         )}

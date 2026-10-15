@@ -63,7 +63,7 @@ export default function HomePage() {
       <SectionNine />
       <SectionTen />
       <SectionEleven />
-      <SectionTwelve />
+      {/* <SectionTwelve /> */}
       <Footer />
     </main>
   );

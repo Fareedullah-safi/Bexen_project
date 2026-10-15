@@ -11,7 +11,9 @@ export default function SectionFour() {
   useEffect(() => {
     async function fetchAboutData() {
       try {
-        const response = await fetch("/api/homepage/about-us");
+        const response = await fetch("/api/homepage/about-us", {
+          cache: "no-store",
+        });
         const result = await response.json();
 
         if (result.success && result.data) {
@@ -25,28 +27,20 @@ export default function SectionFour() {
     fetchAboutData();
   }, []);
 
-  const getImageUrl = (image, fallback) => {
+  const getImageUrl = (image) => {
     let url = "";
 
     if (typeof image === "string" && image) {
       url = image;
     } else if (image?.url) {
       url = image.url;
-    } else {
-      url = fallback;
     }
 
-    return typeof url === "string"
-      ? url.replace(/^http:\/\//, "https://")
-      : fallback;
+    return typeof url === "string" ? url.replace(/^http:\/\//, "https://") : "";
   };
 
-  const mainImage = getImageUrl(
-    aboutData?.mainImage,
-    "https://themejunction.net/html/bexon/demo/assets/images/about/about-1.webp",
-  );
-
-  const clientImage = getImageUrl(aboutData?.clientImage, "");
+  const mainImage = getImageUrl(aboutData?.mainImage);
+  const clientImage = getImageUrl(aboutData?.clientImage);
 
   return (
     <main className="w-full bg-[#eef2f2] px-4 py-10 sm:px-6 md:px-10 lg:px-12 xl:px-16">
@@ -57,14 +51,15 @@ export default function SectionFour() {
           data-wow-duration="1s"
           data-wow-delay="0.1s"
         >
-          <Image
-            src={mainImage}
-            alt="About us"
-            width={1000}
-            height={700}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 50vw"
-            className="h-112.5 w-full rounded-2xl object-cover sm:h-130 md:h-150 lg:h-155"
-          />
+          {mainImage && (
+            <Image
+              src={mainImage}
+              alt="About us"
+              fill
+              sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) calc(50vw - 40px), 50vw"
+              className="!relative h-112.5 w-full rounded-2xl object-cover sm:h-130 md:h-150 lg:h-155"
+            />
+          )}
 
           {/* Experience Card */}
           <div
@@ -74,21 +69,15 @@ export default function SectionFour() {
           >
             <div className="w-52.5 rounded-tr-2xl bg-white p-5 sm:w-62.5 sm:p-6 md:w-70 md:p-7">
               <p className="text-sm font-medium text-[#229393] sm:text-base md:text-lg">
-                {aboutData?.experienceLabel || "Experiences"}
+                {aboutData?.experienceLabel}
               </p>
 
               <h2 className="mt-6 text-4xl leading-none font-bold text-[#102326] sm:mt-8 sm:text-5xl md:mt-10 md:text-6xl">
-                {aboutData?.experienceNumber || "13+"}
+                {aboutData?.experienceNumber}
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base sm:leading-7 md:text-lg">
-                {aboutData?.experienceText || (
-                  <>
-                    Decades of Experience,
-                    <br />
-                    Endless Innovation
-                  </>
-                )}
+                {aboutData?.experienceText}
               </p>
             </div>
           </div>
@@ -114,7 +103,7 @@ export default function SectionFour() {
               />
 
               <span className="text-sm font-bold tracking-wide text-zinc-950">
-                {aboutData?.sectionLabel || "GET TO KNOW US"}
+                {aboutData?.sectionLabel}
               </span>
             </span>
 
@@ -124,18 +113,7 @@ export default function SectionFour() {
               data-wow-duration="1s"
               data-wow-delay="0.5s"
             >
-              {aboutData?.title || (
-                <>
-                  Empowering
-                  <br />
-                  Businesses with
-                  <br />
-                  Innovation, Expertise,
-                  <br />
-                  and for
-                  <span className="text-[#1E8A8A]"> Success.</span>
-                </>
-              )}
+              {aboutData?.title}
             </h1>
 
             {/* Button */}
@@ -144,23 +122,25 @@ export default function SectionFour() {
               data-wow-duration="0.8s"
               data-wow-delay="0.7s"
             >
-              <a
-                href={aboutData?.buttonLink || "/about"}
-                className="group/button inline-flex w-35 cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#0C1E21] py-1 pr-1 pl-4 text-xs font-semibold text-white transition-colors duration-300 hover:bg-[#1E8A8A]"
-              >
-                <span className="overflow-hidden leading-none">
-                  <span className="block transition-transform duration-400 ease-in-out [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5">
-                    {aboutData?.buttonText || "View demo"}
+              {aboutData?.buttonText && aboutData?.buttonLink && (
+                <a
+                  href={aboutData.buttonLink}
+                  className="group/button inline-flex w-35 cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#0C1E21] py-1 pr-1 pl-4 text-xs font-semibold text-white transition-colors duration-300 hover:bg-[#1E8A8A]"
+                >
+                  <span className="overflow-hidden leading-none">
+                    <span className="block transition-transform duration-400 ease-in-out [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5">
+                      {aboutData.buttonText}
+                    </span>
                   </span>
-                </span>
 
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white">
-                  <ArrowRight
-                    size={16}
-                    className="-rotate-45 text-[#0C1E21] transition-transform duration-300 group-hover/button:rotate-0"
-                  />
-                </span>
-              </a>
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white">
+                    <ArrowRight
+                      size={16}
+                      className="-rotate-45 text-[#0C1E21] transition-transform duration-300 group-hover/button:rotate-0"
+                    />
+                  </span>
+                </a>
+              )}
             </div>
           </div>
 
@@ -186,18 +166,14 @@ export default function SectionFour() {
 
               {/* Testimonial */}
               <p className="mt-5 text-sm leading-6 text-white/90 sm:text-base">
-                {aboutData?.description ||
-                  "We believe in building lasting relationships with our clients through trust, innovation, and exceptional service."}
+                {aboutData?.description}
               </p>
-
               {/* Person */}
               <div className="mt-5">
-                <p className="text-sm font-semibold">
-                  {aboutData?.clientName || "Esther Howard"}
-                </p>
+                <p className="text-sm font-semibold">{aboutData?.clientName}</p>
 
                 <p className="mt-1 text-xs text-white/70">
-                  {aboutData?.clientRole || "Co.Founder"}
+                  {aboutData?.clientRole}
                 </p>
               </div>
             </div>
@@ -212,10 +188,10 @@ export default function SectionFour() {
                 <>
                   {/* YouTube Thumbnail */}
                   <Image
-                    src="https://img.youtube.com/vi/MLpWrANjFbI/hqdefault.jpg"
+                    src="https://images.unsplash.com/photo-1782723725302-d4e05aa16411?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
                     alt="Discover Our Story"
                     fill
-                    sizes="(max-width: 640px) 100vw, 50vw"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                     className="object-cover"
                   />
 

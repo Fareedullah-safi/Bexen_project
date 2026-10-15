@@ -6,10 +6,10 @@ import { useEffect, useState } from "react";
 
 export default function SectionEight() {
   const [section, setSection] = useState({
-    badgeText: "CLIENTS FEEDBACK",
-    highlightWord: "Stories",
-    headingLineOne: "Success Stories Fuel",
-    headingLineTwo: "our Innovation.",
+    badgeText: "",
+    highlightWord: "",
+    headingLineOne: "",
+    headingLineTwo: "",
     description: "",
   });
 
@@ -20,7 +20,9 @@ export default function SectionEight() {
   useEffect(() => {
     const loadTestimonials = async () => {
       try {
-        const response = await fetch("/api/homepage/reviews-section");
+        const response = await fetch("/api/homepage/reviews-section", {
+          cache: "no-store",
+        });
 
         if (!response.ok) {
           throw new Error("Failed to load testimonials");
@@ -30,18 +32,30 @@ export default function SectionEight() {
 
         if (result.success && result.data) {
           if (result.data.section) {
-            setSection((previous) => ({
-              ...previous,
-              ...result.data.section,
-            }));
+            setSection({
+              badgeText: result.data.section.badgeText || "",
+              highlightWord: result.data.section.highlightWord || "",
+              headingLineOne: result.data.section.headingLineOne || "",
+              headingLineTwo: result.data.section.headingLineTwo || "",
+              description: result.data.section.description || "",
+            });
           }
 
           if (Array.isArray(result.data.reviews)) {
-            setTestimonials(result.data.reviews);
+            setTestimonials(
+              result.data.reviews.filter(
+                (testimonial) =>
+                  testimonial &&
+                  (testimonial.text || testimonial.comment || testimonial.name),
+              ),
+            );
+          } else {
+            setTestimonials([]);
           }
         }
       } catch (error) {
         console.error("Failed to load testimonials:", error);
+        setTestimonials([]);
       } finally {
         setIsLoading(false);
       }
@@ -69,11 +83,16 @@ export default function SectionEight() {
       (previous) => (previous - 1 + slideSets.length) % slideSets.length,
     );
   };
+  console.log("service data", testimonials);
 
   const visibleTestimonials =
     slideSets.length > 0
       ? slideSets[currentSlide].map((index) => testimonials[index])
       : [];
+
+  const headingParts = section.headingLineOne
+    ? section.headingLineOne.split(section.highlightWord || "\u0000")
+    : [];
 
   return (
     <section className="relative z-10 -mt-50 w-full bg-[#e8eeee] px-4">
@@ -82,78 +101,105 @@ export default function SectionEight() {
 
         <div className="relative z-10 mx-auto w-full max-w-7xl px-6 py-16 pt-50 sm:px-10 lg:px-16">
           {/* Heading */}
-          <div>
-            <span
-              data-wow-duration="0.8s"
-              className="wow animate__animated animate__fadeInDown group inline-flex items-center gap-2 border border-cyan-100 bg-[#eef2f2] px-4 py-2 text-sm font-bold tracking-wide text-[#1E8A8A] shadow-sm"
-            >
-              <GlobeIcon
-                size={17}
-                className="transition-transform duration-500 group-hover:rotate-180"
-              />
-              {section.badgeText}
-            </span>
+          {(section.badgeText ||
+            section.headingLineOne ||
+            section.headingLineTwo ||
+            section.highlightWord ||
+            section.description) && (
+            <div>
+              {section.badgeText && (
+                <span
+                  data-wow-duration="0.8s"
+                  className="wow animate__animated animate__fadeInDown group inline-flex items-center gap-2 border border-cyan-100 bg-[#eef2f2] px-4 py-2 text-sm font-bold tracking-wide text-[#1E8A8A] shadow-sm"
+                >
+                  <GlobeIcon
+                    size={17}
+                    className="transition-transform duration-500 group-hover:rotate-180"
+                  />
+                  {section.badgeText}
+                </span>
+              )}
 
-            <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <h1
-                data-wow-duration="0.9s"
-                data-wow-delay="0.1s"
-                className="wow animate__animated animate__fadeInLeft max-w-3xl text-4xl leading-tight font-medium text-[#102326] sm:text-5xl lg:text-5xl"
-              >
-                {
-                  section.headingLineOne.split(
-                    section.highlightWord || "Stories",
-                  )[0]
-                }
-                <span className="text-[#1E8A8A]">{section.highlightWord}</span>
-                {section.headingLineOne
-                  .split(section.highlightWord || "Stories")
-                  .slice(1)
-                  .join(section.highlightWord || "Stories")}
-                <br />
-                <span className="text-[#1E8A8A]">{section.headingLineTwo}</span>
-              </h1>
+              <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                {(section.headingLineOne ||
+                  section.headingLineTwo ||
+                  section.highlightWord) && (
+                  <h1
+                    data-wow-duration="0.9s"
+                    data-wow-delay="0.1s"
+                    className="wow animate__animated animate__fadeInLeft max-w-3xl text-4xl leading-tight font-medium text-[#102326] sm:text-5xl lg:text-5xl"
+                  >
+                    {section.highlightWord && section.headingLineOne
+                      ? headingParts[0]
+                      : section.headingLineOne}
 
-              {/* Navigation */}
+                    {section.highlightWord && section.headingLineOne && (
+                      <span className="text-[#1E8A8A]">
+                        {section.highlightWord}
+                      </span>
+                    )}
+
+                    {section.highlightWord &&
+                      section.headingLineOne &&
+                      headingParts.slice(1).join(section.highlightWord)}
+
+                    {section.headingLineOne && section.headingLineTwo && <br />}
+
+                    {section.headingLineTwo && (
+                      <span className="text-[#1E8A8A]">
+                        {section.headingLineTwo}
+                      </span>
+                    )}
+                  </h1>
+                )}
+
+                {section.description && (
+                  <p className="max-w-xl text-sm leading-6 text-zinc-600 sm:text-base md:text-lg">
+                    {section.description}
+                  </p>
+                )}
+
+                {/* Navigation */}
+                <div
+                  data-wow-duration="0.8s"
+                  data-wow-delay="0.2s"
+                  className="wow animate__animated animate__fadeInRight flex shrink-0 items-center gap-3"
+                >
+                  <button
+                    type="button"
+                    aria-label="Previous testimonials"
+                    onClick={previousSlide}
+                    disabled={isLoading || testimonials.length === 0}
+                    className="group flex h-13 w-13 cursor-pointer items-center justify-center rounded-full border border-[#102326]/10 bg-[#eef2f2] text-[#102326] transition-all duration-300 hover:border-[#1E8A8A] hover:bg-[#1E8A8A] hover:text-white hover:shadow-lg hover:shadow-[#1E8A8A]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ArrowLeft
+                      size={20}
+                      className="transition-transform duration-300 group-hover:-translate-x-1"
+                    />
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-label="Next testimonials"
+                    onClick={nextSlide}
+                    disabled={isLoading || testimonials.length === 0}
+                    className="group flex h-13 w-13 cursor-pointer items-center justify-center rounded-full bg-[#1E8A8A] text-white transition-all duration-300 hover:-translate-y-1 hover:bg-[#167575] hover:shadow-lg hover:shadow-[#1E8A8A]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ArrowRight
+                      size={20}
+                      className="transition-transform duration-300 group-hover:translate-x-1"
+                    />
+                  </button>
+                </div>
+              </div>
+
               <div
                 data-wow-duration="0.8s"
-                data-wow-delay="0.2s"
-                className="wow animate__animated animate__fadeInRight flex shrink-0 items-center gap-3"
-              >
-                <button
-                  type="button"
-                  aria-label="Previous testimonials"
-                  onClick={previousSlide}
-                  disabled={isLoading || testimonials.length === 0}
-                  className="group flex h-13 w-13 cursor-pointer items-center justify-center rounded-full border border-[#102326]/10 bg-[#eef2f2] text-[#102326] transition-all duration-300 hover:border-[#1E8A8A] hover:bg-[#1E8A8A] hover:text-white hover:shadow-lg hover:shadow-[#1E8A8A]/20 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <ArrowLeft
-                    size={20}
-                    className="transition-transform duration-300 group-hover:-translate-x-1"
-                  />
-                </button>
-
-                <button
-                  type="button"
-                  aria-label="Next testimonials"
-                  onClick={nextSlide}
-                  disabled={isLoading || testimonials.length === 0}
-                  className="group flex h-13 w-13 cursor-pointer items-center justify-center rounded-full bg-[#1E8A8A] text-white transition-all duration-300 hover:-translate-y-1 hover:bg-[#167575] hover:shadow-lg hover:shadow-[#1E8A8A]/20 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <ArrowRight
-                    size={20}
-                    className="transition-transform duration-300 group-hover:translate-x-1"
-                  />
-                </button>
-              </div>
+                data-wow-delay="0.3s"
+                className="wow animate__animated animate__fadeIn mt-10 h-px w-full bg-[#102326]/10"
+              />
             </div>
-
-            <div
-              data-wow-duration="0.8s"
-              data-wow-delay="0.3s"
-              className="wow animate__animated animate__fadeIn mt-10 h-px w-full bg-[#102326]/10"
-            />
-          </div>
+          )}
 
           {/* Testimonials */}
           {isLoading ? (
@@ -194,22 +240,23 @@ export default function SectionEight() {
                       </div>
                     </div>
 
-                    <p className="mt-7 text-sm leading-7 text-zinc-600 sm:text-base">
-                      {testimonial.text || testimonial.comment || ""}
-                    </p>
+                    {(testimonial.text || testimonial.comment) && (
+                      <p className="mt-7 text-sm leading-7 text-zinc-600 sm:text-base">
+                        {testimonial.text || testimonial.comment}
+                      </p>
+                    )}
                   </div>
 
                   {/* User */}
                   <div className="relative z-10 mt-8 flex items-center gap-4 border-t border-[#102326]/8 pt-5">
-                    <div className="relative">
+                    <div className="relative h-12 w-12 shrink-0">
                       {testimonial.image ? (
                         <Image
-                          width={900}
-                          height={999}
                           src={testimonial.image}
                           alt={testimonial.name || "Client"}
-                          unoptimized
-                          className="h-12 w-12 rounded-full object-cover ring-4 ring-[#eef2f2] transition-transform duration-500 group-hover:scale-105"
+                          fill
+                          sizes="48px"
+                          className="rounded-full object-cover ring-4 ring-[#eef2f2] transition-transform duration-500 group-hover:scale-105"
                         />
                       ) : (
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2f2] text-lg font-semibold text-[#1E8A8A] ring-4 ring-[#eef2f2]">
@@ -221,13 +268,17 @@ export default function SectionEight() {
                     </div>
 
                     <div>
-                      <h2 className="text-sm font-semibold text-[#102326] sm:text-base">
-                        {testimonial.name}
-                      </h2>
+                      {testimonial.name && (
+                        <h2 className="text-sm font-semibold text-[#102326] sm:text-base">
+                          {testimonial.name}
+                        </h2>
+                      )}
 
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {testimonial.role}
-                      </p>
+                      {testimonial.role && (
+                        <p className="mt-1 text-xs text-zinc-500">
+                          {testimonial.role}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
