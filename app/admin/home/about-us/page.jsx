@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   FileImage,
   AlertCircle,
+  PlayCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import Spinner from "@/app/admin/Components/Admin/Spinner";
@@ -25,9 +26,10 @@ const initialData = {
   buttonText: "Learn More",
   buttonLink: "/about",
   mainImage: "",
-  clientImage: "",
+  thumbnailImage: "",
   clientName: "",
   clientRole: "",
+  videoLink: "",
 };
 
 const getImageUrl = (image) =>
@@ -51,22 +53,53 @@ const isFile = (value) => typeof File !== "undefined" && value instanceof File;
 const isSupportedImage = (file) =>
   ["image/jpeg", "image/png", "image/webp"].includes(file.type);
 
-export default function AboutUs() {
+const isValidYouTubeUrl = (value) => {
+  try {
+    const url = new URL(value.trim());
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+
+    let videoId = "";
+
+    if (hostname === "youtu.be") {
+      videoId = url.pathname.split("/").filter(Boolean)[0] || "";
+    } else if (
+      hostname === "youtube.com" ||
+      hostname === "m.youtube.com" ||
+      hostname === "youtube-nocookie.com"
+    ) {
+      if (url.pathname === "/watch") {
+        videoId = url.searchParams.get("v") || "";
+      } else {
+        const parts = url.pathname.split("/").filter(Boolean);
+
+        if (["embed", "shorts", "live", "v"].includes(parts[0])) {
+          videoId = parts[1] || "";
+        }
+      }
+    }
+
+    return /^[a-zA-Z0-9_-]{11}$/.test(videoId);
+  } catch {
+    return false;
+  }
+};
+
+export default function page() {
   const [formData, setFormData] = useState(initialData);
 
   const [imageIds, setImageIds] = useState({
     mainImage: "",
-    clientImage: "",
+    thumbnailImage: "",
   });
 
   const [previews, setPreviews] = useState({
     mainImage: "",
-    clientImage: "",
+    thumbnailImage: "",
   });
 
   const [imageErrors, setImageErrors] = useState({
     mainImage: false,
-    clientImage: false,
+    thumbnailImage: false,
   });
 
   const [isFetching, setIsFetching] = useState(true);
@@ -101,6 +134,7 @@ export default function AboutUs() {
     return () => observer.disconnect();
   }, []);
 
+  // Load saved MongoDB data into every input.
   useEffect(() => {
     let active = true;
 
@@ -111,9 +145,10 @@ export default function AboutUs() {
         });
 
         const result = await response.json();
+        console.log(result);
 
         if (!response.ok || !result.success) {
-          throw new Error(result.message || "Failed to load About Us data");
+          throw new Error(result.message || "Failed to load About Us data.");
         }
 
         if (!active) return;
@@ -121,26 +156,32 @@ export default function AboutUs() {
         if (result.data) {
           const data = result.data;
 
+          const thumbnailData = data.thumbnailImage ?? data.clientImage ?? "";
+
+          const mainImageUrl = getImageUrl(data.mainImage);
+          const thumbnailImageUrl = getImageUrl(thumbnailData);
+
           setFormData({
             ...initialData,
             ...data,
-            mainImage: getImageUrl(data.mainImage),
-            clientImage: getImageUrl(data.clientImage),
+            mainImage: mainImageUrl,
+            thumbnailImage: thumbnailImageUrl,
+            videoLink: data.videoLink || "",
           });
 
           setImageIds({
             mainImage: data.mainImage?.publicId || "",
-            clientImage: data.clientImage?.publicId || "",
+            thumbnailImage: thumbnailData?.publicId || "",
           });
 
           setPreviews({
-            mainImage: getImageUrl(data.mainImage),
-            clientImage: getImageUrl(data.clientImage),
+            mainImage: mainImageUrl,
+            thumbnailImage: thumbnailImageUrl,
           });
 
           setImageErrors({
             mainImage: false,
-            clientImage: false,
+            thumbnailImage: false,
           });
 
           setHasSavedData(true);
@@ -149,7 +190,7 @@ export default function AboutUs() {
         console.error("About Us GET Error:", error);
 
         if (active) {
-          toast.error(error.message || "Failed to load saved About Us data");
+          toast.error(error.message || "Failed to load saved About Us data.");
         }
       } finally {
         if (active) setIsFetching(false);
@@ -188,13 +229,13 @@ export default function AboutUs() {
     if (!file) return;
 
     if (!isSupportedImage(file)) {
-      toast.error("Only JPG, PNG, and WEBP images are allowed");
+      toast.error("Only JPG, PNG, and WEBP images are allowed.");
       e.target.value = "";
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be 5 MB or smaller");
+      toast.error("Image must be 5 MB or smaller.");
       e.target.value = "";
       return;
     }
@@ -245,6 +286,7 @@ export default function AboutUs() {
       [field]: false,
     }));
 
+    // A changed URL must be uploaded to Cloudinary before saving.
     setImageIds((prev) => ({
       ...prev,
       [field]: "",
@@ -280,31 +322,45 @@ export default function AboutUs() {
   };
 
   const validateForm = () => {
+    const videoLink = String(formData.videoLink || "").trim();
+
+    if (!videoLink) {
+      toast.error("YouTube Video Link is required.");
+      return false;
+    }
+
+    if (!isValidYouTubeUrl(videoLink)) {
+      toast.error("Enter a valid YouTube video URL.");
+      return false;
+    }
+
     for (const [field, label] of requiredFields) {
       if (!String(formData[field] ?? "").trim()) {
-        toast.error(`${label} is required`);
+        toast.error(`${label} is required.`);
         return false;
       }
     }
 
-    for (const field of ["mainImage", "clientImage"]) {
+    for (const field of ["mainImage", "thumbnailImage"]) {
       const image = formData[field];
-      const label = field === "mainImage" ? "Main Image" : "Client Image";
+      const label = field === "mainImage" ? "Main Image" : "Video Thumbnail";
 
       if (!image) {
-        toast.error(`${label} is required`);
+        toast.error(`${label} is required.`);
         return false;
       }
 
       if (typeof image === "string") {
         try {
-          const url = new URL(image);
+          const url = new URL(image.trim());
 
           if (!["http:", "https:"].includes(url.protocol)) {
-            throw new Error("Invalid protocol");
+            throw new Error("Invalid URL protocol.");
           }
         } catch {
-          toast.error(`Enter a valid URL or upload the ${label} from your PC`);
+          toast.error(
+            `Enter a valid image URL or upload the ${label} from your PC.`,
+          );
           return false;
         }
       }
@@ -313,7 +369,7 @@ export default function AboutUs() {
     const link = formData.buttonLink.trim();
 
     if (link.startsWith("//")) {
-      toast.error("Button Link must be an internal path or HTTP/HTTPS URL");
+      toast.error("Button Link must be an internal path or HTTP/HTTPS URL.");
       return false;
     }
 
@@ -322,10 +378,10 @@ export default function AboutUs() {
         const url = new URL(link);
 
         if (!["http:", "https:"].includes(url.protocol)) {
-          throw new Error("Invalid protocol");
+          throw new Error("Invalid URL protocol.");
         }
       } catch {
-        toast.error("Enter a valid button link, such as /about");
+        toast.error("Enter a valid button link, such as /about.");
         return false;
       }
     }
@@ -341,37 +397,45 @@ export default function AboutUs() {
     setIsSaving(true);
 
     try {
+      // Preserve existing images until they are changed.
       const images = {
         mainImage: {
           url:
             typeof formData.mainImage === "string"
               ? formData.mainImage.trim()
-              : "",
+              : previews.mainImage,
           publicId: imageIds.mainImage,
         },
-        clientImage: {
+        thumbnailImage: {
           url:
-            typeof formData.clientImage === "string"
-              ? formData.clientImage.trim()
-              : "",
-          publicId: imageIds.clientImage,
+            typeof formData.thumbnailImage === "string"
+              ? formData.thumbnailImage.trim()
+              : previews.thumbnailImage,
+          publicId: imageIds.thumbnailImage,
         },
       };
 
       const uploadData = new FormData();
-      let hasFiles = false;
+      let hasImagesToUpload = false;
 
-      if (isFile(formData.mainImage)) {
-        uploadData.append("mainImage", formData.mainImage);
-        hasFiles = true;
+      for (const field of ["mainImage", "thumbnailImage"]) {
+        const image = formData[field];
+
+        if (isFile(image)) {
+          uploadData.append(field, image);
+          hasImagesToUpload = true;
+        } else if (
+          typeof image === "string" &&
+          image.trim() &&
+          !imageIds[field]
+        ) {
+          // Pasted external URLs are also uploaded to Cloudinary.
+          uploadData.append(`${field}Url`, image.trim());
+          hasImagesToUpload = true;
+        }
       }
 
-      if (isFile(formData.clientImage)) {
-        uploadData.append("clientImage", formData.clientImage);
-        hasFiles = true;
-      }
-
-      if (hasFiles) {
+      if (hasImagesToUpload) {
         const uploadResponse = await fetch(
           "/api/homepage/about-us/upload-images",
           {
@@ -383,21 +447,30 @@ export default function AboutUs() {
         const uploadResult = await uploadResponse.json();
 
         if (!uploadResponse.ok || !uploadResult.success) {
-          throw new Error(uploadResult.message || "Image upload failed");
+          throw new Error(uploadResult.message || "Image upload failed.");
         }
 
-        if (isFile(formData.mainImage)) {
-          images.mainImage = uploadResult.images?.mainImage;
-        }
+        for (const field of ["mainImage", "thumbnailImage"]) {
+          const image = formData[field];
 
-        if (isFile(formData.clientImage)) {
-          images.clientImage = uploadResult.images?.clientImage;
-        }
+          const needsUpload =
+            isFile(image) ||
+            (typeof image === "string" && image.trim() && !imageIds[field]);
 
-        if (!images.mainImage?.url || !images.clientImage?.url) {
-          throw new Error(
-            "Image upload did not return the required image URLs",
-          );
+          if (!needsUpload) continue;
+
+          const uploadedImage = uploadResult.images?.[field];
+
+          if (!uploadedImage?.url || !uploadedImage?.publicId) {
+            throw new Error(
+              `Cloudinary did not return a valid ${field} URL and public ID.`,
+            );
+          }
+
+          images[field] = {
+            url: uploadedImage.url,
+            publicId: uploadedImage.publicId,
+          };
         }
       }
 
@@ -412,9 +485,11 @@ export default function AboutUs() {
         buttonLink: formData.buttonLink.trim(),
         clientName: formData.clientName.trim(),
         clientRole: formData.clientRole.trim(),
+        videoLink: formData.videoLink.trim(),
         mainImage: images.mainImage,
-        clientImage: images.clientImage,
+        thumbnailImage: images.thumbnailImage,
       };
+      console.log(payload);
 
       const response = await fetch("/api/homepage/about-us", {
         method: "POST",
@@ -427,44 +502,49 @@ export default function AboutUs() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to save About Us data");
+        throw new Error(result.message || "Failed to save About Us data.");
       }
 
       const savedData = result.data || payload;
 
+      const savedThumbnail =
+        savedData.thumbnailImage ?? savedData.clientImage ?? "";
+
       const mainImageUrl = getImageUrl(savedData.mainImage);
-      const clientImageUrl = getImageUrl(savedData.clientImage);
+      const thumbnailImageUrl = getImageUrl(savedThumbnail);
 
       revokePreview(previews.mainImage);
-      revokePreview(previews.clientImage);
+      revokePreview(previews.thumbnailImage);
 
       setFormData({
         ...initialData,
         ...savedData,
         mainImage: mainImageUrl,
-        clientImage: clientImageUrl,
+        thumbnailImage: thumbnailImageUrl,
+        videoLink: savedData.videoLink || "",
       });
 
       setImageIds({
         mainImage: savedData.mainImage?.publicId || "",
-        clientImage: savedData.clientImage?.publicId || "",
+        thumbnailImage: savedThumbnail?.publicId || "",
       });
 
       setPreviews({
         mainImage: mainImageUrl,
-        clientImage: clientImageUrl,
+        thumbnailImage: thumbnailImageUrl,
       });
 
       setImageErrors({
         mainImage: false,
-        clientImage: false,
+        thumbnailImage: false,
       });
 
       setHasSavedData(true);
+
       toast.success("About Us saved successfully!");
     } catch (error) {
       console.error("About Us Save Error:", error);
-      toast.error(error.message || "Something went wrong");
+      toast.error(error.message || "Something went wrong.");
     } finally {
       setIsSaving(false);
     }
@@ -534,7 +614,9 @@ export default function AboutUs() {
             {imageErrors[field] ? (
               <div className="flex flex-col items-center gap-2 px-4 text-center">
                 <AlertCircle size={30} className="text-amber-500" />
+
                 <p className="text-sm font-medium">Image could not be loaded</p>
+
                 <p className={`text-xs ${mutedTextClass}`}>
                   Check the URL or choose another image.
                 </p>
@@ -579,6 +661,7 @@ export default function AboutUs() {
             ) : (
               <CheckCircle2 size={15} />
             )}
+
             {imageErrors[field] ? "Image unavailable" : "Image selected"}
           </div>
         </div>
@@ -632,6 +715,10 @@ export default function AboutUs() {
           className={`${inputClass} pl-10`}
         />
       </div>
+
+      <p className={`mt-2 text-xs ${mutedTextClass}`}>
+        Saving uploads this image to Cloudinary and stores its Cloudinary URL.
+      </p>
     </div>
   );
 
@@ -711,19 +798,25 @@ export default function AboutUs() {
 
             <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-7">
               {renderInput("Experience Number", "experienceNumber", "13+")}
+
               {renderInput(
                 "Experience Label",
                 "experienceLabel",
                 "Years of Experience",
               )}
+
               {renderInput(
                 "Experience Text",
                 "experienceText",
                 "Decades of Experience, Endless Innovation",
               )}
+
               {renderInput("Section Label", "sectionLabel", "Get to Know Us")}
+
               {renderInput("Title", "title", "Enter section title")}
+
               {renderInput("Button Text", "buttonText", "Learn More")}
+
               {renderInput("Button Link", "buttonLink", "/about")}
 
               <div className="sm:col-span-2">
@@ -764,8 +857,10 @@ export default function AboutUs() {
 
                 <div>
                   <h2 className="font-semibold">Section Images</h2>
+
                   <p className={`mt-1 text-xs ${mutedTextClass}`}>
-                    Both images are required. Upload a file or provide a URL.
+                    Upload the main image and video thumbnail, or provide image
+                    URLs. Images are saved to Cloudinary.
                   </p>
                 </div>
               </div>
@@ -773,7 +868,49 @@ export default function AboutUs() {
 
             <div className="grid gap-6 p-5 sm:grid-cols-2 sm:p-7">
               {renderImageField("Main Image", "mainImage")}
-              {renderImageField("Client Image", "clientImage")}
+
+              {renderImageField("Video Thumbnail", "thumbnailImage")}
+
+              <div className="sm:col-span-2">
+                <label htmlFor="videoLink" className={labelClass}>
+                  YouTube Video Link <span className="text-red-400">*</span>
+                </label>
+
+                <div className="relative">
+                  <PlayCircle
+                    size={18}
+                    className="absolute top-1/2 left-3 -translate-y-1/2 text-red-500"
+                  />
+
+                  <input
+                    id="videoLink"
+                    name="videoLink"
+                    type="url"
+                    value={formData.videoLink}
+                    onChange={handleChange}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className={`${inputClass} pl-10`}
+                    required
+                    aria-describedby="videoLinkHelp"
+                  />
+                </div>
+
+                <p
+                  id="videoLinkHelp"
+                  className={`mt-2 text-xs ${mutedTextClass}`}
+                >
+                  Enter a valid YouTube video URL. YouTube watch, Shorts, embed,
+                  and youtu.be links are supported.
+                </p>
+
+                {formData.videoLink.trim() &&
+                  isValidYouTubeUrl(formData.videoLink) && (
+                    <p className="mt-2 flex items-center gap-2 text-xs text-emerald-500">
+                      <CheckCircle2 size={14} />
+                      Valid YouTube video link
+                    </p>
+                  )}
+              </div>
             </div>
           </section>
 
@@ -787,6 +924,7 @@ export default function AboutUs() {
             >
               <div>
                 <h2 className="font-semibold">Client Information</h2>
+
                 <p className={`mt-1 text-xs ${mutedTextClass}`}>
                   Enter the client details displayed in your section.
                 </p>
@@ -795,6 +933,7 @@ export default function AboutUs() {
 
             <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-7">
               {renderInput("Client Name", "clientName", "Enter client name")}
+
               {renderInput("Client Role", "clientRole", "Enter client role")}
             </div>
           </section>

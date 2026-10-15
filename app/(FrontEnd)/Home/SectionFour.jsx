@@ -14,10 +14,17 @@ export default function SectionFour() {
         const response = await fetch("/api/homepage/about-us", {
           cache: "no-store",
         });
+
         const result = await response.json();
 
         if (result.success && result.data) {
-          setAboutData(result.data);
+          setAboutData({
+            ...result.data,
+            mainImage: result.data.mainImage || { url: "", publicId: "" },
+            thumbnailImage: result.data.thumbnailImage?.url
+              ? result.data.thumbnailImage
+              : result.data.clientImage || { url: "", publicId: "" },
+          });
         }
       } catch (error) {
         console.error("Failed to load About Us data:", error);
@@ -40,7 +47,7 @@ export default function SectionFour() {
   };
 
   const mainImage = getImageUrl(aboutData?.mainImage);
-  const clientImage = getImageUrl(aboutData?.clientImage);
+  const clientImage = getImageUrl(aboutData?.thumbnailImage);
 
   return (
     <main className="w-full bg-[#eef2f2] px-4 py-10 sm:px-6 md:px-10 lg:px-12 xl:px-16">
@@ -168,6 +175,7 @@ export default function SectionFour() {
               <p className="mt-5 text-sm leading-6 text-white/90 sm:text-base">
                 {aboutData?.description}
               </p>
+
               {/* Person */}
               <div className="mt-5">
                 <p className="text-sm font-semibold">{aboutData?.clientName}</p>
@@ -186,9 +194,12 @@ export default function SectionFour() {
             >
               {!isPlaying ? (
                 <>
-                  {/* YouTube Thumbnail */}
+                  {/* Thumbnail: use saved About Us thumbnail, with fallback */}
                   <Image
-                    src="https://images.unsplash.com/photo-1782723725302-d4e05aa16411?q=80&w=870&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
+                    src={
+                      clientImage ||
+                      "https://images.unsplash.com/photo-1782723725302-d4e05aa16411?q=80&w=870&auto=format&fit=crop"
+                    }
                     alt="Discover Our Story"
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -222,7 +233,7 @@ export default function SectionFour() {
               ) : (
                 <iframe
                   className="absolute inset-0 h-full w-full"
-                  src="https://www.youtube.com/embed/MLpWrANjFbI?autoplay=1"
+                  src={`https://www.youtube.com/embed/${(aboutData?.videoUrl || "https://youtu.be/bAhM3td5PzY").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&/]+)/)?.[1] || "bAhM3td5PzY"}?autoplay=1`}
                   title="Discover Our Story"
                   allow="autoplay; encrypted-media; picture-in-picture"
                   allowFullScreen
