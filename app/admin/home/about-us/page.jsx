@@ -145,7 +145,6 @@ export default function page() {
         });
 
         const result = await response.json();
-        console.log(result);
 
         if (!response.ok || !result.success) {
           throw new Error(result.message || "Failed to load About Us data.");
@@ -489,7 +488,6 @@ export default function page() {
         mainImage: images.mainImage,
         thumbnailImage: images.thumbnailImage,
       };
-      console.log(payload);
 
       const response = await fetch("/api/homepage/about-us", {
         method: "POST",

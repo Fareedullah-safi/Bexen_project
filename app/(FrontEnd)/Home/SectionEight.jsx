@@ -83,7 +83,6 @@ export default function SectionEight() {
       (previous) => (previous - 1 + slideSets.length) % slideSets.length,
     );
   };
-  console.log("service data", testimonials);
 
   const visibleTestimonials =
     slideSets.length > 0

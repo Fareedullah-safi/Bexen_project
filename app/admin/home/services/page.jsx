@@ -194,7 +194,6 @@ export default function SolutionsAdmin() {
       try {
         const res = await fetch("/api/homepage/services");
         const result = await res.json();
-        console.log(result)
 
         if (res.ok && result.success && result.data) {
           const d = result.data;

@@ -8,7 +8,6 @@ export async function POST(request) {
 
     const data = await request.json();
 
-    console.log("RECEIVED DATA:", data);
 
     const { logos } = data;
 
@@ -30,7 +29,6 @@ export async function POST(request) {
       })),
     });
 
-    console.log("SAVED DATA:", brandLogo);
 
     return Response.json({
       success: true,

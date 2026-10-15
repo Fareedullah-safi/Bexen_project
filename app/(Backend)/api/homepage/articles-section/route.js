@@ -15,7 +15,6 @@ async function deleteFromCloudinary(publicId) {
   if (!publicId) return;
   try {
     await cloudinary.uploader.destroy(publicId);
-    console.log(`Deleted from Cloudinary: ${publicId}`);
   } catch (err) {
     console.warn(`Could not delete ${publicId}:`, err.message);
   }
@@ -84,9 +83,6 @@ export async function POST(request) {
 
     // ── Step 4: Delete removed images from Cloudinary ──
     if (removedPublicIds.length > 0) {
-      console.log(
-        `Deleting ${removedPublicIds.length} image(s) from Cloudinary...`,
-      );
       // Delete all removed images in parallel
       await Promise.all(removedPublicIds.map(deleteFromCloudinary));
     }
