@@ -183,7 +183,7 @@ export default function BrandLogos() {
         cache: "no-store",
       });
       const data = await response.json();
-
+      console.log(data);
       if (!response.ok || !data.success) {
         throw new Error(data.error || "Failed to load saved logos");
       }

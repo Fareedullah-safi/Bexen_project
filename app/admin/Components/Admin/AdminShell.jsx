@@ -301,7 +301,7 @@ export default function AdminShell({ children }) {
 
               <button
                 type="button"
-                onClick={handleLogout}
+                // onClick={handleLogout}
                 className="hidden items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 sm:flex dark:border-white/10 dark:text-slate-300 dark:hover:border-red-500/20 dark:hover:bg-red-500/10 dark:hover:text-red-400"
               >
                 <LogOut size={18} />

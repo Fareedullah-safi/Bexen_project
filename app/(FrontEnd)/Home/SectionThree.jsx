@@ -12,6 +12,7 @@ export default function BrandLogos() {
     const dataLogos = async () => {
       try {
         const res = await fetch("/api/homepage/brand-logos/postlogoDB", {
+          method: "GET",
           cache: "no-store",
         });
 
@@ -20,10 +21,11 @@ export default function BrandLogos() {
         if (!res.ok) {
           throw new Error(data?.message || "Failed to load brand logos");
         }
-
+        console.log(data)
         const uploadedLogos =
           data?.data?.flatMap(
-            (item) => item?.logos?.map((logo) => logo?.url).filter(Boolean) || []
+            (item) =>
+              item?.logos?.map((logo) => logo?.url).filter(Boolean) || [],
           ) || [];
 
         setDbLogos(uploadedLogos);

@@ -41,7 +41,7 @@ const moveButtonClass =
 2. CONSTANTS
 ========================================================= */
 
-const PROJECTS_API = "/api/homepage/projects/cards";
+const PROJECTS_API = "/api/homepage/projects";
 const HEADER_API = "/api/homepage/projects/header";
 
 const headerFields = [

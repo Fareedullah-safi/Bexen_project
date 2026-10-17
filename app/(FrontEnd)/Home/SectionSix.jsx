@@ -23,7 +23,7 @@ export default function SectionSix() {
       try {
         const [headerRes, projectsRes] = await Promise.all([
           axios.get("/api/homepage/projects/header").catch(() => null),
-          axios.get("/api/homepage/projects/cards").catch(() => null),
+          axios.get("/api/homepage/projects").catch(() => null),
         ]);
 
         if (headerRes?.data) {

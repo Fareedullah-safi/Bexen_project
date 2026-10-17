@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
+import axios from "axios";
 import {
   BarChart3,
   Bell,
@@ -25,9 +26,10 @@ import {
   Sun,
   Users,
   X,
+  UserRound,
 } from "lucide-react";
 
-/* ============ MENU LINKS (edit here) ============ */
+/* ============ MENU LINKS ============ */
 
 const navigation = [
   {
@@ -37,16 +39,14 @@ const navigation = [
       { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
     ],
   },
-
   {
     label: "Website Content",
     items: [
-      // ---------- Home Page (same order as the real page) ----------
       {
         name: "Home Page",
         icon: FileText,
         children: [
-          { name: "Hero", href: "/admin/home" }, // your existing image page
+          { name: "Hero", href: "/admin/home" },
           { name: "Features", href: "/admin/home/features" },
           { name: "Brand Logos", href: "/admin/home/brand-logos" },
           { name: "About Us", href: "/admin/home/about-us" },
@@ -57,8 +57,6 @@ const navigation = [
           { name: "Articles Section", href: "/admin/home/articles-section" },
         ],
       },
-
-      // ---------- About Us page (fill in later) ----------
       {
         name: "About Us Page",
         icon: Info,
@@ -68,8 +66,6 @@ const navigation = [
           { name: "Recognitions", href: "/admin/about/recognitions" },
         ],
       },
-
-      // ---------- Services (names from the real page) ----------
       {
         name: "Services",
         icon: BriefcaseBusiness,
@@ -92,8 +88,6 @@ const navigation = [
           },
         ],
       },
-
-      // ---------- Resources (from the site menu) ----------
       {
         name: "Resources",
         icon: Newspaper,
@@ -105,8 +99,6 @@ const navigation = [
           { name: "Contact Page", href: "/admin/resources/contact" },
         ],
       },
-
-      // ---------- Shared on every page (normal link, no dropdown) ----------
       {
         name: "Footer and Contact Info",
         href: "/admin/site/footer",
@@ -114,7 +106,6 @@ const navigation = [
       },
     ],
   },
-
   {
     label: "Management",
     items: [
@@ -122,7 +113,6 @@ const navigation = [
       { name: "Messages", href: "/admin/messages", icon: MessageSquare },
     ],
   },
-
   {
     label: "System",
     items: [{ name: "Settings", href: "/admin/settings", icon: Settings }],
@@ -132,53 +122,168 @@ const navigation = [
 /* ============ COMPONENT ============ */
 
 export default function AdminShell({ children }) {
-  const pathname = usePathname(); // current URL
+  const pathname = usePathname();
   const { theme, setTheme } = useTheme();
 
-  /* ---------- State ---------- */
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [openName, setOpenName] = useState(null);
 
-  /* ---------- Active link helpers ---------- */
+  // Logged-in administrator profile
+  const [adminUid, setAdminUid] = useState("");
+  const [adminName, setAdminName] = useState("Administrator");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminImage, setAdminImage] = useState("");
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
-  // Normal link: is this the current page?
-  const isActive = (href) => {
-    if (href === "/admin") return pathname === "/admin";
-    return pathname === href || pathname.startsWith(`${href}/`);
-  };
+  /* ============ LOAD SESSION ============ */
 
-  // Dropdown child: exact match only
-  const isChildActive = (href) => pathname === href;
-
-  // Name of the dropdown that contains the current page
-  const activeGroupName =
-    navigation
-      .flatMap((group) => group.items)
-      .find((item) => item.children?.some((c) => isChildActive(c.href)))
-      ?.name ?? null;
-
-  // Only one dropdown open at a time
-  const [openName, setOpenName] = useState(activeGroupName);
-
-  /* ---------- Effects ---------- */
-
-  // Runs once on load
   useEffect(() => {
     setMounted(true);
-  }, []);
 
-  // Runs when the URL changes
+    const loadSession = async () => {
+      try {
+        const res = await axios.get("/api/admin/adminusers/session", {
+          withCredentials: true,
+        });
+
+        if (res.data.success && res.data.admin) {
+          const admin = res.data.admin;
+
+          setAdminUid(admin.uid || "");
+          setAdminEmail(admin.email || "");
+        }
+      } catch (error) {
+        console.error(
+          "Unable to load admin session:",
+          error.response?.data || error.message,
+        );
+      }
+    };
+
+    loadSession();
+  }, []);
+  //handle signout
+  const handleSignOut = async () => {
+    try {
+      await axios.post(
+        "/api/admin/adminusers/logout",
+        {},
+        { withCredentials: true },
+      );
+    } catch (error) {
+      console.log("Sign out failed:", error);
+    }
+  };
+
+  /* ============ LOAD SAVED PROFILE ============ */
+
   useEffect(() => {
-    setMobileOpen(false);
-    if (activeGroupName) setOpenName(activeGroupName);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+    if (!adminUid) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      setIsProfileLoading(true);
+
+      try {
+        const res = await axios.get("/api/admin/adminusers/profile", {
+          params: { UID: adminUid },
+          withCredentials: true,
+        });
+
+        if (cancelled) return;
+
+        if (res.data.success) {
+          const profile = res.data.profile || res.data.data;
+
+          if (profile) {
+            setAdminName(profile.name || "Administrator");
+            setAdminImage(profile.imageUrl || "");
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Unable to load admin profile:",
+          error.response?.data || error.message,
+        );
+      } finally {
+        if (!cancelled) {
+          setIsProfileLoading(false);
+        }
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminUid]);
+
+  /* ============ PROFILE HELPERS ============ */
+
+  const initials =
+    adminName
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0].toUpperCase())
+      .join("") || "A";
 
   const isDark = mounted && theme === "dark";
 
-  /* ---------- Normal link UI ---------- */
+  const isActive = (href) => {
+    if (href === "/admin") return pathname === "/admin";
+
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
+  const isChildActive = (href) => pathname === href;
+
+  const activeGroupName =
+    navigation
+      .flatMap((group) => group.items)
+      .find((item) => item.children?.some((child) => isChildActive(child.href)))
+      ?.name ?? null;
+
+  useEffect(() => {
+    setMobileOpen(false);
+
+    if (activeGroupName) {
+      setOpenName(activeGroupName);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  /* ============ AVATAR ============ */
+
+  const renderAvatar = (size = "h-10 w-10", textSize = "text-sm") => (
+    <div
+      className={`flex ${size} shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--accent)]/20 bg-[var(--accent-soft)] font-bold text-[var(--accent)]`}
+    >
+      {adminImage ? (
+        <img
+          src={adminImage}
+          alt={`${adminName} profile`}
+          className="h-full w-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      ) : (
+        <span className={textSize}>{initials}</span>
+      )}
+    </div>
+  );
+
+  /* ============ NORMAL LINK ============ */
+
   const renderLink = (item) => {
     const Icon = item.icon;
     const active = isActive(item.href);
@@ -203,7 +308,8 @@ export default function AdminShell({ children }) {
     );
   };
 
-  /* ---------- Dropdown UI ---------- */
+  /* ============ DROPDOWN ============ */
+
   const renderDropdown = (item) => {
     const Icon = item.icon;
     const open = openName === item.name;
@@ -211,7 +317,6 @@ export default function AdminShell({ children }) {
 
     return (
       <div key={item.name}>
-        {/* Button that opens/closes */}
         <button
           type="button"
           onClick={() => setOpenName(open ? null : item.name)}
@@ -223,6 +328,7 @@ export default function AdminShell({ children }) {
         >
           <Icon size={19} />
           <span className="flex-1 text-left">{item.name}</span>
+
           <ChevronDown
             size={16}
             className={`transition-transform duration-200 ${
@@ -231,7 +337,6 @@ export default function AdminShell({ children }) {
           />
         </button>
 
-        {/* Child links (only when open) */}
         {open && (
           <div className="mt-1 ml-6 space-y-0.5 border-l border-[var(--border)] pl-3">
             {item.children.map((child) => {
@@ -266,7 +371,6 @@ export default function AdminShell({ children }) {
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      {/* Mobile dark overlay */}
       {mobileOpen && (
         <button
           aria-label="Close sidebar"
@@ -275,13 +379,12 @@ export default function AdminShell({ children }) {
         />
       )}
 
-      {/* ---------- Sidebar ---------- */}
+      {/* SIDEBAR */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-transform duration-300 lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Logo */}
         <div className="flex h-[76px] items-center justify-between border-b border-[var(--border)] px-5">
           <Link href="/admin" className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent)] text-white shadow-[var(--accent)]/20 shadow-lg">
@@ -299,6 +402,8 @@ export default function AdminShell({ children }) {
           </Link>
 
           <button
+            type="button"
+            aria-label="Close sidebar"
             onClick={() => setMobileOpen(false)}
             className="rounded-lg p-2 text-[var(--muted)] hover:bg-[var(--surface-soft)] lg:hidden"
           >
@@ -306,7 +411,6 @@ export default function AdminShell({ children }) {
           </button>
         </div>
 
-        {/* Menu links */}
         <div className="flex-1 overflow-y-auto px-3 py-5">
           {navigation.map((group) => (
             <div key={group.label} className="mb-6">
@@ -323,41 +427,41 @@ export default function AdminShell({ children }) {
           ))}
         </div>
 
-        {/* User box */}
+        {/* SIDEBAR PROFILE */}
         <div className="border-t border-[var(--border)] p-4">
-          <div className="rounded-2xl bg-[var(--surface-soft)] p-3">
+          <Link
+            href="/admin/users"
+            className="block rounded-2xl bg-[var(--surface-soft)] p-3 transition-colors hover:bg-[var(--accent-soft)]"
+          >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] font-bold text-white">
-                A
-              </div>
+              {renderAvatar()}
 
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-[var(--foreground)]">
-                  Administrator
+                  {isProfileLoading ? "Loading profile..." : adminName}
                 </p>
                 <p className="truncate text-xs text-[var(--muted)]">
-                  admin@website.com
+                  {adminEmail || "Administrator"}
                 </p>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
       </aside>
 
-      {/* ---------- Right side ---------- */}
+      {/* RIGHT SIDE */}
       <div className="lg:pl-[270px]">
-        {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-[var(--border)] bg-[var(--surface)]/90 px-4 backdrop-blur-xl sm:px-6">
           <div className="flex items-center gap-3">
-            {/* Mobile menu button */}
             <button
+              type="button"
+              aria-label="Open sidebar"
               onClick={() => setMobileOpen(true)}
               className="rounded-xl border border-[var(--border)] p-2.5 text-[var(--foreground)] hover:bg-[var(--surface-soft)] lg:hidden"
             >
               <Menu size={20} />
             </button>
 
-            {/* Search */}
             <div className="hidden items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 md:flex md:w-[280px] lg:w-[340px]">
               <Search size={18} className="text-[var(--muted)]" />
               <input
@@ -375,7 +479,6 @@ export default function AdminShell({ children }) {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* View site */}
             <Link
               href="/"
               target="_blank"
@@ -385,8 +488,9 @@ export default function AdminShell({ children }) {
               View Site
             </Link>
 
-            {/* Theme toggle */}
+            {/* THEME TOGGLE */}
             <button
+              type="button"
               onClick={() => setTheme(isDark ? "light" : "dark")}
               className="rounded-xl border border-[var(--border)] p-2.5 text-[var(--muted)] transition hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)]"
               title="Toggle theme"
@@ -394,9 +498,11 @@ export default function AdminShell({ children }) {
               {isDark ? <Sun size={19} /> : <Moon size={19} />}
             </button>
 
-            {/* Notifications */}
+            {/* NOTIFICATIONS */}
             <div className="relative">
               <button
+                type="button"
+                aria-label="Toggle notifications"
                 onClick={() => {
                   setNotificationsOpen(!notificationsOpen);
                   setProfileOpen(false);
@@ -434,20 +540,23 @@ export default function AdminShell({ children }) {
               )}
             </div>
 
-            {/* Profile menu */}
+            {/* TOP-RIGHT PROFILE */}
             <div className="relative">
               <button
+                type="button"
+                aria-label="Toggle admin profile menu"
+                aria-expanded={profileOpen}
                 onClick={() => {
                   setProfileOpen(!profileOpen);
                   setNotificationsOpen(false);
                 }}
                 className="flex items-center gap-2 rounded-xl border border-[var(--border)] p-1.5 pr-2.5 hover:bg-[var(--surface-soft)]"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-sm font-bold text-white">
-                  A
-                </div>
+                {renderAvatar("h-8 w-8", "text-xs")}
 
-                <span className="hidden text-sm font-bold sm:block">Admin</span>
+                <span className="hidden max-w-28 truncate text-sm font-bold sm:block">
+                  {adminName}
+                </span>
 
                 <ChevronDown
                   size={15}
@@ -456,20 +565,42 @@ export default function AdminShell({ children }) {
               </button>
 
               {profileOpen && (
-                <div className="absolute top-14 right-0 w-56 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-2xl">
-                  <div className="border-b border-[var(--border)] px-3 py-3">
-                    <p className="font-bold">Administrator</p>
-                    <p className="text-xs text-[var(--muted)]">
-                      admin@website.com
-                    </p>
+                <div className="absolute top-14 right-0 z-50 w-64 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-2xl">
+                  <div className="flex items-center gap-3 border-b border-[var(--border)] px-3 py-3">
+                    {renderAvatar()}
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold">{adminName}</p>
+                      <p className="truncate text-xs text-[var(--muted)]">
+                        {adminEmail || "Administrator"}
+                      </p>
+                    </div>
                   </div>
 
-                  <button className="mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)]">
+                  <Link
+                    href="/admin/adminusers"
+                    onClick={() => setProfileOpen(false)}
+                    className="mt-2 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)]"
+                  >
+                    <UserRound size={17} />
+                    My Profile
+                  </Link>
+
+                  <Link
+                    href="/admin/adminusers"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)]"
+                  >
                     <Settings size={17} />
                     Account Settings
-                  </button>
+                  </Link>
 
-                  <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-500 hover:bg-red-500/10">
+                  <div className="my-2 border-t border-[var(--border)]" />
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-500 hover:bg-red-500/10"
+                  >
                     <LogOut size={17} />
                     Sign Out
                   </button>
@@ -479,7 +610,7 @@ export default function AdminShell({ children }) {
           </div>
         </header>
 
-        {/* Page content */}
+        {/* PAGE CONTENT */}
         <main className="min-h-[calc(100vh-76px)] p-4 sm:p-6 lg:p-8">
           {children}
         </main>

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Box } from "lucide-react";
 import Loader from "@/app/Components/Loader";
 
-export default function SectionTwoSectionTwo() {
+export default function SectionTwo() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 

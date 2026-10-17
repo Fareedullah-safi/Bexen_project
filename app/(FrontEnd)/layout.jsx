@@ -1,11 +1,9 @@
 import { Mona_Sans } from "next/font/google";
-import "../globals.css";
+import "@/app/globals.css";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "sonner";
-import WowAnimation from "../Components/WowAnimation";
-import { NavBar } from "../Components/NavBar";
-import SectionTwelve from "../Components/SectionTwelve";
-import Footer from "../Components/Footer";
+import WowAnimation from "@/app/Components/WowAnimation";
+import ConditionalLayout from "../Components/Admin/UI/ConditionalLayout";
 
 const monaSans = Mona_Sans({
   subsets: ["latin"],
@@ -33,10 +31,10 @@ export default function RootLayout({ children }) {
         />
 
         <WowAnimation />
-        <NavBar />
+
+        <ConditionalLayout />
+
         {children}
-        <SectionTwelve />
-        <Footer />
 
         <Toaster position="top-right" richColors closeButton duration={3000} />
       </body>
