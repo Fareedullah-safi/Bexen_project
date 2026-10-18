@@ -178,6 +178,8 @@ export default function AdminShell({ children }) {
         {},
         { withCredentials: true },
       );
+      // Navigate only after the logout request completes.
+      window.location.replace("/adminLogin");
     } catch (error) {
       console.log("Sign out failed:", error);
     }
