@@ -24,11 +24,12 @@ export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(false);
 
   async function handleLogin(e) {
     e.preventDefault();
 
-    if (isLoading) return;
+    if (isLoading || cooldown) return;
 
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -39,9 +40,10 @@ export default function AdminLogin() {
       return;
     }
 
-    setIsLoading(true);
+    setCooldown(true);
+    setTimeout(() => setCooldown(false), 3000);
 
-    const toastId = toast.loading("Verifying admin credentials...");
+    setIsLoading(true);
 
     try {
       const res = await axios.post("/api/admin/adminusers/login", {
@@ -51,15 +53,12 @@ export default function AdminLogin() {
 
       if (!res.data?.success) {
         toast.error("Login failed", {
-          id: toastId,
-          description:
-            res.data?.message || "Invalid email or password.",
+          description: res.data?.message || "Invalid email or password.",
         });
         return;
       }
 
       toast.success("Login successful", {
-        id: toastId,
         description: "Welcome to your Bexon admin dashboard.",
       });
 
@@ -70,29 +69,23 @@ export default function AdminLogin() {
 
       if (status === 401) {
         toast.error("Invalid credentials", {
-          id: toastId,
           description: "Your email or password is incorrect.",
         });
       } else if (status === 400) {
         toast.error("Invalid input", {
-          id: toastId,
-          description:
-            serverMessage || "Please check your email and password.",
+          description: serverMessage || "Please check your email and password.",
         });
       } else if (status === 429) {
         toast.error("Too many attempts", {
-          id: toastId,
           description: "Please wait a moment before trying again.",
         });
       } else if (err.response) {
         toast.error("Login failed", {
-          id: toastId,
           description:
             serverMessage || "The server could not process your request.",
         });
       } else {
         toast.error("Connection error", {
-          id: toastId,
           description:
             "Unable to connect to the server. Check your connection and try again.",
         });
@@ -101,7 +94,6 @@ export default function AdminLogin() {
       setIsLoading(false);
     }
   }
-
   return (
     <main
       className={`relative flex min-h-screen items-center justify-center px-4 py-10 transition-colors duration-300 ${
@@ -253,23 +245,24 @@ export default function AdminLogin() {
                       isDark ? "text-[#8495a7]" : "text-[#98a2b3]"
                     }`}
                   >
-                    {showPassword ? (
-                      <EyeOff size={19} />
-                    ) : (
-                      <Eye size={19} />
-                    )}
+                    {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
                   </button>
                 </div>
               </div>
-
               <button
                 type="submit"
-                disabled={isLoading}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#1e8a8a]/15 transition duration-200 hover:bg-[#176f6f] focus:ring-4 focus:ring-[#1e8a8a]/20 focus:outline-none active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isLoading || cooldown}
+                className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#1e8a8a]/15 transition duration-200 focus:ring-4 focus:ring-[#1e8a8a]/20 focus:outline-none active:scale-[0.99] disabled:cursor-pointer disabled:opacity-100 ${
+                  isLoading || cooldown
+                    ? "bg-[#155e5e]"
+                    : "bg-[#1e8a8a] hover:bg-[#176f6f]"
+                }`}
               >
                 {isLoading
                   ? "Verifying admin..."
-                  : "Sign in to dashboard"}
+                  : cooldown
+                    ? "Please wait..."
+                    : "Sign in to dashboard"}
               </button>
             </form>
 

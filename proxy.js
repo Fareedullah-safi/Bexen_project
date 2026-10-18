@@ -4,16 +4,24 @@ import { getAdminSession } from "@/Lib/getAllCookies/getAdminSession";
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
-  const session = await getAdminSession();
+  // Allow the login page to load without authentication.
+  if (pathname === "/adminLogin") {
+    const session = await getAdminSession();
 
-  // Protect admin pages.
-  if (pathname.startsWith("/admin") && !session) {
-    return NextResponse.redirect(new URL("/adminLogin", request.url));
+    if (session) {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+
+    return NextResponse.next();
   }
 
-  // Redirect logged-in admins away from the login page.
-  if (pathname === "/adminLogin" && session) {
-    return NextResponse.redirect(new URL("/admin", request.url));
+  // Protect admin pages.
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    const session = await getAdminSession();
+
+    if (!session) {
+      return NextResponse.redirect(new URL("/adminLogin", request.url));
+    }
   }
 
   return NextResponse.next();

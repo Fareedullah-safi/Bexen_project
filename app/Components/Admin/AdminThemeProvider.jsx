@@ -6,9 +6,10 @@ export default function AdminThemeProvider({ children }) {
   return (
     <ThemeProvider
       attribute="class"
-      defaultTheme="light"
+      defaultTheme="dark"
       enableSystem={false}
       storageKey="universal-admin-theme"
+      disableTransitionOnChange
     >
       {children}
     </ThemeProvider>

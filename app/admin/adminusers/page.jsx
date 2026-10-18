@@ -89,7 +89,7 @@ export default function AdminUsersPage() {
           }
         }
       } catch (error) {
-        console.error(
+        console.log(
           "Unable to load admin profile:",
           error.response?.data || error.message,
         );

@@ -207,7 +207,7 @@ export default function AdminShell({ children }) {
           }
         }
       } catch (error) {
-        console.error(
+        console.log(
           "Unable to load admin profile:",
           error.response?.data || error.message,
         );
@@ -596,14 +596,16 @@ export default function AdminShell({ children }) {
                   </Link>
 
                   <div className="my-2 border-t border-[var(--border)]" />
-                  <button
-                    type="button"
-                    onClick={handleSignOut}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-500 hover:bg-red-500/10"
-                  >
-                    <LogOut size={17} />
-                    Sign Out
-                  </button>
+                  <Link href={"/adminLogin"}>
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-500 hover:bg-red-500/10"
+                    >
+                      <LogOut size={17} />
+                      Sign Out
+                    </button>
+                  </Link>
                 </div>
               )}
             </div>
