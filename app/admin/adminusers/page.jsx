@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
+import Spinner from "../Components/Admin/Spinner";
 
 const initialAdmin = { name: "", email: "", password: "" };
 const initialPassword = { currentPassword: "", newPassword: "" };
@@ -30,6 +31,7 @@ export default function AdminUsersPage() {
   const widgetRef = useRef(null);
 
   const [widgetReady, setWidgetReady] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("profile");
   const [showPassword, setShowPassword] = useState({});
   const [addAdmin, setAddAdmin] = useState(initialAdmin);
@@ -44,43 +46,38 @@ export default function AdminUsersPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [adminUid, setAdminUid] = useState("");
 
-  // Get the logged-in admin UID.
+  // Load the admin session and profile before showing the page.
   useEffect(() => {
-    const getAdminUid = async () => {
+    let isMounted = true;
+
+    const loadAdminData = async () => {
+      setIsPageLoading(true);
+
       try {
-        const res = await axios.get("/api/admin/adminusers/session", {
+        const sessionRes = await axios.get("/api/admin/adminusers/session", {
           withCredentials: true,
         });
 
-        if (res.data.success) {
-          setAdminUid(res.data.admin.uid);
+        if (!sessionRes.data.success || !sessionRes.data.admin?.uid) {
+          return;
         }
-      } catch (error) {
-        console.error(
-          "Unable to get admin UID:",
-          error.response?.data || error.message,
-        );
-      }
-    };
 
-    getAdminUid();
-  }, []);
+        const uid = sessionRes.data.admin.uid;
 
-  // Load the saved profile after the admin UID is available.
-  useEffect(() => {
-    if (!adminUid) return;
+        if (!isMounted) return;
 
-    const loadProfile = async () => {
-      setIsLoadingProfile(true);
+        setAdminUid(uid);
+        setIsLoadingProfile(true);
 
-      try {
-        const res = await axios.get("/api/admin/adminusers/profile", {
-          params: { UID: adminUid },
+        const profileRes = await axios.get("/api/admin/adminusers/profile", {
+          params: { UID: uid },
           withCredentials: true,
         });
 
-        if (res.data.success) {
-          const profile = res.data.profile || res.data.data;
+        if (!isMounted) return;
+
+        if (profileRes.data.success) {
+          const profile = profileRes.data.profile || profileRes.data.data;
 
           if (profile) {
             setProfileName(profile.name || "");
@@ -89,17 +86,24 @@ export default function AdminUsersPage() {
           }
         }
       } catch (error) {
-        console.log(
-          "Unable to load admin profile:",
+        console.error(
+          "Unable to load admin data:",
           error.response?.data || error.message,
         );
       } finally {
-        setIsLoadingProfile(false);
+        if (isMounted) {
+          setIsLoadingProfile(false);
+          setIsPageLoading(false);
+        }
       }
     };
 
-    loadProfile();
-  }, [adminUid]);
+    loadAdminData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const inputClass =
     "w-full rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] py-3.5 pl-11 pr-12 text-sm text-[var(--foreground)] outline-none transition-all duration-300 placeholder:text-[var(--muted)] hover:border-[var(--accent)]/50 focus:border-[var(--accent)] focus:bg-[var(--surface)] focus:ring-4 focus:ring-[var(--accent)]/10";
@@ -327,12 +331,18 @@ export default function AdminUsersPage() {
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
 
+    if (isChangingPassword) return;
+
     if (!changePassword.currentPassword || !changePassword.newPassword) {
       return toast.error("Please fill in both password fields.");
     }
 
     if (changePassword.newPassword.length < 8) {
       return toast.error("New password must contain at least 8 characters.");
+    }
+
+    if (changePassword.newPassword.length > 128) {
+      return toast.error("New password is too long.");
     }
 
     if (changePassword.currentPassword === changePassword.newPassword) {
@@ -342,7 +352,29 @@ export default function AdminUsersPage() {
     setIsChangingPassword(true);
 
     try {
-      toast.info("Connect your change-password API.");
+      const res = await axios.post(
+        "/api/admin/adminusers/change-password",
+        {
+          currentPassword: changePassword.currentPassword,
+          newPassword: changePassword.newPassword,
+        },
+        { withCredentials: true },
+      );
+
+      if (res.data.success) {
+        toast.success(res.data.msg || "Password changed successfully.");
+
+        setChangePassword({ ...initialPassword });
+        setShowPassword({});
+      } else {
+        toast.error(res.data.msg || "Unable to change your password.");
+      }
+    } catch (error) {
+      toast.error(
+        error.response?.data?.msg ||
+          error.response?.data?.message ||
+          "Unable to change your password.",
+      );
     } finally {
       setIsChangingPassword(false);
     }
@@ -399,6 +431,15 @@ export default function AdminUsersPage() {
     ["add", "Add Admin", UserPlus],
     ["password", "Change Password", LockKeyhole],
   ];
+
+  // Show the spinner until the session and profile requests finish.
+  if (isPageLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <main className="relative isolate min-h-screen overflow-hidden bg-[var(--background)] px-4 py-6 text-[var(--foreground)] transition-colors duration-300 sm:px-6 sm:py-8 lg:px-8">
