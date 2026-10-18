@@ -3,133 +3,158 @@ import cloudinary from "@/Lib/cloudinary";
 
 export const runtime = "nodejs";
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/svg+xml",
+];
+
 export async function POST(request) {
   try {
     const formData = await request.formData();
     const ids = formData.getAll("ids");
-    const files = formData.getAll("files");
-    const urls = formData.getAll("urls");
+
+    if (!ids.length) {
+      return NextResponse.json(
+        { success: false, error: "No logos received." },
+        { status: 400 },
+      );
+    }
 
     const logos = [];
-    let fileIndex = 0;
 
-    for (let index = 0; index < ids.length; index++) {
-      const id = Number(ids[index]);
-      const url = String(urls[index] || "").trim();
+    for (const rawId of ids) {
+      const id = Number(rawId);
 
       if (![1, 2, 3].includes(id)) {
         return NextResponse.json(
-          { success: false, error: `Invalid logo ID: ${ids[index]}` },
+          { success: false, error: `Invalid logo ID: ${rawId}` },
           { status: 400 },
         );
       }
 
-      const file = files[fileIndex];
-      const hasFile =
-        file && typeof file.arrayBuffer === "function" && file.size > 0;
+      const file = formData.get(`file_${id}`);
+      const externalUrl = String(formData.get(`url_${id}`) || "").trim();
 
-      // Uploaded files are stored in Cloudinary.
-      if (hasFile) {
-        fileIndex++;
+      let uploaded;
 
-        if (
-          !["image/jpeg", "image/png", "image/webp", "image/svg+xml"].includes(
-            file.type,
-          )
-        ) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: `${file.name} must be JPG, PNG, WEBP, or SVG.`,
-            },
-            { status: 400 },
-          );
+      // Upload a selected file.
+      if (file && typeof file !== "string" && file.size > 0) {
+        if (!ALLOWED_TYPES.includes(file.type)) {
+          throw new Error(`Logo ${id}: Unsupported image type.`);
         }
 
-        if (file.size > 5 * 1024 * 1024) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: `${file.name} exceeds the 5MB limit.`,
-            },
-            { status: 400 },
-          );
+        if (file.size > MAX_FILE_SIZE) {
+          throw new Error(`Logo ${id}: Image must be under 5MB.`);
         }
 
         const buffer = Buffer.from(await file.arrayBuffer());
 
-        const uploaded = await new Promise((resolve, reject) => {
+        uploaded = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             {
               folder: "brand-logos",
               resource_type: "image",
             },
             (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
+              if (error) return reject(error);
+              resolve(result);
             },
           );
 
           stream.end(buffer);
         });
+      } else if (externalUrl) {
+        // Download and upload the external image to Cloudinary.
+        let parsedUrl;
 
-        logos.push({
-          id,
-          url: uploaded.secure_url,
-          publicId: uploaded.public_id,
+        try {
+          parsedUrl = new URL(externalUrl);
+        } catch {
+          throw new Error(`Logo ${id}: Invalid image URL.`);
+        }
+
+        if (
+          !["https:", "http:"].includes(parsedUrl.protocol) ||
+          parsedUrl.username ||
+          parsedUrl.password
+        ) {
+          throw new Error(`Logo ${id}: Invalid image URL.`);
+        }
+
+        const response = await fetch(parsedUrl, {
+          signal: AbortSignal.timeout(15000),
+          redirect: "follow",
         });
 
-        continue;
-      }
-
-      // Existing external image URLs don't require a Cloudinary upload.
-      if (url) {
-        try {
-          const parsedUrl = new URL(url);
-
-          if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-            throw new Error("Invalid URL protocol");
-          }
-        } catch {
-          return NextResponse.json(
-            {
-              success: false,
-              error: `Logo ${id} has an invalid image URL.`,
-            },
-            { status: 400 },
+        if (!response.ok) {
+          throw new Error(
+            `Logo ${id}: Could not download the external image (${response.status}).`,
           );
         }
 
-        logos.push({
-          id,
-          url,
-          publicId: "",
-        });
-      }
-    }
+        const contentType = (response.headers.get("content-type") || "")
+          .split(";")[0]
+          .trim()
+          .toLowerCase();
 
-    if (!logos.length) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Please upload a logo or provide an image URL.",
-        },
-        { status: 400 },
-      );
+        if (!ALLOWED_TYPES.includes(contentType)) {
+          throw new Error(
+            `Logo ${id}: The URL did not return a supported image.`,
+          );
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+
+        if (arrayBuffer.byteLength > MAX_FILE_SIZE) {
+          throw new Error(`Logo ${id}: Image must be under 5MB.`);
+        }
+
+        if (arrayBuffer.byteLength === 0) {
+          throw new Error(`Logo ${id}: The downloaded image is empty.`);
+        }
+
+        const buffer = Buffer.from(arrayBuffer);
+
+        uploaded = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: "brand-logos",
+              resource_type: "image",
+            },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result);
+            },
+          );
+
+          stream.end(buffer);
+        });
+      } else {
+        // Ignore empty optional logo slots.
+        continue;
+      }
+
+      logos.push({
+        id,
+        url: uploaded.secure_url,
+        publicId: uploaded.public_id,
+      });
     }
 
     return NextResponse.json({
       success: true,
-      message: "Brand logos processed successfully.",
       logos,
     });
   } catch (error) {
-    console.error("Brand logos Cloudinary upload error:", error);
+    console.error("Brand logo Cloudinary upload error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        error: error.message || "Cloudinary upload failed.",
+        error: error.message || "Failed to upload logos to Cloudinary.",
       },
       { status: 500 },
     );

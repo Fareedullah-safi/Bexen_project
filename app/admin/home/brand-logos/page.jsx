@@ -110,15 +110,7 @@ export default function BrandLogos() {
   const handleSubmit = async () => {
     if (isSaving) return;
 
-    const data = {
-      logos: logos.map((logo) => ({
-        id: logo.id,
-        file: logo.file,
-        url: logo.url,
-      })),
-    };
-
-    if (!data.logos[0].file && !data.logos[0].url.trim()) {
+    if (!logos[0].file && !logos[0].url.trim()) {
       return toast.error("Please add Logo 1");
     }
 
@@ -126,10 +118,16 @@ export default function BrandLogos() {
       setIsSaving(true);
 
       const formData = new FormData();
-      data.logos.forEach((logo) => {
+
+      logos.forEach((logo) => {
         formData.append("ids", String(logo.id));
-        if (logo.file) formData.append("files", logo.file);
-        formData.append("urls", logo.url || "");
+
+        // Keep each upload matched to its own logo slot.
+        if (logo.file) {
+          formData.append(`file_${logo.id}`, logo.file);
+        }
+
+        formData.append(`url_${logo.id}`, logo.url || "");
       });
 
       const response = await fetch("/api/homepage/brand-logos/upload", {
@@ -138,8 +136,9 @@ export default function BrandLogos() {
       });
 
       const result = await response.json();
+
       if (!response.ok || !result.success) {
-        throw new Error(result.error || "Cloudinary upload failed");
+        throw new Error(result.error || "Logo upload failed.");
       }
 
       const postResponse = await fetch("/api/homepage/brand-logos", {
@@ -149,9 +148,12 @@ export default function BrandLogos() {
       });
 
       const postResult = await postResponse.json();
+
       if (!postResponse.ok || !postResult.success) {
         throw new Error(
-          postResult.error || "Failed to save logos. Check your logo links.",
+          postResult.error ||
+            postResult.message ||
+            "Failed to save logos to the database.",
         );
       }
 
@@ -160,14 +162,22 @@ export default function BrandLogos() {
       });
 
       logos.forEach((logo) => revokePreview(logo.preview));
+
       setLogos((prev) =>
-        prev.map((logo) => ({ ...logo, file: null, url: "", preview: "" })),
+        prev.map((logo) => ({
+          ...logo,
+          file: null,
+          url: "",
+          preview: "",
+        })),
       );
+
       setImageErrors({});
       toast.success("Brand logos saved successfully");
+
       await allBoxData();
     } catch (error) {
-      console.error("Submit error:", error);
+      console.error("Brand logos save error:", error);
       toast.error(error.message || "Something went wrong");
     } finally {
       setIsSaving(false);
