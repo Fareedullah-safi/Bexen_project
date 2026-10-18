@@ -3,7 +3,7 @@ import "@/app/globals.css";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "sonner";
 import WowAnimation from "@/app/Components/WowAnimation";
-import ConditionalLayout from "../Components/Admin/UI/ConditionalLayout";
+import FrontEndLayout from "@/app/Components/HelperHooks/FrontEndLayout";
 
 const monaSans = Mona_Sans({
   subsets: ["latin"],
@@ -32,9 +32,7 @@ export default function RootLayout({ children }) {
 
         <WowAnimation />
 
-        <ConditionalLayout />
-
-        {children}
+        <FrontEndLayout>{children}</FrontEndLayout>
 
         <Toaster position="top-right" richColors closeButton duration={3000} />
       </body>
