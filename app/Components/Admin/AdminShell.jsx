@@ -28,6 +28,7 @@ import {
   X,
   UserRound,
 } from "lucide-react";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 /* ============ MENU LINKS ============ */
 
@@ -137,6 +138,7 @@ export default function AdminShell({ children }) {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminImage, setAdminImage] = useState("");
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
 
   /* ============ LOAD SESSION ============ */
 
@@ -160,12 +162,15 @@ export default function AdminShell({ children }) {
           "Unable to load admin session:",
           error.response?.data || error.message,
         );
+      } finally {
+        setIsSessionLoading(false);
       }
     };
 
     loadSession();
   }, []);
-  //handle signout
+
+  // Handle sign out
   const handleSignOut = async () => {
     try {
       await axios.post(
@@ -368,6 +373,14 @@ export default function AdminShell({ children }) {
   };
 
   /* ============ PAGE LAYOUT ============ */
+
+  if (isSessionLoading || (adminUid && isProfileLoading)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--background)]">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
