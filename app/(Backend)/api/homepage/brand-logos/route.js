@@ -7,7 +7,6 @@ export async function POST(request) {
     await connectDB();
 
     const data = await request.json();
-
     const { logos } = data;
 
     if (!logos?.length) {
@@ -20,13 +19,21 @@ export async function POST(request) {
       );
     }
 
-    const brandLogo = await BrandLogo.create({
-      logos: logos.map((logo) => ({
-        id: Number(logo.id),
-        url: logo.url,
-        publicId: logo.publicId,
-      })),
-    });
+    const brandLogo = await BrandLogo.findOneAndUpdate(
+      {},
+      {
+        $push: {
+          logos: {
+            $each: logos.map((logo) => ({
+              id: Number(logo.id),
+              url: logo.url,
+              publicId: logo.publicId,
+            })),
+          },
+        },
+      },
+      { new: true, upsert: true },
+    );
 
     return Response.json({
       success: true,
@@ -46,7 +53,6 @@ export async function POST(request) {
 }
 
 // Get data from DB
-
 export async function GET() {
   try {
     await connectDB();
@@ -70,15 +76,14 @@ export async function GET() {
   }
 }
 
-// Delete icon from DB and Cloudinary
-
+// Delete logo from DB and Cloudinary
 export async function DELETE(request) {
   try {
     await connectDB();
 
     const { logoId, publicId } = await request.json();
 
-    if (!logoId || !publicId) {
+    if (logoId == null || !publicId) {
       return Response.json(
         {
           success: false,
@@ -88,18 +93,17 @@ export async function DELETE(request) {
       );
     }
 
-    // Delete directly from Cloudinary
+    // Delete from Cloudinary
     await cloudinary.uploader.destroy(publicId);
 
-    // Delete exact logo object
+    // Delete exact logo from DB
     const result = await BrandLogo.updateOne(
-      {
-        "logos._id": logoId,
-      },
+      { "logos.id": logoId, "logos.publicId": publicId },
       {
         $pull: {
           logos: {
-            _id: logoId,
+            id: logoId,
+            publicId,
           },
         },
       },

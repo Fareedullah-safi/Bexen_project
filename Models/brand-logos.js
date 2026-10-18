@@ -2,27 +2,29 @@ import mongoose from "mongoose";
 
 const BrandLogoSchema = new mongoose.Schema(
   {
-    logos: [
-      {
-        id: {
-          type: Number,
-          required: true,
+    logos: {
+      type: [
+        {
+          id: {
+            type: Number,
+            required: true,
+          },
+          publicId: {
+            type: String,
+            default: "",
+          },
+          url: {
+            type: String,
+            required: true,
+          },
         },
-
-        publicId: {
-          type: String,
-          default: "",
-        },
-        url: {
-          type: String,
-          required: true,
-        },
-      },
-    ],
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
 export default mongoose.models.BrandLogo ||
