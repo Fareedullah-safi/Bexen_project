@@ -9,35 +9,75 @@ export default function BrandLogos() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const dataLogos = async () => {
       try {
-        const res = await fetch("/api/homepage/brand-logos/postlogoDB", {
+        const res = await fetch("/api/homepage/brand-logos", {
           method: "GET",
           cache: "no-store",
         });
 
         const data = await res.json();
 
-        if (!res.ok) {
+        if (!res.ok || data?.success === false) {
           throw new Error(data?.message || "Failed to load brand logos");
         }
-        console.log(data)
-        const uploadedLogos =
-          data?.data?.flatMap(
-            (item) =>
-              item?.logos?.map((logo) => logo?.url).filter(Boolean) || [],
-          ) || [];
 
-        setDbLogos(uploadedLogos);
+        // Support common database response structures.
+        const records = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.logos)
+              ? [{ logos: data.logos }]
+              : data?.data && typeof data.data === "object"
+                ? [data.data]
+                : [];
+
+        const uploadedLogos = records.flatMap((item) => {
+          if (typeof item === "string") {
+            return item.startsWith("http") ? [item] : [];
+          }
+
+          if (Array.isArray(item?.logos)) {
+            return item.logos
+              .map((logo) => (typeof logo === "string" ? logo : logo?.url))
+              .filter(
+                (url) => typeof url === "string" && url.trim().length > 0,
+              );
+          }
+
+          if (item?.url) {
+            return [item.url];
+          }
+
+          return [];
+        });
+
+        if (isMounted) {
+          setDbLogos(uploadedLogos);
+        }
+
+        console.log("Brand logos loaded:", uploadedLogos);
       } catch (error) {
         console.error("Failed to load brand logos:", error);
-        setDbLogos([]);
+
+        if (isMounted) {
+          setDbLogos([]);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     dataLogos();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   if (loading) {
@@ -83,6 +123,7 @@ export default function BrandLogos() {
                 animation: "logoScroll 20s linear infinite",
               }}
             >
+              {/* First logo group */}
               <div className="flex shrink-0 gap-3 pr-3 sm:gap-4 sm:pr-4 md:gap-5 md:pr-5 lg:gap-6 lg:pr-6">
                 {dbLogos.map((logo, index) => (
                   <div
@@ -104,6 +145,7 @@ export default function BrandLogos() {
                 ))}
               </div>
 
+              {/* Second logo group for seamless scrolling */}
               <div className="flex shrink-0 gap-6 pr-6">
                 {dbLogos.map((logo, index) => (
                   <div

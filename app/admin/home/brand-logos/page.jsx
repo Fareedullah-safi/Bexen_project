@@ -132,7 +132,7 @@ export default function BrandLogos() {
         formData.append("urls", logo.url || "");
       });
 
-      const response = await fetch("/api/homepage/brand-logos", {
+      const response = await fetch("/api/homepage/brand-logos/upload", {
         method: "POST",
         body: formData,
       });
@@ -142,7 +142,7 @@ export default function BrandLogos() {
         throw new Error(result.error || "Cloudinary upload failed");
       }
 
-      const postResponse = await fetch("/api/homepage/brand-logos/postlogoDB", {
+      const postResponse = await fetch("/api/homepage/brand-logos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ logos: result.logos }),
@@ -179,7 +179,7 @@ export default function BrandLogos() {
 
     try {
       setIsFetching(true);
-      const response = await fetch("/api/homepage/brand-logos/postlogoDB", {
+      const response = await fetch("/api/homepage/brand-logos", {
         cache: "no-store",
       });
       const data = await response.json();
@@ -202,10 +202,9 @@ export default function BrandLogos() {
 
     try {
       setIsFetchingTitle(true);
-      const response = await fetch(
-        "/api/homepage/brand-logos/postlogoDB/title",
-        { cache: "no-store" },
-      );
+      const response = await fetch("/api/homepage/brand-logos/title", {
+        cache: "no-store",
+      });
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -228,14 +227,11 @@ export default function BrandLogos() {
 
     try {
       setIsChangingTitle(true);
-      const response = await fetch(
-        "/api/homepage/brand-logos/postlogoDB/title",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: sectionTitle.trim() }),
-        },
-      );
+      const response = await fetch("/api/homepage/brand-logos/title", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: sectionTitle.trim() }),
+      });
 
       const data = await response.json();
       if (!response.ok || !data.success) {
@@ -256,7 +252,7 @@ export default function BrandLogos() {
 
     try {
       setDeletingLogo(publicId);
-      const response = await fetch("/api/homepage/brand-logos/postlogoDB", {
+      const response = await fetch("/api/homepage/brand-logos", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ publicId, logoId: _id }),

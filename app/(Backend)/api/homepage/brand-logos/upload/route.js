@@ -1,135 +1,135 @@
+import { NextResponse } from "next/server";
 import cloudinary from "@/Lib/cloudinary";
-import connectDB from "@/Lib/mongoDB";
-import BrandLogo from "@/Models/brand-logos";
+
+export const runtime = "nodejs";
 
 export async function POST(request) {
   try {
-    await connectDB();
+    const formData = await request.formData();
+    const ids = formData.getAll("ids");
+    const files = formData.getAll("files");
+    const urls = formData.getAll("urls");
 
-    const data = await request.json();
+    const logos = [];
+    let fileIndex = 0;
 
+    for (let index = 0; index < ids.length; index++) {
+      const id = Number(ids[index]);
+      const url = String(urls[index] || "").trim();
 
-    const { logos } = data;
+      if (![1, 2, 3].includes(id)) {
+        return NextResponse.json(
+          { success: false, error: `Invalid logo ID: ${ids[index]}` },
+          { status: 400 },
+        );
+      }
 
-    if (!logos?.length) {
-      return Response.json(
+      const file = files[fileIndex];
+      const hasFile =
+        file && typeof file.arrayBuffer === "function" && file.size > 0;
+
+      // Uploaded files are stored in Cloudinary.
+      if (hasFile) {
+        fileIndex++;
+
+        if (
+          !["image/jpeg", "image/png", "image/webp", "image/svg+xml"].includes(
+            file.type,
+          )
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `${file.name} must be JPG, PNG, WEBP, or SVG.`,
+            },
+            { status: 400 },
+          );
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `${file.name} exceeds the 5MB limit.`,
+            },
+            { status: 400 },
+          );
+        }
+
+        const buffer = Buffer.from(await file.arrayBuffer());
+
+        const uploaded = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: "brand-logos",
+              resource_type: "image",
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            },
+          );
+
+          stream.end(buffer);
+        });
+
+        logos.push({
+          id,
+          url: uploaded.secure_url,
+          publicId: uploaded.public_id,
+        });
+
+        continue;
+      }
+
+      // Existing external image URLs don't require a Cloudinary upload.
+      if (url) {
+        try {
+          const parsedUrl = new URL(url);
+
+          if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+            throw new Error("Invalid URL protocol");
+          }
+        } catch {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Logo ${id} has an invalid image URL.`,
+            },
+            { status: 400 },
+          );
+        }
+
+        logos.push({
+          id,
+          url,
+          publicId: "",
+        });
+      }
+    }
+
+    if (!logos.length) {
+      return NextResponse.json(
         {
           success: false,
-          error: "Logos are required",
+          error: "Please upload a logo or provide an image URL.",
         },
         { status: 400 },
       );
     }
 
-    const brandLogo = await BrandLogo.create({
-      logos: logos.map((logo) => ({
-        id: Number(logo.id),
-        url: logo.url,
-        publicId: logo.publicId,
-      })),
-    });
-
-
-    return Response.json({
+    return NextResponse.json({
       success: true,
-      data: brandLogo,
+      message: "Brand logos processed successfully.",
+      logos,
     });
   } catch (error) {
-    console.error("MongoDB error:", error);
+    console.error("Brand logos Cloudinary upload error:", error);
 
-    return Response.json(
+    return NextResponse.json(
       {
         success: false,
-        error: error.message,
-      },
-      { status: 500 },
-    );
-  }
-}
-
-// Get data from DB
-
-export async function GET() {
-  try {
-    await connectDB();
-
-    const data = await BrandLogo.find();
-
-    return Response.json({
-      success: true,
-      data,
-    });
-  } catch (error) {
-    console.error("GET brand logos error:", error);
-
-    return Response.json(
-      {
-        success: false,
-        error: error.message,
-      },
-      { status: 500 },
-    );
-  }
-}
-
-// Delete icon from DB and Cloudinary
-
-export async function DELETE(request) {
-  try {
-    await connectDB();
-
-    const { logoId, publicId } = await request.json();
-
-    if (!logoId || !publicId) {
-      return Response.json(
-        {
-          success: false,
-          error: "logoId and publicId are required",
-        },
-        { status: 400 },
-      );
-    }
-
-    // Delete directly from Cloudinary
-    await cloudinary.uploader.destroy(publicId);
-
-    // Delete exact logo object
-    const result = await BrandLogo.updateOne(
-      {
-        "logos._id": logoId,
-      },
-      {
-        $pull: {
-          logos: {
-            _id: logoId,
-          },
-        },
-      },
-    );
-
-    if (result.modifiedCount === 0) {
-      return Response.json(
-        {
-          success: false,
-          error: "Logo not found",
-        },
-        { status: 404 },
-      );
-    }
-
-    return Response.json({
-      success: true,
-      message: "Logo deleted successfully",
-      logoId,
-      publicId,
-    });
-  } catch (error) {
-    console.error("DELETE LOGO ERROR:", error);
-
-    return Response.json(
-      {
-        success: false,
-        error: error.message,
+        error: error.message || "Cloudinary upload failed.",
       },
       { status: 500 },
     );

@@ -11,7 +11,7 @@ const BrandLogoSchema = new mongoose.Schema(
 
         publicId: {
           type: String,
-          required: true,
+          default: "",
         },
         url: {
           type: String,
