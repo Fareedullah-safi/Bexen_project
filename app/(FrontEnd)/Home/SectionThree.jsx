@@ -59,7 +59,6 @@ export default function BrandLogos() {
           setDbLogos(uploadedLogos);
         }
 
-        console.log("Brand logos loaded:", uploadedLogos);
       } catch (error) {
         console.error("Failed to load brand logos:", error);
 
