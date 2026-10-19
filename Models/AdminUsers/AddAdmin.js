@@ -7,20 +7,21 @@ const AdminUserSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
     email: {
       type: String,
       required: true,
       unique: true,
-      lowercase: true,
       trim: true,
+      lowercase: true,
     },
-
     password: {
       type: String,
       required: true,
-      select: false,
     },
+    role: {
+      type: String,
+      enum: ["super-admin", "admin", "editor", "viewer"],
+    }
   },
   {
     timestamps: true,

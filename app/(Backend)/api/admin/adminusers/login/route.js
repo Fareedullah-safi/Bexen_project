@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
-import { createHmac } from "crypto";
 import connectDB from "@/Lib/mongoDB";
 import AddAdmin from "@/Models/AdminUsers/AddAdmin";
 import bcrypt from "bcryptjs";
+import { createHmac } from "crypto";
+import { NextResponse } from "next/server";
 
 export async function POST(req) {
   try {
@@ -56,6 +56,7 @@ export async function POST(req) {
     const sessionData = {
       uid: admin._id.toString(),
       email: admin.email,
+      role: admin.role,
       exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24,
     };
 

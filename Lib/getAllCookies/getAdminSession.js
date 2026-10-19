@@ -38,6 +38,7 @@ export async function getAdminSession() {
     if (
       !session.uid ||
       !session.email ||
+      !session.role ||
       !session.exp ||
       session.exp <= Math.floor(Date.now() / 1000)
     ) {
@@ -47,6 +48,7 @@ export async function getAdminSession() {
     return {
       uid: session.uid,
       email: session.email,
+      role : session.role,
     };
   } catch {
     return null;

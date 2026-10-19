@@ -11,12 +11,12 @@ export async function GET() {
         { status: 401 },
       );
     }
-
     return NextResponse.json({
       success: true,
       admin: {
         uid: admin.uid,
         email: admin.email,
+        role: admin.role
       },
     });
   } catch (error) {
