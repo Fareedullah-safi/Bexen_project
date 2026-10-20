@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { requireDeletePermission, requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
+import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
 import ReviewSection from "@/Models/counters/ReviewSection";
-import cloudinary from "@/Lib/cloudinary";
+import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
@@ -49,6 +50,11 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     await connectDB();
 
     const body = await req.json();
@@ -90,6 +96,18 @@ export async function POST(req) {
 
 export async function DELETE(req) {
   try {
+    //USER ADMIN CHECKS
+    const permission = await requireDeletePermission();
+
+    console.log("DELETE AUTHORIZATION:", {
+      authorized: permission.authorized,
+      role: permission.admin?.role,
+    });
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+    //USER ADMIN CHECKS
     await connectDB();
 
     const { reviewId, publicId } = await req.json();

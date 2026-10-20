@@ -1,7 +1,11 @@
-import { NextResponse } from "next/server";
-import connectDB from "@/Lib/mongoDB";
+import {
+  requireDeletePermission,
+  requireEditPermission,
+} from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
+import connectDB from "@/Lib/mongoDB";
 import Cards from "@/Models/Projects/Cards";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -24,6 +28,11 @@ export async function GET() {
 
 export async function POST(request) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     await connectDB();
 
     const formData = await request.formData();
@@ -123,6 +132,18 @@ export async function POST(request) {
 
 export async function DELETE(request) {
   try {
+    //USER ADMIN CHECKS
+    const permission = await requireDeletePermission();
+
+    console.log("DELETE AUTHORIZATION:", {
+      authorized: permission.authorized,
+      role: permission.admin?.role,
+    });
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+    //USER ADMIN CHECKS
     await connectDB();
 
     const { searchParams } = new URL(request.url);

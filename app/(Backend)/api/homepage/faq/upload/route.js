@@ -1,7 +1,13 @@
-import { NextResponse } from "next/server";
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
+import { NextResponse } from "next/server";
 export async function POST(request) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     let image;
 
     if (

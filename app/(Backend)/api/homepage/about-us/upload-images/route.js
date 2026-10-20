@@ -1,69 +1,60 @@
-import { NextResponse } from "next/server";
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function uploadImage(file, imageUrl, folder) {
   // Upload a local file.
-  if (
-    file &&
-    typeof file.arrayBuffer === "function" &&
-    file.size > 0
-  ) {
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
+  const permission = await requireEditPermission();
+
+  if (!permission.authorized) {
+    return permission.response;
+  }
+
+  if (file && typeof file.arrayBuffer === "function" && file.size > 0) {
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
     if (!allowedTypes.includes(file.type)) {
-      throw new Error(
-        "Only JPG, PNG, and WEBP images are allowed."
-      );
+      throw new Error("Only JPG, PNG, and WEBP images are allowed.");
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      throw new Error(
-        "Image size must not exceed 5MB."
-      );
+      throw new Error("Image size must not exceed 5MB.");
     }
 
-    const buffer = Buffer.from(
-      await file.arrayBuffer()
-    );
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-    const result = await new Promise(
-      (resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            folder: `bexon/${folder}`,
-            resource_type: "image",
-            secure: true,
-          },
-          (error, uploadedResult) => {
-            if (error) {
-              reject(error);
-              return;
-            }
-
-            if (!uploadedResult?.secure_url) {
-              reject(
-                new Error(
-                  "Cloudinary upload succeeded without returning secure_url."
-                )
-              );
-              return;
-            }
-
-            resolve(uploadedResult);
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: `bexon/${folder}`,
+          resource_type: "image",
+          secure: true,
+        },
+        (error, uploadedResult) => {
+          if (error) {
+            reject(error);
+            return;
           }
-        );
 
-        stream.on("error", reject);
-        stream.end(buffer);
-      }
-    );
+          if (!uploadedResult?.secure_url) {
+            reject(
+              new Error(
+                "Cloudinary upload succeeded without returning secure_url.",
+              ),
+            );
+            return;
+          }
+
+          resolve(uploadedResult);
+        },
+      );
+
+      stream.on("error", reject);
+      stream.end(buffer);
+    });
 
     return {
       url: result.secure_url,
@@ -72,10 +63,7 @@ async function uploadImage(file, imageUrl, folder) {
   }
 
   // Upload an image from a URL.
-  if (
-    typeof imageUrl === "string" &&
-    imageUrl.trim()
-  ) {
+  if (typeof imageUrl === "string" && imageUrl.trim()) {
     let parsedUrl;
 
     try {
@@ -84,28 +72,18 @@ async function uploadImage(file, imageUrl, folder) {
       throw new Error("Please provide a valid image URL.");
     }
 
-    if (
-      parsedUrl.protocol !== "https:" &&
-      parsedUrl.protocol !== "http:"
-    ) {
-      throw new Error(
-        "Image URL must use HTTP or HTTPS."
-      );
+    if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+      throw new Error("Image URL must use HTTP or HTTPS.");
     }
 
-    const result = await cloudinary.uploader.upload(
-      parsedUrl.toString(),
-      {
-        folder: `bexon/${folder}`,
-        resource_type: "image",
-        secure: true,
-      }
-    );
+    const result = await cloudinary.uploader.upload(parsedUrl.toString(), {
+      folder: `bexon/${folder}`,
+      resource_type: "image",
+      secure: true,
+    });
 
     if (!result?.secure_url) {
-      throw new Error(
-        "Cloudinary did not return secure_url."
-      );
+      throw new Error("Cloudinary did not return secure_url.");
     }
 
     return {
@@ -119,6 +97,12 @@ async function uploadImage(file, imageUrl, folder) {
 }
 
 export async function POST(request) {
+  const permission = await requireEditPermission();
+
+if (!permission.authorized) {
+  return permission.response;
+}
+  
   try {
     const formData = await request.formData();
 
@@ -127,36 +111,27 @@ export async function POST(request) {
     const thumbnailFile = formData.get("thumbnailImage");
 
     const mainImageUrl = formData.get("mainImageUrl");
-    const thumbnailImageUrl = formData.get(
-      "thumbnailImageUrl"
-    );
+    const thumbnailImageUrl = formData.get("thumbnailImageUrl");
 
     const images = {};
 
     // Upload main image if supplied.
     if (
       (mainFile instanceof File && mainFile.size > 0) ||
-      (typeof mainImageUrl === "string" &&
-        mainImageUrl.trim())
+      (typeof mainImageUrl === "string" && mainImageUrl.trim())
     ) {
-      images.mainImage = await uploadImage(
-        mainFile,
-        mainImageUrl,
-        "about-us"
-      );
+      images.mainImage = await uploadImage(mainFile, mainImageUrl, "about-us");
     }
 
     // Upload thumbnail image if supplied.
     if (
-      (thumbnailFile instanceof File &&
-        thumbnailFile.size > 0) ||
-      (typeof thumbnailImageUrl === "string" &&
-        thumbnailImageUrl.trim())
+      (thumbnailFile instanceof File && thumbnailFile.size > 0) ||
+      (typeof thumbnailImageUrl === "string" && thumbnailImageUrl.trim())
     ) {
       images.thumbnailImage = await uploadImage(
         thumbnailFile,
         thumbnailImageUrl,
-        "about-us"
+        "about-us",
       );
     }
 
@@ -171,11 +146,9 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: false,
-        message:
-          error.message ||
-          "Failed to upload About Us images.",
+        message: error.message || "Failed to upload About Us images.",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }

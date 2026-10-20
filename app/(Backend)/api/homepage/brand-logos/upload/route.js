@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import cloudinary from "@/Lib/cloudinary";
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
+
 
 export const runtime = "nodejs";
 
@@ -13,6 +15,12 @@ const ALLOWED_TYPES = [
 
 export async function POST(request) {
   try {
+const permission = await requireEditPermission();
+
+if (!permission.authorized) {
+  return permission.response;
+}
+
     const formData = await request.formData();
     const ids = formData.getAll("ids");
 

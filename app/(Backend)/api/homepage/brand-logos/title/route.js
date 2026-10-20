@@ -1,8 +1,14 @@
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import connectDB from "@/Lib/mongoDB";
 import BrandLogoTitle from "@/Models/brand-logo-title";
 
 export async function POST(request) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     await connectDB();
 
     const { title } = await request.json();

@@ -1,9 +1,15 @@
-import { NextResponse } from "next/server";
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import connectDB from "@/Lib/mongoDB";
 import ProjectsHeader from "@/Models/Projects/ProjectsHeader";
+import { NextResponse } from "next/server";
 
 export async function POST(request) {
   try {
+    const permission = await requireEditPermission();
+
+if (!permission.authorized) {
+  return permission.response;
+}
     await connectDB();
     const body = await request.json();
     if (!body) {

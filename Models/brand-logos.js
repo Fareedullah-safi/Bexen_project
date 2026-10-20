@@ -6,8 +6,8 @@ const BrandLogoSchema = new mongoose.Schema(
       type: [
         {
           id: {
-            type: Number,
-            required: true,
+            type: String,
+            ref: "BrandLogo",
           },
           publicId: {
             type: String,
@@ -24,7 +24,7 @@ const BrandLogoSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 export default mongoose.models.BrandLogo ||

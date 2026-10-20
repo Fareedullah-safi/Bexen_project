@@ -1,14 +1,7 @@
-import { NextResponse } from "next/server";
 import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
 import BlogSection from "@/Models/articles-section/BlogSection";
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+import { NextResponse } from "next/server";
 
 // Helper: delete an image from Cloudinary by its public ID
 async function deleteFromCloudinary(publicId) {
@@ -104,6 +97,40 @@ export async function POST(request) {
     console.error("POST Error:", error);
     return NextResponse.json(
       { success: false, message: "Failed to save." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(req) {
+  try {
+    await connectDB();
+
+    const { _id } = await req.json();
+
+    const section = await BlogSection.findOne();
+    const article = section?.posts.id(_id);
+
+    if (!article) {
+      return NextResponse.json(
+        { success: false, message: "Article not found." },
+        { status: 404 },
+      );
+    }
+
+    if (article.publicId) {
+      await cloudinary.uploader.destroy(article.publicId);
+    }
+
+    article.deleteOne();
+    await section.save();
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete article error:", error);
+
+    return NextResponse.json(
+      { success: false, message: "Delete failed." },
       { status: 500 },
     );
   }

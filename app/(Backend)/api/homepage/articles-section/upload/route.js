@@ -1,5 +1,4 @@
-
-import { v2 as cloudinary } from "cloudinary";
+import cloudinary from "@/Lib/cloudinary";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -25,12 +24,7 @@ export async function POST(request) {
       );
     }
 
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "image/gif",
-    ];
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
@@ -49,8 +43,7 @@ export async function POST(request) {
     // Only permit deletion from this blog image folder.
     if (
       oldPublicId &&
-      (typeof oldPublicId !== "string" ||
-        !oldPublicId.startsWith(FOLDER))
+      (typeof oldPublicId !== "string" || !oldPublicId.startsWith(FOLDER))
     ) {
       return NextResponse.json(
         { message: "Invalid old image public ID." },
@@ -85,14 +78,12 @@ export async function POST(request) {
 
     if (oldPublicId && oldPublicId !== uploadedImage.public_id) {
       try {
-        const deletedImage = await cloudinary.uploader.destroy(
-          oldPublicId,
-          { resource_type: "image" },
-        );
+        const deletedImage = await cloudinary.uploader.destroy(oldPublicId, {
+          resource_type: "image",
+        });
 
         oldImageDeleted =
-          deletedImage.result === "ok" ||
-          deletedImage.result === "not found";
+          deletedImage.result === "ok" || deletedImage.result === "not found";
 
         if (!oldImageDeleted) {
           console.error(
@@ -106,6 +97,7 @@ export async function POST(request) {
       }
     }
 
+    console.log(oldImageDeleted);
     return NextResponse.json({
       success: true,
       url: uploadedImage.secure_url,

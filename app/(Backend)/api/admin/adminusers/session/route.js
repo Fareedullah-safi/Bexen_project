@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
 import { getAdminSession } from "@/Lib/getAllCookies/getAdminSession";
+import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
     const admin = await getAdminSession();
+    console.log(admin);
 
     if (!admin) {
       return NextResponse.json(
@@ -16,7 +17,7 @@ export async function GET() {
       admin: {
         uid: admin.uid,
         email: admin.email,
-        role: admin.role
+        role: admin.role,
       },
     });
   } catch (error) {

@@ -1,23 +1,24 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 import {
+  ArrowDown,
+  ArrowUp,
   Box,
+  ImagePlus,
+  Link as LinkIcon,
+  Loader2,
   Plus,
   Save,
   Trash2,
   Upload,
-  ImagePlus,
-  ArrowUp,
-  ArrowDown,
-  Link as LinkIcon,
-  Loader2,
 } from "lucide-react";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
 
-/* ==================== Image Picker Component ==================== */
+/* ==================== Image Picker ==================== */
+
 function ImagePicker({ value, onChange, disabled }) {
   const fileRef = useRef(null);
   const [preview, setPreview] = useState("");
@@ -148,9 +149,11 @@ function ImagePicker({ value, onChange, disabled }) {
 
         <div className="flex items-center gap-3">
           <div className="h-px flex-1 bg-[var(--border)]" />
+
           <span className="text-[11px] font-bold tracking-wider text-[var(--muted)]">
             OR
           </span>
+
           <div className="h-px flex-1 bg-[var(--border)]" />
         </div>
 
@@ -176,7 +179,8 @@ function ImagePicker({ value, onChange, disabled }) {
   );
 }
 
-/* ==================== Main Admin Page Component ==================== */
+/* ==================== Main Admin Page ==================== */
+
 export default function SolutionsAdmin() {
   const [badge, setBadge] = useState("OUR SOLUTIONS");
   const [headingOne, setHeadingOne] = useState("Solutions to Transform");
@@ -188,14 +192,21 @@ export default function SolutionsAdmin() {
   const [deletingId, setDeletingId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  /* ---------------- 1. Load Data on Startup ---------------- */
+  /* ==================== Load Data ==================== */
+
   useEffect(() => {
     async function loadData() {
       try {
         const res = await fetch("/api/homepage/services");
-        const result = await res.json();
+        const result = await res.json().catch(() => ({}));
 
-        if (res.ok && result.success && result.data) {
+        if (!res.ok || result.success === false) {
+          throw new Error(
+            result.message || result.error || "Failed to load saved data",
+          );
+        }
+
+        if (result.data) {
           const d = result.data;
 
           setBadge(d.badge || "OUR SOLUTIONS");
@@ -220,8 +231,7 @@ export default function SolutionsAdmin() {
           addSolution();
         }
       } catch (err) {
-        console.error("Load error:", err);
-        toast.error("Failed to load saved data");
+        toast.error(err.message || "Failed to load saved data");
         addSolution();
       } finally {
         setIsLoading(false);
@@ -231,7 +241,8 @@ export default function SolutionsAdmin() {
     loadData();
   }, []);
 
-  /* ---------------- 2. Card Helpers ---------------- */
+  /* ==================== Card Helpers ==================== */
+
   function updateSolution(id, field, value) {
     setSolutions((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
@@ -279,7 +290,8 @@ export default function SolutionsAdmin() {
     setSolutions(list);
   }
 
-  /* ---------------- 3. Delete Using Only MongoDB _id ---------------- */
+  /* ==================== Delete Solution ==================== */
+
   async function handleDeleteCard(cardId) {
     if (deletingId) return;
 
@@ -302,23 +314,25 @@ export default function SolutionsAdmin() {
         body: JSON.stringify({ cardId }),
       });
 
-      const result = await res.json();
+      const result = await res.json().catch(() => ({}));
 
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || "Failed to delete card");
+      if (!res.ok || result.success === false) {
+        throw new Error(
+          result.message || result.error || "Failed to delete card",
+        );
       }
 
       setSolutions((prev) => prev.filter((c) => c.id !== cardId));
       toast.success("Card deleted successfully");
     } catch (error) {
-      console.error(error);
       toast.error(error.message || "Failed to delete card");
     } finally {
       setDeletingId(null);
     }
   }
 
-  /* ---------------- 4. Save Data (POST) ---------------- */
+  /* ==================== Save Solutions ==================== */
+
   async function handleSave(e) {
     e.preventDefault();
 
@@ -373,10 +387,12 @@ export default function SolutionsAdmin() {
         body: formData,
       });
 
-      const result = await res.json();
+      const result = await res.json().catch(() => ({}));
 
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || "Failed to save");
+      if (!res.ok || result.success === false) {
+        throw new Error(
+          result.message || result.error || "Failed to save solutions",
+        );
       }
 
       toast.success("Solutions saved successfully");
@@ -393,18 +409,21 @@ export default function SolutionsAdmin() {
         );
       }
     } catch (err) {
-      console.error("Save error:", err);
       toast.error(err.message || "Something went wrong");
     } finally {
       setIsSaving(false);
     }
   }
 
+  /* ==================== Styles ==================== */
+
   const inputClass =
     "w-full rounded-2xl border border-[var(--border)] bg-[var(--background)] px-4 py-3.5 text-sm text-[var(--foreground)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-60";
 
   const labelClass =
     "mb-2 block text-sm font-semibold text-[var(--foreground)]";
+
+  /* ==================== Loading State ==================== */
 
   if (isLoading) {
     return (
@@ -416,6 +435,8 @@ export default function SolutionsAdmin() {
       </div>
     );
   }
+
+  /* ==================== UI ==================== */
 
   return (
     <div className="min-h-screen w-full bg-[var(--background)] text-[var(--foreground)]">
@@ -453,7 +474,6 @@ export default function SolutionsAdmin() {
             <div className="grid gap-5 md:grid-cols-2">
               <div>
                 <label className={labelClass}>Badge Text</label>
-
                 <input
                   value={badge}
                   onChange={(e) => setBadge(e.target.value)}
@@ -465,7 +485,6 @@ export default function SolutionsAdmin() {
 
               <div>
                 <label className={labelClass}>Highlight Word</label>
-
                 <input
                   value={highlight}
                   onChange={(e) => setHighlight(e.target.value)}
@@ -477,7 +496,6 @@ export default function SolutionsAdmin() {
 
               <div>
                 <label className={labelClass}>Heading Line 1</label>
-
                 <input
                   value={headingOne}
                   onChange={(e) => setHeadingOne(e.target.value)}
@@ -489,7 +507,6 @@ export default function SolutionsAdmin() {
 
               <div>
                 <label className={labelClass}>Heading Line 2</label>
-
                 <input
                   value={headingTwo}
                   onChange={(e) => setHeadingTwo(e.target.value)}
@@ -587,7 +604,6 @@ export default function SolutionsAdmin() {
                     <div className="space-y-4">
                       <div>
                         <label className={labelClass}>Card Title</label>
-
                         <input
                           value={item.title}
                           onChange={(e) =>
@@ -601,7 +617,6 @@ export default function SolutionsAdmin() {
 
                       <div>
                         <label className={labelClass}>Description</label>
-
                         <textarea
                           value={item.description}
                           onChange={(e) =>
@@ -621,7 +636,6 @@ export default function SolutionsAdmin() {
 
                     <div>
                       <label className={labelClass}>Card Image</label>
-
                       <ImagePicker
                         value={item.image}
                         disabled={isSaving || deletingId === item.id}

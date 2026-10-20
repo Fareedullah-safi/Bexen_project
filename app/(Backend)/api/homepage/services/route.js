@@ -1,7 +1,11 @@
-import { NextResponse } from "next/server";
+import {
+  requireDeletePermission,
+  requireEditPermission,
+} from "@/Lib/AdminPermission/adminPermissions";
+import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
 import Solutions from "@/Models/Services";
-import cloudinary from "@/Lib/cloudinary";
+import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +51,11 @@ export async function GET() {
 /* ---------------- 2. POST: Save & Upload ---------------- */
 export async function POST(req) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     await connectDB();
     const formData = await req.formData();
 
@@ -117,6 +126,19 @@ export async function POST(req) {
 /* ---------------- 3. DELETE: Using only MongoDB cardId ---------------- */
 export async function DELETE(req) {
   try {
+    // USER ADMIN CHECKS
+    const permission = await requireDeletePermission();
+
+    console.log("DELETE AUTHORIZATION:", {
+      authorized: permission.authorized,
+      role: permission.admin?.role,
+    });
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+
+    // USER ADMIN CHECKS
     await connectDB();
     const { cardId } = await req.json();
 

@@ -7,6 +7,8 @@ import { ImagePlus, Link, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import Spinner from "@/app/admin/Components/Admin/Spinner";
 
+/* ==================== ICON PICKER ==================== */
+
 function IconPicker({ icon, onChange }) {
   const fileRef = useRef(null);
   const [imageError, setImageError] = useState(false);
@@ -176,6 +178,8 @@ function IconPicker({ icon, onChange }) {
   );
 }
 
+/* ==================== HELPERS ==================== */
+
 const createEmptyIcon = () => ({
   mode: "file",
   file: null,
@@ -194,7 +198,6 @@ const createEmptyCard = () => ({
 const normalizeFormData = (data) => ({
   tagline: data?.tagline || "",
   title: data?.title || "",
-
   cards: (data?.cards || []).map((card) => {
     const { url = "", publicId = "" } = card.icon || {};
 
@@ -213,6 +216,8 @@ const normalizeFormData = (data) => ({
   }),
 });
 
+/* ==================== FEATURES ==================== */
+
 export default function Features() {
   const [form, setForm] = useState({
     tagline: "",
@@ -223,6 +228,8 @@ export default function Features() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
+  /* ==================== FETCH DATA ==================== */
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -232,15 +239,17 @@ export default function Features() {
 
         const result = await response.json();
 
-        if (!response.ok) {
-          throw new Error(result?.error || "Failed to load data");
+        if (!response.ok || result?.success === false) {
+          throw new Error(
+            result?.message || result?.error || "Failed to load data",
+          );
         }
 
         if (result?.data) {
           setForm(normalizeFormData(result.data));
         }
       } catch (error) {
-        console.error(error);
+        console.error("Load features error:", error);
         toast.error(error.message || "Failed to load features data");
       } finally {
         setFetching(false);
@@ -249,6 +258,8 @@ export default function Features() {
 
     loadData();
   }, []);
+
+  /* ==================== FORM HANDLERS ==================== */
 
   const setField = (name, value) => {
     setForm((prev) => ({
@@ -273,6 +284,8 @@ export default function Features() {
     }));
   };
 
+  /* ==================== DELETE CARD ==================== */
+
   const removeCard = async (cardId, index) => {
     if (!cardId) {
       setForm((prev) => ({
@@ -289,15 +302,15 @@ export default function Features() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          cardId,
-        }),
+        body: JSON.stringify({ cardId }),
       });
 
       const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result?.error || "Failed to delete card");
+      if (!response.ok || result?.success === false) {
+        throw new Error(
+          result?.message || result?.error || "Failed to delete card",
+        );
       }
 
       setForm((prev) => ({
@@ -311,6 +324,8 @@ export default function Features() {
       toast.error(error.message || "Failed to delete card");
     }
   };
+
+  /* ==================== SAVE FEATURES ==================== */
 
   const handleSubmit = async () => {
     if (loading) return;
@@ -348,8 +363,10 @@ export default function Features() {
 
       const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result?.error || "Failed to save features");
+      if (!response.ok || result?.success === false) {
+        throw new Error(
+          result?.message || result?.error || "Failed to save features",
+        );
       }
 
       if (result?.data) {
@@ -358,20 +375,24 @@ export default function Features() {
 
       toast.success("Changes saved successfully!");
     } catch (error) {
-      console.error(error);
+      console.error("Save features error:", error);
       toast.error(error.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
 
+  /* ==================== LOADING ==================== */
+
   if (fetching) {
     return (
-      <div className="flex w-full items-center justify-center h-[85vh]">
+      <div className="flex h-[85vh] w-full items-center justify-center">
         <Spinner />
       </div>
     );
   }
+
+  /* ==================== UI ==================== */
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">

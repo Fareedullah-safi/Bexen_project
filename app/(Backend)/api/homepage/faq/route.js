@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import dbConnect from "@/Lib/mongoDB";
 import Faq from "@/Models/faq/FAQ";
+import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
@@ -19,6 +20,11 @@ export async function GET() {
 
 export async function PUT(request) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     await dbConnect();
 
     const body = await request.json();

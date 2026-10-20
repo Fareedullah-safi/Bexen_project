@@ -1,25 +1,27 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
+import axios from "axios";
 import {
   BookOpen,
-  Plus,
-  Trash2,
-  ImagePlus,
-  Save,
-  Type,
   CalendarDays,
-  UserRound,
-  Tag,
-  Link as LinkIcon,
   ChevronDown,
   ChevronUp,
+  ImagePlus,
+  Link as LinkIcon,
   LoaderCircle,
+  Plus,
+  Save,
+  Tag,
+  Trash2,
+  Type,
+  UserRound,
 } from "lucide-react";
+import Script from "next/script";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
 
-/* ============ CONSTANTS ============ */
+const API_URL = "/api/homepage/articles-section";
 
 const months = [
   "JAN",
@@ -40,121 +42,37 @@ const emptyPost = {
   day: "",
   month: "OCT",
   image: "",
+  publicId: "",
   category: "",
   author: "Admin",
   title: "",
   link: "",
 };
 
-/* ============ SHARED TAILWIND STYLES ============ */
+/* ---------- styles ---------- */
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none transition focus:border-[#1e8a8a] dark:border-[#263442] dark:bg-[#16212c] dark:text-gray-100";
-
+  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none focus:border-[#1e8a8a] dark:border-[#263442] dark:bg-[#16212c] dark:text-gray-100";
 const labelClass =
   "mb-2 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200";
-
 const cardClass =
   "rounded-2xl border border-gray-200 bg-white p-5 dark:border-[#263442] dark:bg-[#111a23]";
+const primaryBtn =
+  "flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#176f6f] disabled:opacity-60";
+const outlineBtn =
+  "flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] hover:bg-[#e7f5f5] disabled:opacity-60 dark:hover:bg-[#162c32]";
 
-/* ============ PURE HELPER FUNCTIONS ============ */
-
-function validLink(value = "") {
-  const link = value.trim();
-  if (link.startsWith("/")) return !link.startsWith("//") && !/\s/.test(link);
-  try {
-    const url = new URL(link);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-
-function validImageUrl(value = "") {
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-
-function isValidImageFile(file) {
-  const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-  if (!allowed.includes(file.type))
-    return "Choose a JPG, PNG, WEBP, or GIF image.";
-  if (file.size > 5 * 1024 * 1024) return "Image must be smaller than 5 MB.";
-  return null;
-}
-
-function validatePost(post, hasSelectedFile = false) {
-  const result = {};
-  if (post.title.trim().length < 3 || post.title.trim().length > 120)
-    result.title = "Title must be 3–120 characters.";
-  if (!hasSelectedFile && !validImageUrl(post.image))
-    result.image = "Choose an image or enter a valid image URL.";
-  if (!/^\d{1,2}$/.test(post.day) || +post.day < 1 || +post.day > 31)
-    result.day = "Enter a day from 1 to 31.";
-  if (!months.includes(post.month.toUpperCase().trim()))
-    result.month = "Select a valid month.";
-  if (!post.category.trim() || post.category.trim().length > 40)
-    result.category = "Category is required (max 40 characters).";
-  if (!post.author.trim() || post.author.trim().length > 60)
-    result.author = "Author is required (max 60 characters).";
-  if (!validLink(post.link)) result.link = "Enter a valid article link.";
-  return result;
-}
-
-async function uploadImage(file) {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/homepage/articles-section/upload", {
-    method: "POST",
-    body: formData,
-  });
-  const data = await response.json();
-
-  if (!response.ok || !data.url) {
-    throw new Error(data.message || "Image upload failed.");
-  }
-  return data.url;
-}
-
-async function saveBlogSection(payload) {
-  const response = await fetch("/api/homepage/articles-section", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const result = await response.json();
-
-  if (!response.ok || !result.success) {
-    throw new Error(result.message || "Failed to save blog section.");
-  }
-  return result.data || payload;
-}
-
-// Fetch existing data from backend
-async function fetchBlogSection() {
-  const response = await fetch("/api/homepage/articles-section");
-  const result = await response.json();
-
-  if (!response.ok || !result.success) {
-    throw new Error(result.message || "Failed to load blog section.");
-  }
-  return result.data;
-}
-
-/* ============ SMALL REUSABLE UI PIECES ============ */
+/* ---------- small components ---------- */
 
 function ErrorText({ children }) {
-  if (!children) return null;
-  return <p className="mt-1 text-xs text-red-500">{children}</p>;
+  return children ? (
+    <p className="mt-1 text-xs text-red-500">{children}</p>
+  ) : null;
 }
 
 function ImagePreview({ src, alt }) {
   const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
 
   if (!src || failed) {
     return (
@@ -190,24 +108,17 @@ function Field({ label, icon: Icon, error, className = "", ...props }) {
   );
 }
 
-function SelectField({
-  label,
-  icon: Icon,
-  error,
-  options,
-  className = "",
-  ...props
-}) {
+function SelectField({ label, icon: Icon, error, options, ...props }) {
   return (
-    <div className={className}>
+    <div>
       <label className={labelClass}>
         {Icon && <Icon size={15} />}
         {label}
       </label>
       <select className={inputClass} {...props}>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
           </option>
         ))}
       </select>
@@ -217,6 +128,12 @@ function SelectField({
 }
 
 function ArticleFields({ data, onChange, errors }) {
+  const bind = (name) => ({
+    value: data[name],
+    error: errors[name],
+    onChange: (e) => onChange(name, e.target.value),
+  });
+
   return (
     <>
       <Field
@@ -226,35 +143,27 @@ function ArticleFields({ data, onChange, errors }) {
         min="1"
         max="31"
         placeholder="24"
-        value={data.day}
-        error={errors.day}
-        onChange={(e) => onChange("day", e.target.value)}
+        {...bind("day")}
       />
       <SelectField
         label="Month"
         icon={CalendarDays}
-        value={data.month}
         options={months}
-        error={errors.month}
-        onChange={(e) => onChange("month", e.target.value)}
+        {...bind("month")}
       />
       <Field
         label="Category"
         icon={Tag}
         maxLength={40}
         placeholder="BUSINESS"
-        value={data.category}
-        error={errors.category}
-        onChange={(e) => onChange("category", e.target.value)}
+        {...bind("category")}
       />
       <Field
         label="Author"
         icon={UserRound}
         maxLength={60}
         placeholder="Admin"
-        value={data.author}
-        error={errors.author}
-        onChange={(e) => onChange("author", e.target.value)}
+        {...bind("author")}
       />
       <Field
         label="Article Title"
@@ -262,221 +171,319 @@ function ArticleFields({ data, onChange, errors }) {
         maxLength={120}
         placeholder="Enter article title"
         className="sm:col-span-2"
-        value={data.title}
-        error={errors.title}
-        onChange={(e) => onChange("title", e.target.value)}
+        {...bind("title")}
       />
       <Field
         label="Article Link"
         icon={LinkIcon}
         placeholder="/blog/my-article or https://example.com/article"
         className="sm:col-span-2"
-        value={data.link}
-        error={errors.link}
-        onChange={(e) => onChange("link", e.target.value)}
+        {...bind("link")}
       />
     </>
   );
 }
 
-/* ============ MAIN COMPONENT ============ */
+/* Confirmation popup shown before deleting */
+function ConfirmDialog({ article, deleting, onCancel, onConfirm }) {
+  if (!article) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={() => !deleting && onCancel()}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-[#111a23]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-bold">Delete article?</h3>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+          “{article.title || "Untitled"}” will be permanently removed.
+          {article._id ? " This cannot be undone." : ""}
+        </p>
+
+        <div className="mt-5 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={deleting}
+            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-60 dark:border-[#263442] dark:hover:bg-[#16212c]"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={deleting}
+            className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {deleting && <LoaderCircle size={16} className="animate-spin" />}
+            {deleting ? "Deleting..." : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- helpers ---------- */
+
+function validLink(value = "") {
+  const link = value.trim();
+  if (link.startsWith("/")) return !link.startsWith("//") && !/\s/.test(link);
+
+  try {
+    return ["http:", "https:"].includes(new URL(link).protocol);
+  } catch {
+    return false;
+  }
+}
+
+function validatePost(post) {
+  const errors = {};
+  const title = post.title.trim();
+  const day = Number(post.day);
+
+  if (title.length < 3 || title.length > 120)
+    errors.title = "Title must be 3–120 characters.";
+  if (!/^https?:\/\//i.test(post.image || ""))
+    errors.image = "Please upload an image.";
+  if (!Number.isInteger(day) || day < 1 || day > 31)
+    errors.day = "Enter a day from 1 to 31.";
+  if (!months.includes(String(post.month).toUpperCase()))
+    errors.month = "Select a valid month.";
+  if (!post.category.trim() || post.category.trim().length > 40)
+    errors.category = "Category is required (max 40 characters).";
+  if (!post.author.trim() || post.author.trim().length > 60)
+    errors.author = "Author is required (max 60 characters).";
+  if (!validLink(post.link)) errors.link = "Enter a valid article link.";
+
+  return errors;
+}
+
+// Make every post from the API look the same in state
+const normalizePost = (post) => ({
+  ...post,
+  _id: post._id ? String(post._id) : "",
+  publicId: post.publicId || "",
+});
+
+const getErrorMessage = (error, fallback) =>
+  error.response?.data?.message || error.message || fallback;
+
+/* ---------- main component ---------- */
 
 export default function BlogSectionAdmin() {
-  // Start with empty state — data comes from backend
   const [sectionTitle, setSectionTitle] = useState("");
   const [highlightedTitle, setHighlightedTitle] = useState("");
   const [posts, setPosts] = useState([]);
-
   const [newPost, setNewPost] = useState(emptyPost);
-  const [newPreview, setNewPreview] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
 
   const [openPosts, setOpenPosts] = useState([]);
-  const [errors, setErrors] = useState({});
+  const [headingErrors, setHeadingErrors] = useState({});
+  const [newPostErrors, setNewPostErrors] = useState({});
   const [postErrors, setPostErrors] = useState({});
 
-  const [isUploading, setIsUploading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [cloudinaryReady, setCloudinaryReady] = useState(false);
 
-  const fileRef = useRef(null);
+  const [postToDelete, setPostToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
-  /* ---------- LOAD DATA FROM BACKEND ON MOUNT ---------- */
+  const widgetRef = useRef(null);
+  const onUploadedRef = useRef(null);
+
+  /* ----- load ----- */
 
   useEffect(() => {
+    async function loadData() {
+      try {
+        const { data: res } = await axios.get(API_URL);
+        if (!res.success) throw new Error(res.message);
+
+        setSectionTitle(res.data?.sectionTitle || "The Ultimate");
+        setHighlightedTitle(res.data?.highlightedTitle || "Resource.");
+        setPosts((res.data?.posts || []).map(normalizePost));
+      } catch (error) {
+        toast.error(getErrorMessage(error, "Could not load blog section."));
+      } finally {
+        setLoading(false);
+      }
+    }
+
     loadData();
   }, []);
 
-  async function loadData() {
-    setIsLoading(true);
-    try {
-      const data = await fetchBlogSection();
+  /* ----- image upload ----- */
 
-      if (data) {
-        setSectionTitle(data.sectionTitle || "");
-        setHighlightedTitle(data.highlightedTitle || "");
-        setPosts(
-          (data.posts || []).map((post) => ({
-            ...post,
-            id: post.id || Date.now() + Math.random(),
-          })),
-        );
-      }
-    } catch (error) {
-      toast.error(error.message || "Could not load blog section.");
-    } finally {
-      setIsLoading(false);
+  function uploadImage(onUploaded) {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+    if (!cloudinaryReady || !window.cloudinary) {
+      return toast.error("Cloudinary is still loading. Try again.");
     }
-  }
-
-  /* ---------- small state updates ---------- */
-
-  const updateNewPost = (field, value) =>
-    setNewPost((current) => ({ ...current, [field]: value }));
-
-  const updatePost = (id, field, value) =>
-    setPosts((current) =>
-      current.map((post) =>
-        post.id === id ? { ...post, [field]: value } : post,
-      ),
-    );
-
-  const togglePost = (id) =>
-    setOpenPosts((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id],
-    );
-
-  /* ---------- image selection (new article: preview only) ---------- */
-
-  function chooseImage(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    const error = isValidImageFile(file);
-    if (error) return toast.error(error);
-
-    if (newPreview) URL.revokeObjectURL(newPreview);
-
-    setSelectedFile(file);
-    setNewPreview(URL.createObjectURL(file));
-    updateNewPost("image", "");
-    setErrors((current) => ({ ...current, image: "" }));
-  }
-
-  /* ---------- image replacement (uploads immediately) ---------- */
-
-  async function replaceArticleImage(event, postId) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    const error = isValidImageFile(file);
-    if (error) return toast.error(error);
-
-    setIsUploading(true);
-    const toastId = toast.loading("Uploading replacement image...");
-
-    try {
-      const imageUrl = await uploadImage(file);
-      updatePost(postId, "image", imageUrl);
-      toast.success("Article image updated.", { id: toastId });
-    } catch (err) {
-      toast.error(err.message || "Image upload failed.", { id: toastId });
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
-  /* ---------- add / remove articles ---------- */
-
-  async function addArticle() {
-    const result = validatePost(newPost, Boolean(selectedFile));
-    setErrors(result);
-
-    if (Object.keys(result).length > 0) {
-      toast.error("Please complete the required fields.");
-      return;
+    if (!cloudName || !uploadPreset) {
+      return toast.error("Check your Cloudinary environment variables.");
     }
 
-    setIsUploading(true);
-    const toastId = toast.loading(
-      selectedFile
-        ? "Uploading image and adding article..."
-        : "Adding article...",
-    );
+    onUploadedRef.current = onUploaded;
 
-    try {
-      const imageUrl = selectedFile
-        ? await uploadImage(selectedFile)
-        : newPost.image.trim();
-      const article = { ...newPost, id: Date.now(), image: imageUrl };
+    if (!widgetRef.current) {
+      widgetRef.current = window.cloudinary.createUploadWidget(
+        {
+          cloudName,
+          uploadPreset,
+          sources: ["local", "url", "camera"],
+          multiple: false,
+          maxFileSize: 5 * 1024 * 1024,
+          clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "gif"],
+          resourceType: "image",
+          folder: "bexon/images",
+        },
+        (error, result) => {
+          if (error) {
+            setUploading(false);
+            return toast.error("Image upload failed.");
+          }
 
-      setPosts((current) => [...current, article]);
-      setOpenPosts((current) => [...current, article.id]);
+          if (result.event === "queues-start") setUploading(true);
+          if (result.event === "queues-end" || result.event === "close")
+            setUploading(false);
 
-      if (newPreview) URL.revokeObjectURL(newPreview);
-
-      setNewPost({ ...emptyPost });
-      setSelectedFile(null);
-      setNewPreview("");
-      setErrors({});
-
-      toast.success("Article added successfully.", { id: toastId });
-      saveData();
-    } catch (error) {
-      toast.error(error.message || "Could not add article.", { id: toastId });
-    } finally {
-      setIsUploading(false);
+          if (result.event === "success" && result.info?.secure_url) {
+            onUploadedRef.current?.({
+              image: result.info.secure_url,
+              publicId: result.info.public_id || "",
+            });
+            onUploadedRef.current = null;
+            toast.success("Image uploaded successfully.");
+          }
+        },
+      );
     }
+
+    widgetRef.current.open();
   }
 
-  function removeArticle(id) {
-    setPosts((current) => current.filter((post) => post.id !== id));
-    setOpenPosts((current) => current.filter((item) => item !== id));
-    setPostErrors((current) => {
-      const updated = { ...current };
-      delete updated[id];
-      return updated;
+  /* ----- new article form ----- */
+
+  function updateNewPost(changes) {
+    setNewPost((current) => ({ ...current, ...changes }));
+    setNewPostErrors((current) => {
+      const next = { ...current };
+      Object.keys(changes).forEach((key) => delete next[key]);
+      return next;
     });
-    toast.success("Article removed.");
-    saveData();
   }
 
-  /* ---------- validate + save everything ---------- */
+  function addArticle() {
+    const errors = validatePost(newPost);
+    setNewPostErrors(errors);
+
+    if (Object.keys(errors).length) {
+      return toast.error("Please complete all required fields.");
+    }
+
+    const article = {
+      ...newPost,
+      id: Date.now(),
+      day: String(newPost.day),
+      _id: "",
+    };
+
+    setPosts((current) => [...current, article]);
+    setOpenPosts((current) => [...current, article.id]);
+    setNewPost(emptyPost);
+    toast.success("Article added. Click Save Changes to store it.");
+  }
+
+  /* ----- existing articles ----- */
+
+  function updatePost(id, changes) {
+    setPosts((current) =>
+      current.map((post) => (post.id === id ? { ...post, ...changes } : post)),
+    );
+    setPostErrors((current) => {
+      const next = { ...(current[id] || {}) };
+      Object.keys(changes).forEach((key) => delete next[key]);
+      return { ...current, [id]: next };
+    });
+  }
+
+  function togglePost(id) {
+    setOpenPosts((current) =>
+      current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
+    );
+  }
+
+  /* ----- delete ----- */
+
+  // Remove an article from every piece of local state
+  function removeFromState(id) {
+    setPosts((current) => current.filter((p) => p.id !== id));
+    setOpenPosts((current) => current.filter((x) => x !== id));
+    setPostErrors(({ [id]: _removed, ...rest }) => rest);
+  }
+
+  async function confirmDelete() {
+    const post = postToDelete;
+    if (!post) return;
+
+    // Not saved yet → nothing to delete on the server
+    if (!post._id) {
+      removeFromState(post.id);
+      setPostToDelete(null);
+      return toast.success("Article removed.");
+    }
+
+    setDeleting(true);
+    try {
+      const { data } = await axios.delete(API_URL, { data: { _id: post._id } });
+      if (!data.success) throw new Error(data.message);
+
+      // Only update the UI after the server confirms
+      removeFromState(post.id);
+      setPostToDelete(null);
+      toast.success("Article deleted.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Could not delete the article."));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  /* ----- save ----- */
 
   async function saveData() {
-    const headingErrors = {};
+    const headings = {};
     if (!sectionTitle.trim())
-      headingErrors.sectionTitle = "Enter the section title.";
+      headings.sectionTitle = "Enter the section title.";
     if (!highlightedTitle.trim())
-      headingErrors.highlightedTitle = "Enter the highlighted title.";
+      headings.highlightedTitle = "Enter the highlighted title.";
 
     const articleErrors = {};
     posts.forEach((post) => {
-      const result = validatePost(post);
-      if (Object.keys(result).length > 0) articleErrors[post.id] = result;
+      const errors = validatePost(post);
+      if (Object.keys(errors).length) articleErrors[post.id] = errors;
     });
 
-    setErrors(headingErrors);
+    setHeadingErrors(headings);
     setPostErrors(articleErrors);
 
-    if (
-      Object.keys(headingErrors).length > 0 ||
-      Object.keys(articleErrors).length > 0
-    ) {
-      toast.error("Please fix the errors before continuing.");
-      return;
+    if (Object.keys(headings).length || Object.keys(articleErrors).length) {
+      return toast.error("Please fix the errors before saving.");
+    }
+    if (!posts.length) {
+      return toast.error("Add at least one article before saving.");
     }
 
-    if (posts.length === 0) {
-      toast.error("Add at least one article before saving.");
-      return;
-    }
-
-    setIsSaving(true);
+    setSaving(true);
     const toastId = toast.loading("Saving blog section...");
 
     try {
@@ -484,10 +491,12 @@ export default function BlogSectionAdmin() {
         sectionTitle: sectionTitle.trim(),
         highlightedTitle: highlightedTitle.trim(),
         posts: posts.map((post) => ({
+          ...(post._id ? { _id: post._id } : {}),
           id: post.id,
-          day: post.day.trim ? post.day.trim() : post.day,
+          day: String(post.day).trim(),
           month: post.month,
-          image: post.image.trim(),
+          image: post.image,
+          publicId: post.publicId,
           category: post.category.trim(),
           author: post.author.trim(),
           title: post.title.trim(),
@@ -495,42 +504,59 @@ export default function BlogSectionAdmin() {
         })),
       };
 
-      const saved = await saveBlogSection(payload);
+      const { data: res } = await axios.post(API_URL, payload);
+      if (!res.success) throw new Error(res.message);
 
-      if (saved?.sectionTitle) setSectionTitle(saved.sectionTitle);
-      if (saved?.highlightedTitle) setHighlightedTitle(saved.highlightedTitle);
-      if (Array.isArray(saved?.posts)) setPosts(saved.posts);
+      const saved = res.data || payload;
+      setSectionTitle(saved.sectionTitle || payload.sectionTitle);
+      setHighlightedTitle(saved.highlightedTitle || payload.highlightedTitle);
+      setPosts((saved.posts || payload.posts).map(normalizePost));
 
       toast.success("Blog section saved successfully!", { id: toastId });
     } catch (error) {
-      toast.error(error.message || "Something went wrong while saving.", {
+      toast.error(getErrorMessage(error, "Could not save blog section."), {
         id: toastId,
       });
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   }
 
-  /* ============ LOADING SCREEN ============ */
+  /* ----- render ----- */
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f7f9fc] dark:bg-[#0b1117]">
-        <div className="flex flex-col items-center gap-3">
-          <LoaderCircle size={32} className="animate-spin text-[#1e8a8a]" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Loading blog section...
-          </p>
-        </div>
+        <LoaderCircle size={32} className="animate-spin text-[#1e8a8a]" />
       </div>
     );
   }
 
-  /* ============ UI ============ */
+  const busy = saving || uploading || deleting;
+  const saveLabel = saving ? "Saving..." : "Save Changes";
+  const saveIcon = saving ? (
+    <LoaderCircle size={17} className="animate-spin" />
+  ) : (
+    <Save size={17} />
+  );
 
   return (
     <div className="min-h-screen space-y-5 bg-[#f7f9fc] p-4 text-gray-900 sm:p-6 dark:bg-[#0b1117] dark:text-gray-100">
-      {/* HEADER */}
+      <Script
+        src="https://upload-widget.cloudinary.com/global/all.js"
+        strategy="afterInteractive"
+        onLoad={() => setCloudinaryReady(true)}
+        onError={() => toast.error("Could not load Cloudinary widget.")}
+      />
+
+      <ConfirmDialog
+        article={postToDelete}
+        deleting={deleting}
+        onCancel={() => setPostToDelete(null)}
+        onConfirm={confirmDelete}
+      />
+
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-[#e7f5f5] p-3 text-[#1e8a8a] dark:bg-[#162c32] dark:text-[#35b5b5]">
@@ -547,22 +573,17 @@ export default function BlogSectionAdmin() {
         <button
           type="button"
           onClick={saveData}
-          disabled={isUploading || isSaving}
-          className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#176f6f] disabled:opacity-60"
+          disabled={busy}
+          className={primaryBtn}
         >
-          {isSaving ? (
-            <LoaderCircle size={17} className="animate-spin" />
-          ) : (
-            <Save size={17} />
-          )}
-          {isSaving ? "Saving..." : "Save Changes"}
+          {saveIcon}
+          {saveLabel}
         </button>
       </div>
 
-      {/* SECTION HEADING */}
+      {/* Section heading */}
       <section className={cardClass}>
         <h2 className="mb-4 font-bold">Section Heading</h2>
-
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label="Main Title"
@@ -570,7 +591,7 @@ export default function BlogSectionAdmin() {
             maxLength={80}
             placeholder="The Ultimate"
             value={sectionTitle}
-            error={errors.sectionTitle}
+            error={headingErrors.sectionTitle}
             onChange={(e) => setSectionTitle(e.target.value)}
           />
           <Field
@@ -579,92 +600,63 @@ export default function BlogSectionAdmin() {
             maxLength={80}
             placeholder="Resource."
             value={highlightedTitle}
-            error={errors.highlightedTitle}
+            error={headingErrors.highlightedTitle}
             onChange={(e) => setHighlightedTitle(e.target.value)}
           />
         </div>
       </section>
 
-      {/* ADD NEW ARTICLE */}
+      {/* Add new article */}
       <section className={cardClass}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-bold">Add New Article</h2>
           <Plus size={19} className="text-[#1e8a8a]" />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <label className={labelClass}>
-              <ImagePlus size={15} />
-              Article Image — Add Working URL
-            </label>
+        <label className={labelClass}>
+          <ImagePlus size={15} />
+          Article Image
+        </label>
+        <button
+          type="button"
+          disabled={!cloudinaryReady || uploading}
+          onClick={() => uploadImage((img) => updateNewPost(img))}
+          className={outlineBtn}
+        >
+          <ImagePlus size={16} />
+          {cloudinaryReady ? "Upload Image" : "Loading uploader..."}
+        </button>
+        <ErrorText>{newPostErrors.image}</ErrorText>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <input
-                className={inputClass}
-                value={newPost.image}
-                placeholder="Paste image URL or choose a file"
-                onChange={(event) => {
-                  if (newPreview) URL.revokeObjectURL(newPreview);
-                  setNewPreview("");
-                  setSelectedFile(null);
-                  updateNewPost("image", event.target.value);
-                }}
-              />
-
-              <input
-                ref={fileRef}
-                type="file"
-                className="hidden"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={chooseImage}
-              />
-
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={isUploading}
-                className="flex shrink-0 items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] hover:bg-[#e7f5f5] disabled:opacity-60 dark:hover:bg-[#162c32]"
-              >
-                <ImagePlus size={16} />
-                Choose Image
-              </button>
-            </div>
-
-            <ErrorText>{errors.image}</ErrorText>
-
-            {(newPreview || validImageUrl(newPost.image)) && (
-              <div className="mt-3">
-                <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Image Preview — upload happens when you add the article
-                </p>
-                <ImagePreview
-                  src={newPreview || newPost.image}
-                  alt="New article preview"
-                />
-              </div>
-            )}
+        {newPost.image && (
+          <div className="mt-3">
+            <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+              Image Preview
+            </p>
+            <ImagePreview src={newPost.image} alt="New article preview" />
           </div>
+        )}
 
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <ArticleFields
             data={newPost}
-            errors={errors}
-            onChange={updateNewPost}
+            errors={newPostErrors}
+            onChange={(field, value) => updateNewPost({ [field]: value })}
           />
         </div>
 
         <button
           type="button"
           onClick={addArticle}
-          disabled={isUploading}
-          className="mt-5 flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#176f6f] disabled:opacity-60"
+          disabled={busy}
+          className={`mt-5 ${primaryBtn}`}
         >
-          {isUploading ? <Spinner /> : <Plus size={17} />}
-          {isUploading ? "Adding Article..." : "Add Article"}
+          {uploading ? <Spinner /> : <Plus size={17} />}
+          Add Article
         </button>
       </section>
 
-      {/* ALL ARTICLES */}
+      {/* All articles */}
       <section className={cardClass}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
@@ -678,7 +670,7 @@ export default function BlogSectionAdmin() {
           </span>
         </div>
 
-        {posts.length === 0 ? (
+        {!posts.length ? (
           <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
             No articles yet. Add one above to get started.
           </p>
@@ -686,7 +678,7 @@ export default function BlogSectionAdmin() {
           <div className="space-y-3">
             {posts.map((post, index) => {
               const isOpen = openPosts.includes(post.id);
-              const articleErrors = postErrors[post.id] || {};
+              const errors = postErrors[post.id] || {};
 
               return (
                 <div
@@ -694,7 +686,7 @@ export default function BlogSectionAdmin() {
                   className="overflow-hidden rounded-xl border border-gray-200 dark:border-[#263442]"
                 >
                   <div className="flex items-center gap-3 p-3">
-                    {validImageUrl(post.image) ? (
+                    {post.image ? (
                       <img
                         src={post.image}
                         alt={post.title}
@@ -725,8 +717,8 @@ export default function BlogSectionAdmin() {
                     <button
                       type="button"
                       onClick={() => togglePost(post.id)}
-                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-[#16212c]"
                       aria-label={isOpen ? "Collapse article" : "Edit article"}
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-[#16212c]"
                     >
                       {isOpen ? (
                         <ChevronUp size={19} />
@@ -737,9 +729,10 @@ export default function BlogSectionAdmin() {
 
                     <button
                       type="button"
-                      onClick={() => removeArticle(post.id)}
-                      className="rounded-lg p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                      onClick={() => setPostToDelete(post)}
+                      disabled={busy}
                       aria-label="Delete article"
+                      className="rounded-lg p-2 text-red-500 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/30"
                     >
                       <Trash2 size={17} />
                     </button>
@@ -749,36 +742,22 @@ export default function BlogSectionAdmin() {
                     <div className="grid gap-4 border-t border-gray-200 p-4 sm:grid-cols-2 dark:border-[#263442]">
                       <div className="sm:col-span-2">
                         <label className={labelClass}>Article Image</label>
+                        <button
+                          type="button"
+                          disabled={!cloudinaryReady || uploading}
+                          onClick={() =>
+                            uploadImage((img) => updatePost(post.id, img))
+                          }
+                          className={outlineBtn}
+                        >
+                          <ImagePlus size={16} />
+                          Replace Image
+                        </button>
+                        <ErrorText>{errors.image}</ErrorText>
 
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <input
-                            className={inputClass}
-                            value={post.image}
-                            placeholder="Image URL"
-                            onChange={(event) =>
-                              updatePost(post.id, "image", event.target.value)
-                            }
-                          />
-
-                          <label className="flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2 text-sm font-medium text-[#1e8a8a] hover:bg-[#e7f5f5] dark:hover:bg-[#162c32]">
-                            <ImagePlus size={16} />
-                            Replace Image
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept="image/jpeg,image/png,image/webp,image/gif"
-                              onChange={(event) =>
-                                replaceArticleImage(event, post.id)
-                              }
-                            />
-                          </label>
-                        </div>
-
-                        <ErrorText>{articleErrors.image}</ErrorText>
-
-                        {validImageUrl(post.image) && (
+                        {post.image && (
                           <div className="mt-3">
-                            <p className="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                            <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
                               Image Preview
                             </p>
                             <ImagePreview
@@ -791,9 +770,9 @@ export default function BlogSectionAdmin() {
 
                       <ArticleFields
                         data={post}
-                        errors={articleErrors}
+                        errors={errors}
                         onChange={(field, value) =>
-                          updatePost(post.id, field, value)
+                          updatePost(post.id, { [field]: value })
                         }
                       />
                     </div>
@@ -805,20 +784,16 @@ export default function BlogSectionAdmin() {
         )}
       </section>
 
-      {/* BOTTOM ACTION */}
+      {/* Sticky save bar */}
       <div className="sticky bottom-3 flex justify-end rounded-xl border border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-[#263442] dark:bg-[#111a23]/95">
         <button
           type="button"
           onClick={saveData}
-          disabled={isUploading || isSaving}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#176f6f] disabled:opacity-60 sm:w-auto"
+          disabled={busy}
+          className={`${primaryBtn} w-full justify-center sm:w-auto`}
         >
-          {isSaving ? (
-            <LoaderCircle size={17} className="animate-spin" />
-          ) : (
-            <Save size={17} />
-          )}
-          {isSaving ? "Saving..." : "Save Changes"}
+          {saveIcon}
+          {saveLabel}
         </button>
       </div>
     </div>

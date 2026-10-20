@@ -1,5 +1,6 @@
 "use client";
 
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 import axios from "axios";
 import {
   ArrowDown,
@@ -7,17 +8,16 @@ import {
   ChevronDown,
   ChevronUp,
   ImagePlus,
+  LoaderCircle,
   MessageSquareQuote,
   Plus,
   Save,
   Search,
   Trash2,
   Upload,
-  LoaderCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 export default function ReviewsAdminPanel() {
   const input =
@@ -336,11 +336,51 @@ export default function ReviewsAdminPanel() {
     setReviews(updatedReviews);
   };
 
-  const deleteReview = (reviewId) => {
-    const updatedReviews = reviews.filter((item) => item.id !== reviewId);
-    setReviews(updatedReviews);
-    if (openId === reviewId) setOpenId(null);
-    toast.success("Review removed. Save your changes to confirm.");
+  const deleteReview = async (reviewId) => {
+    try {
+      const review = reviews.find(
+        (item) => item._id === reviewId || item.id === reviewId,
+      );
+
+      if (!review) {
+        toast.error("Review not found");
+        return;
+      }
+
+      const response = await axios.delete("/api/homepage/reviews-section", {
+        data: {
+          reviewId: review._id || review.id,
+          publicId: review.publicId,
+        },
+      });
+
+      if (!response.data?.success) {
+        toast.error(
+          response.data?.message ||
+            response.data?.error ||
+            "Failed to delete review",
+        );
+        return;
+      }
+
+      const updatedReviews = reviews.filter(
+        (item) => item._id !== reviewId && item.id !== reviewId,
+      );
+
+      setReviews(updatedReviews);
+
+      if (openId === reviewId) {
+        setOpenId(null);
+      }
+
+      toast.success(response.data.message || "Review deleted successfully");
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          "You do not have permission to delete this review",
+      );
+    }
   };
 
   const addStat = () => {

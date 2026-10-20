@@ -1,10 +1,18 @@
-import { NextResponse } from "next/server";
+import {
+  requireDeletePermission,
+  requireEditPermission,
+} from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
 import dbConnect from "@/Lib/mongoDB";
 import HomeSlider from "@/Models/HomeSlider";
-
+import { NextResponse } from "next/server";
 export async function POST(request) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     await dbConnect();
 
     const formData = await request.formData();
@@ -81,6 +89,17 @@ export async function GET() {
 // delete api
 export async function DELETE(request) {
   try {
+    const permission = await requireDeletePermission();
+
+    console.log("DELETE AUTHORIZATION:", {
+      authorized: permission.authorized,
+      role: permission.admin?.role,
+    });
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+
     await dbConnect();
 
     const { id } = await request.json();

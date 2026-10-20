@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
-import connectDB from "@/Lib/mongoDB";
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
+import connectDB from "@/Lib/mongoDB";
 import AboutUs from "@/Models/AboutUs";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,6 +84,12 @@ export async function GET() {
 
 // POST: Create or update About Us data
 export async function POST(request) {
+  const permission = await requireEditPermission();
+
+  if (!permission.authorized) {
+    return permission.response;
+  }
+
   try {
     await connectDB();
 

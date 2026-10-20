@@ -1,6 +1,10 @@
+import {
+  requireDeletePermission,
+  requireEditPermission,
+} from "@/Lib/AdminPermission/adminPermissions";
+import cloudinary from "@/Lib/cloudinary";
 import dbConnect from "@/Lib/mongoDB";
 import Features from "@/Models/Features";
-import cloudinary from "@/Lib/cloudinary";
 
 const ALLOWED_TYPES = [
   "image/png",
@@ -74,6 +78,11 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     const formData = await req.formData();
 
     const tagline = (formData.get("tagline") || "").toString();
@@ -211,6 +220,18 @@ export async function POST(req) {
 
 export async function DELETE(request) {
   try {
+    //USER ADMIN CHECKS
+    const permission = await requireDeletePermission();
+
+    console.log("DELETE AUTHORIZATION:", {
+      authorized: permission.authorized,
+      role: permission.admin?.role,
+    });
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+    //USER ADMIN CHECKS
     await dbConnect();
 
     const { cardId } = await request.json();

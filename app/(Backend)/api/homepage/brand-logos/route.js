@@ -1,3 +1,4 @@
+import { requireDeletePermission } from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
 import BrandLogo from "@/Models/brand-logos";
@@ -79,30 +80,34 @@ export async function GET() {
 // Delete logo from DB and Cloudinary
 export async function DELETE(request) {
   try {
+    const permission = await requireDeletePermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+
     await connectDB();
 
-    const { logoId, publicId } = await request.json();
+    const { publicId } = await request.json();
 
-    if (logoId == null || !publicId) {
+    if (!publicId) {
       return Response.json(
         {
           success: false,
-          error: "logoId and publicId are required",
+          error: "publicId is required",
         },
         { status: 400 },
       );
     }
 
-    // Delete from Cloudinary
-    await cloudinary.uploader.destroy(publicId);
-
-    // Delete exact logo from DB
+    // Find and delete the logo using only publicId
     const result = await BrandLogo.updateOne(
-      { "logos.id": logoId, "logos.publicId": publicId },
+      {
+        "logos.publicId": publicId,
+      },
       {
         $pull: {
           logos: {
-            id: logoId,
             publicId,
           },
         },
@@ -119,10 +124,16 @@ export async function DELETE(request) {
       );
     }
 
+    // Delete image from Cloudinary
+    try {
+      await cloudinary.uploader.destroy(publicId);
+    } catch (error) {
+      console.error("Cloudinary deletion error:", error);
+    }
+
     return Response.json({
       success: true,
       message: "Logo deleted successfully",
-      logoId,
       publicId,
     });
   } catch (error) {
@@ -131,7 +142,7 @@ export async function DELETE(request) {
     return Response.json(
       {
         success: false,
-        error: error.message,
+        error: error.message || "Failed to delete logo",
       },
       { status: 500 },
     );

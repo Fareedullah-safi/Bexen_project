@@ -1,9 +1,9 @@
 "use client";
 
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 import { ImagePlus, Link, Trash2Icon, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 export default function BrandLogos() {
   const fileRefs = useRef({});
@@ -138,7 +138,9 @@ export default function BrandLogos() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || "Logo upload failed.");
+        throw new Error(
+          result.message || result.error || "Logo upload failed.",
+        );
       }
 
       const postResponse = await fetch("/api/homepage/brand-logos", {
@@ -151,8 +153,8 @@ export default function BrandLogos() {
 
       if (!postResponse.ok || !postResult.success) {
         throw new Error(
-          postResult.error ||
-            postResult.message ||
+          postResult.message ||
+            postResult.error ||
             "Failed to save logos to the database.",
         );
       }
@@ -193,9 +195,13 @@ export default function BrandLogos() {
         cache: "no-store",
       });
       const data = await response.json();
+
       console.log(data);
+
       if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to load saved logos");
+        throw new Error(
+          data.message || data.error || "Failed to load saved logos",
+        );
       }
 
       setSavedData(data.data || []);
@@ -218,7 +224,9 @@ export default function BrandLogos() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to load section title");
+        throw new Error(
+          data.message || data.error || "Failed to load section title",
+        );
       }
 
       setSectionTitle(data.data?.title || "");
@@ -244,8 +252,9 @@ export default function BrandLogos() {
       });
 
       const data = await response.json();
+
       if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to change title");
+        throw new Error(data.message || data.error || "Failed to change title");
       }
 
       toast.success("Title changed successfully");
@@ -269,8 +278,9 @@ export default function BrandLogos() {
       });
 
       const data = await response.json();
+
       if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to delete logo");
+        throw new Error(data.message || data.error || "Failed to delete logo");
       }
 
       toast.success("Logo deleted successfully");
