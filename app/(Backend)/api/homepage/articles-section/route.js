@@ -1,3 +1,7 @@
+import {
+  requireDeletePermission,
+  requireEditPermission,
+} from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
 import BlogSection from "@/Models/articles-section/BlogSection";
@@ -5,6 +9,12 @@ import { NextResponse } from "next/server";
 
 // Delete an image from Cloudinary
 async function deleteFromCloudinary(publicId) {
+  //USER ADMIN CHECKS
+  const permission = await requireDeletePermission();
+  if (!permission.authorized) {
+    return permission.response;
+  }
+  //USER ADMIN CHECKS
   if (!publicId) return;
 
   try {
@@ -42,6 +52,12 @@ export async function GET() {
 // POST: Add one article OR save the complete section
 export async function POST(request) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+
     await connectDB();
 
     const { article, Titles } = await request.json();
@@ -114,6 +130,13 @@ export async function POST(request) {
 // DELETE: Remove one article using its MongoDB subdocument _id
 export async function DELETE(req) {
   try {
+    const permission = await requireDeletePermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+    //USER ADMIN CHECKS
+
     await connectDB();
 
     const { _id } = await req.json();
@@ -154,6 +177,69 @@ export async function DELETE(req) {
 
     return NextResponse.json(
       { success: false, message: "Delete failed." },
+      { status: 500 },
+    );
+  }
+}
+
+// PUT: Update one existing article
+export async function PUT(req) {
+  try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+    await connectDB();
+
+    const { _id, article } = await req.json();
+
+    // Find the section
+    const section = await BlogSection.findOne();
+
+    if (!section) {
+      return NextResponse.json(
+        { success: false, message: "Section not found." },
+        { status: 404 },
+      );
+    }
+
+    // Find the article by its _id
+    const post = section.posts.id(_id);
+
+    if (!post) {
+      return NextResponse.json(
+        { success: false, message: "Article not found." },
+        { status: 404 },
+      );
+    }
+
+    // Update the article fields
+    post.day = Number(article.day);
+    post.month = String(article.month || "OCT").toUpperCase();
+    post.image = article.image;
+    post.publicId = article.publicId;
+    post.category = article.category;
+    post.author = article.author;
+    post.title = article.title;
+    post.link = article.link;
+
+    // Save changes
+    await section.save();
+
+    return NextResponse.json({
+      success: true,
+      message: "Article updated successfully!",
+      data: post,
+    });
+  } catch (error) {
+    console.error("Update article error:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: error.message || "Failed to update article.",
+      },
       { status: 500 },
     );
   }

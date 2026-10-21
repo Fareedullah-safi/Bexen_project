@@ -20,7 +20,7 @@ const ArticleSchema = new mongoose.Schema(
 
     image: {
       type: String,
-      // required: true,
+      required: true,
     },
 
     publicId: {
@@ -51,6 +51,7 @@ const ArticleSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      default: "/",
     },
   },
   {
