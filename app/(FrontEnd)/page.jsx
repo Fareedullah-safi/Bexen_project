@@ -1,18 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Section from "@/app/(FrontEnd)/Home/Section";
-import SectionThree from "@/app/(FrontEnd)/Home/SectionThree";
-import SectionFour from "@/app/(FrontEnd)/Home/SectionFour";
-import SectionFive from "@/app/(FrontEnd)/Home/SectionFive";
-import SectionSix from "@/app/(FrontEnd)/Home/SectionSix";
-import SectionSeven from "@/app/(FrontEnd)/Home/SectionSeven";
 import SectionEight from "@/app/(FrontEnd)/Home/SectionEight";
+import SectionFive from "@/app/(FrontEnd)/Home/SectionFive";
+import SectionFour from "@/app/(FrontEnd)/Home/SectionFour";
 import SectionNine from "@/app/(FrontEnd)/Home/SectionNine";
+import SectionSeven from "@/app/(FrontEnd)/Home/SectionSeven";
+import SectionSix from "@/app/(FrontEnd)/Home/SectionSix";
 import SectionTen from "@/app/(FrontEnd)/Home/SectionTen";
-import SectionEleven from "./Home/SectionEleven";
+import SectionThree from "@/app/(FrontEnd)/Home/SectionThree";
+import SectionTwo from "@/app/(FrontEnd)/Home/SectionTwo";
+import { useEffect, useState } from "react";
 import Loader from "../Components/Loader";
-import SectionTwo from "./about/AboutPages/SectionTwo";
+import SectionEleven from "./Home/SectionEleven";
 
 export default function Page() {
   const [loading, setLoading] = useState(true);
