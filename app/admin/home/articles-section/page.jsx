@@ -19,6 +19,7 @@ import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
+import Spinner from "../../Components/Admin/Spinner";
 
 const API = "/api/homepage/articles-section";
 
@@ -525,8 +526,19 @@ export default function BlogSectionAdmin() {
     "DEC",
   ];
 
+  if (loading) {
+    return (
+      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
+        <Spinner />
+        <p className="text-sm font-medium text-(--muted)]">
+          Loading Articles Page...
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen space-y-5 bg-[#f7f9fc] p-4 text-gray-900 sm:p-6 dark:bg-[#0b1117] dark:text-gray-100">
+    <div className="min-h-screen space-y-5 bg-[#f7f9fc] text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
       <Script
         src="https://upload-widget.cloudinary.com/global/all.js"
         strategy="afterInteractive"

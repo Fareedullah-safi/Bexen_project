@@ -258,7 +258,7 @@ export default function ImageManager({
 
             <p className="mt-1 text-xs text-[var(--muted)]">
               {loading
-                ? "Loading..."
+                ? "Loading Slides..."
                 : `${items.length} ${items.length === 1 ? "image" : "images"}`}
             </p>
           </div>

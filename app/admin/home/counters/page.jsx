@@ -420,14 +420,17 @@ export default function ReviewsAdminPanel() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--background)] text-[var(--foreground)]">
+      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
         <Spinner />
+        <p className="text-sm font-medium text-[var(--muted)]">
+          Loading Counter Page...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)] px-4 py-6 text-[var(--foreground)] sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
         <div className="top-3 z-30 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">

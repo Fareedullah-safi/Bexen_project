@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 import {
-  ImagePlus,
-  Link as LinkIcon,
-  Trash2,
-  Save,
-  LoaderCircle,
-  RotateCcw,
+  AlertCircle,
   CheckCircle2,
   FileImage,
-  AlertCircle,
+  ImagePlus,
+  Link as LinkIcon,
+  LoaderCircle,
   PlayCircle,
+  RotateCcw,
+  Save,
+  Trash2,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 const initialData = {
   experienceNumber: "13+",
@@ -722,16 +722,17 @@ export default function page() {
 
   if (isFetching) {
     return (
-      <div
-        className={`flex min-h-[85vh] items-center justify-center ${pageClass}`}
-      >
+      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
         <Spinner />
+        <p className="text-sm font-medium text-[var(--muted)]">
+          Loading About Us...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen p-4 sm:p-6 lg:p-8 ${pageClass}`}>
+    <div className={`min-h-screen p-2 ${pageClass}`}>
       <div className="mx-auto max-w-6xl">
         <header className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>

@@ -386,8 +386,11 @@ export default function Features() {
 
   if (fetching) {
     return (
-      <div className="flex h-[85vh] w-full items-center justify-center">
+      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
         <Spinner />
+        <p className="text-sm font-medium text-[var(--muted)]">
+          Loading Features...
+        </p>
       </div>
     );
   }

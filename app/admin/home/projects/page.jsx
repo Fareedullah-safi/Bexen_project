@@ -346,6 +346,7 @@ export default function ProjectsAdmin() {
 
   const [savingHeader, setSavingHeader] = useState(false);
   const [headerCooldown, setHeaderCooldown] = useState(false);
+  const [fetching, setfetching] = useState(true);
 
   const requestInProgress = useRef(false);
   const cooldownTimer = useRef(null);
@@ -380,6 +381,7 @@ export default function ProjectsAdmin() {
           buttonText: savedHeader?.buttonText ?? "",
           buttonLink: savedHeader?.buttonLink ?? "/",
         });
+        setfetching(false);
       } catch (error) {
         console.error("Load project header error:", error);
 
@@ -733,6 +735,16 @@ export default function ProjectsAdmin() {
   /* =========================================================
   UI
   ========================================================= */
+  if (fetching) {
+    return (
+      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
+        <Spinner />
+        <p className="text-sm font-medium text-(--muted)]">
+          Loading Projects...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -946,7 +958,7 @@ export default function ProjectsAdmin() {
                 Add New Large Project
               </button>
 
-              <footer className="mt-4 sticky bottom-4 z-10 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
+              <footer className="sticky bottom-4 z-10 mt-4 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
                 <div>
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                     Ready to save your changes?
@@ -963,7 +975,9 @@ export default function ProjectsAdmin() {
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167575] focus-visible:ring-4 focus-visible:ring-[#1E8A8A]/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {savingProjects ? <Spinner /> : <Save size={18} />}
-                  {savingProjects ? "Saving Projects Changes..." : "Save Projects"}
+                  {savingProjects
+                    ? "Saving Projects Changes..."
+                    : "Save Projects"}
                 </button>
               </footer>
             </>

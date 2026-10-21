@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { HelpCircle, ImagePlus, Moon, Save, Upload } from "lucide-react";
-import { toast } from "sonner";
-import axios from "axios";
 import Spinner from "@/app/admin/Components/Admin/Spinner";
+import axios from "axios";
+import { ImagePlus, Save, Upload } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const defaultFormData = {
   headingLineOne: "",
@@ -227,32 +227,25 @@ export default function FaqAdminPanel() {
       setIsSaving(false);
     }
   }
+  if (isFetching) {
+    return (
+      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
+        <Spinner />
+        <p className="text-sm font-medium text-[var(--muted)]">
+          Loading Faqs...
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-[var(--background)] px-4 py-8 text-[var(--foreground)] sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl space-y-6">
+    <main className="bg-(--background)] text-(--foreground)] -m-4 min-h-screen px-4 sm:px-6 lg:px-4">
+      <div className="max-w-8xl mx-auto space-y-6">
         <header
           className={`${cardClass} flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between`}
         >
           <div>
-            <nav
-              className="mb-3 text-sm text-slate-500 dark:text-slate-400"
-              aria-label="Breadcrumb"
-            >
-              Admin
-              <span className="px-2 text-slate-300 dark:text-slate-600">/</span>
-              Homepage
-              <span className="px-2 text-slate-300 dark:text-slate-600">/</span>
-              <span className="text-slate-700 dark:text-slate-200">
-                FAQ Section
-              </span>
-            </nav>
-
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A]/10 text-[#1E8A8A] dark:bg-[#1E8A8A]/20 dark:text-[#62cccc]">
-                <HelpCircle size={22} />
-              </div>
-
               <div>
                 <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
                   FAQ Section
@@ -267,7 +260,7 @@ export default function FaqAdminPanel() {
 
         {isFetching ? (
           <section
-            className={`${cardClass} flex min-h-40 items-center justify-center`}
+            className={`${cardClass} flex min-h-screen items-center justify-center`}
           >
             <Spinner />
           </section>
