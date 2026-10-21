@@ -530,7 +530,7 @@ export default function BlogSectionAdmin() {
     return (
       <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
         <Spinner />
-        <p className="text-sm font-medium text-(--muted)]">
+        <p className="text-(--muted)] text-sm font-medium">
           Loading Articles Page...
         </p>
       </div>

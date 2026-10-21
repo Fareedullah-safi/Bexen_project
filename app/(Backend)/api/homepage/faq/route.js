@@ -28,6 +28,7 @@ export async function PUT(request) {
     await dbConnect();
 
     const body = await request.json();
+    console.log(body)
 
     const data = await Faq.findOneAndUpdate(
       {},
