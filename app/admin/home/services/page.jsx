@@ -659,25 +659,25 @@ export default function SolutionsAdmin() {
           </div>
 
           {/* Save Footer */}
-          <div className="flex justify-end rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
+          <footer className="sticky bottom-4 z-10 mt-4 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
+            <div>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                Ready to save your changes?
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Solutions will upload automatically when you update.
+              </p>
+            </div>
+
             <button
               type="submit"
               disabled={isSaving || !!deletingId}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-8 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:bg-[#155F61] disabled:text-white/80 sm:w-auto"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167575] focus-visible:ring-4 focus-visible:ring-[#1E8A8A]/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSaving ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save size={18} />
-                  Save Solutions
-                </>
-              )}
+              {isSaving ? <Spinner /> : <Save size={18} />}
+              {isSaving ? "Saving Solutions Changes..." : "Save Solutions"}
             </button>
-          </div>
+          </footer>
         </form>
       </div>
     </div>

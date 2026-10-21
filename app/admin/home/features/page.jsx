@@ -2,10 +2,10 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Link, Trash2, Plus } from "lucide-react";
-import { toast } from "sonner";
 import Spinner from "@/app/admin/Components/Admin/Spinner";
+import { ImagePlus, Link, Plus, Save, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 /* ==================== ICON PICKER ==================== */
 
@@ -447,21 +447,12 @@ export default function Features() {
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-bold">Feature Cards</h2>
+            <h2 className="text-xl font-semibold">Feature Cards</h2>
 
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              {form.cards.length} cards
+            <p className="mt-1 text-sm font-medium text-[var(--muted)]">
+              {form.cards.length} Card
             </p>
           </div>
-
-          <button
-            type="button"
-            onClick={addCard}
-            className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 text-xs font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-          >
-            <Plus size={14} />
-            Add Card
-          </button>
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -527,16 +518,35 @@ export default function Features() {
             </p>
           )}
         </div>
-
         <button
           type="button"
-          onClick={handleSubmit}
-          disabled={loading}
-          className="mt-6 flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-8 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={addCard}
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] py-4 text-sm font-semibold text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-60"
         >
-          {loading && <Spinner />}
-          {loading ? "Saving..." : "Save Changes"}
+          <Plus size={18} />
+          Add Card
         </button>
+
+        <footer className="sticky bottom-4 z-10 mt-4 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
+          <div>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              Ready to save your changes?
+            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Features will upload automatically when you save.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167575] focus-visible:ring-4 focus-visible:ring-[#1E8A8A]/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? <Spinner /> : <Save size={18} />}
+            {loading ? "Saving Features Changes..." : "Save Features Changes"}
+          </button>
+        </footer>
       </div>
     </div>
   );

@@ -430,7 +430,7 @@ export default function ReviewsAdminPanel() {
     <div className="min-h-screen bg-[var(--background)] px-4 py-6 text-[var(--foreground)] sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
-        <div className="sticky top-3 z-30 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
+        <div className="top-3 z-30 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
               <MessageSquareQuote size={24} />
@@ -443,23 +443,6 @@ export default function ReviewsAdminPanel() {
               </p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => saveAll()}
-            disabled={saving}
-            className={button}
-          >
-            {saving ? (
-              <LoaderCircle size={18} className="animate-spin" />
-            ) : (
-              <Save
-                size={18}
-                className="transition-transform group-hover:scale-110"
-              />
-            )}
-            {saving ? "Saving Changes..." : "Save All Changes"}
-          </button>
         </div>
 
         {/* Overview */}
@@ -1091,12 +1074,12 @@ export default function ReviewsAdminPanel() {
             </div>
           )}
         </section>
-
-        {/* Bottom Save */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]">
+        <footer className="sticky bottom-4 z-10 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
           <div>
-            <h3 className="font-semibold">Ready to save your changes?</h3>
-            <p className={`mt-1 text-sm ${muted}`}>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              Ready to save your changes?
+            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Save the section content, statistics, and reviews together.
             </p>
           </div>
@@ -1107,6 +1090,7 @@ export default function ReviewsAdminPanel() {
             onClick={() => saveAll()}
             disabled={saving}
           >
+            Save Changes
             {saving ? (
               <LoaderCircle size={18} className="animate-spin" />
             ) : (
@@ -1115,9 +1099,8 @@ export default function ReviewsAdminPanel() {
                 className="transition-transform group-hover:scale-110"
               />
             )}
-            {saving ? "Saving Changes..." : "Save All Changes"}
           </button>
-        </div>
+        </footer>
       </div>
     </div>
   );

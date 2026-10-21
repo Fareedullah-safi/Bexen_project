@@ -1,6 +1,6 @@
-
 "use client";
 
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 import axios from "axios";
 import {
   ArrowDown,
@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 /* =========================================================
 1. STYLES
@@ -297,17 +296,13 @@ function ProjectCard({
               >
                 <Upload size={14} />
                 Upload Image
-
                 <input
                   type="file"
                   accept="image/*"
                   disabled={busy}
                   className="hidden"
                   onChange={(e) => {
-                    onImageFileChange(
-                      project.clientKey,
-                      e.target.files?.[0],
-                    );
+                    onImageFileChange(project.clientKey, e.target.files?.[0]);
                     e.target.value = "";
                   }}
                 />
@@ -375,10 +370,7 @@ export default function ProjectsAdmin() {
 
         // Handle common API response formats.
         const savedHeader =
-          data?.header ??
-          data?.data?.header ??
-          data?.data ??
-          data;
+          data?.header ?? data?.data?.header ?? data?.data ?? data;
 
         setHeader({
           badgeText: savedHeader?.badgeText ?? "",
@@ -394,8 +386,7 @@ export default function ProjectsAdmin() {
         if (active) {
           setHeaderError(true);
           toast.error(
-            error.response?.data?.message ||
-              "Failed to load project header.",
+            error.response?.data?.message || "Failed to load project header.",
           );
         }
       } finally {
@@ -473,9 +464,7 @@ export default function ProjectsAdmin() {
   async function saveHeader() {
     if (savingHeader || headerCooldown) return;
 
-    const hasEmptyField = Object.values(header).some(
-      (value) => !value.trim(),
-    );
+    const hasEmptyField = Object.values(header).some((value) => !value.trim());
 
     if (hasEmptyField) {
       toast.error("Please fill in all header fields.");
@@ -507,9 +496,7 @@ export default function ProjectsAdmin() {
     } catch (error) {
       console.error("Save header error:", error);
 
-      toast.error(
-        error.response?.data?.message || "Failed to save header.",
-      );
+      toast.error(error.response?.data?.message || "Failed to save header.");
     } finally {
       setSavingHeader(false);
 
@@ -527,10 +514,7 @@ export default function ProjectsAdmin() {
       const { data } = await axios.get(HEADER_API);
 
       const savedHeader =
-        data?.header ??
-        data?.data?.header ??
-        data?.data ??
-        data;
+        data?.header ?? data?.data?.header ?? data?.data ?? data;
 
       setHeader({
         badgeText: savedHeader?.badgeText ?? "",
@@ -545,8 +529,7 @@ export default function ProjectsAdmin() {
       setHeaderError(true);
 
       toast.error(
-        error.response?.data?.message ||
-          "Failed to load project header.",
+        error.response?.data?.message || "Failed to load project header.",
       );
     } finally {
       setLoadingHeader(false);
@@ -568,9 +551,7 @@ export default function ProjectsAdmin() {
 
     setProjects((prev) =>
       prev.map((project) =>
-        project.clientKey === clientKey
-          ? { ...project, ...changes }
-          : project,
+        project.clientKey === clientKey ? { ...project, ...changes } : project,
       ),
     );
   }
@@ -592,9 +573,7 @@ export default function ProjectsAdmin() {
     }
 
     if (file.size === 0 || file.size > 5 * 1024 * 1024) {
-      toast.error(
-        "Image must be larger than 0 bytes and no more than 5MB.",
-      );
+      toast.error("Image must be larger than 0 bytes and no more than 5MB.");
       return;
     }
 
@@ -609,8 +588,7 @@ export default function ProjectsAdmin() {
     reader.onload = () => {
       setProjects((prev) =>
         prev.map((project) =>
-          project.clientKey === clientKey &&
-          project.imageFile === file
+          project.clientKey === clientKey && project.imageFile === file
             ? {
                 ...project,
                 imagePreview: reader.result || "",
@@ -631,9 +609,7 @@ export default function ProjectsAdmin() {
     if (requestInProgress.current) return;
 
     setProjects((prev) => {
-      const index = prev.findIndex(
-        (item) => item.clientKey === clientKey,
-      );
+      const index = prev.findIndex((item) => item.clientKey === clientKey);
 
       const newIndex = index + direction;
 
@@ -643,10 +619,7 @@ export default function ProjectsAdmin() {
 
       const updated = [...prev];
 
-      [updated[index], updated[newIndex]] = [
-        updated[newIndex],
-        updated[index],
-      ];
+      [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
 
       return updated;
     });
@@ -657,9 +630,7 @@ export default function ProjectsAdmin() {
 
     if (!project._id) {
       setProjects((prev) =>
-        prev.filter(
-          (item) => item.clientKey !== project.clientKey,
-        ),
+        prev.filter((item) => item.clientKey !== project.clientKey),
       );
       return;
     }
@@ -673,18 +644,14 @@ export default function ProjectsAdmin() {
       });
 
       setProjects((prev) =>
-        prev.filter(
-          (item) => item.clientKey !== project.clientKey,
-        ),
+        prev.filter((item) => item.clientKey !== project.clientKey),
       );
 
       toast.success("Project deleted.");
     } catch (error) {
       console.error("Delete project error:", error);
 
-      toast.error(
-        error.response?.data?.message || "Failed to delete project.",
-      );
+      toast.error(error.response?.data?.message || "Failed to delete project.");
     } finally {
       requestInProgress.current = false;
       setDeletingKey(null);
@@ -692,11 +659,7 @@ export default function ProjectsAdmin() {
   }
 
   async function saveProjects() {
-    if (
-      requestInProgress.current ||
-      loadingProjects ||
-      projectsError
-    ) {
+    if (requestInProgress.current || loadingProjects || projectsError) {
       return;
     }
 
@@ -744,10 +707,7 @@ export default function ProjectsAdmin() {
     setSavingProjects(true);
 
     try {
-      const { data } = await axios.post(
-        PROJECTS_API,
-        formData,
-      );
+      const { data } = await axios.post(PROJECTS_API, formData);
 
       if (!Array.isArray(data?.projects)) {
         throw new Error("Invalid save response");
@@ -835,10 +795,7 @@ export default function ProjectsAdmin() {
                 key={field.name}
                 className={field.textarea ? "md:col-span-2" : ""}
               >
-                <label
-                  htmlFor={field.name}
-                  className={labelClass}
-                >
+                <label htmlFor={field.name} className={labelClass}>
                   {field.label}
                 </label>
 
@@ -892,20 +849,14 @@ export default function ProjectsAdmin() {
             <button
               type="button"
               disabled={
-                loadingHeader ||
-                headerError ||
-                savingHeader ||
-                headerCooldown
+                loadingHeader || headerError || savingHeader || headerCooldown
               }
               onClick={saveHeader}
               className={saveButtonClass}
             >
               {savingHeader ? (
                 <>
-                  <LoaderCircle
-                    size={18}
-                    className="animate-spin"
-                  />
+                  <LoaderCircle size={18} className="animate-spin" />
                   Saving...
                 </>
               ) : (
@@ -953,9 +904,7 @@ export default function ProjectsAdmin() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setReloadProjects((prev) => prev + 1)
-                }
+                onClick={() => setReloadProjects((prev) => prev + 1)}
                 className="mt-3 text-sm font-semibold text-[#1E8A8A]"
               >
                 Try again
@@ -997,34 +946,26 @@ export default function ProjectsAdmin() {
                 Add New Large Project
               </button>
 
-              <div className="mt-6 flex justify-end border-t border-[var(--border)] pt-6">
+              <footer className="mt-4 sticky bottom-4 z-10 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    Ready to save your changes?
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Images upload automatically when you update.
+                  </p>
+                </div>
+
                 <button
                   type="button"
-                  disabled={
-                    busy ||
-                    loadingProjects ||
-                    projectsError ||
-                    projects.length === 0
-                  }
                   onClick={saveProjects}
-                  className={`${saveButtonClass} w-full sm:w-auto`}
+                  disabled={savingProjects}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167575] focus-visible:ring-4 focus-visible:ring-[#1E8A8A]/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {savingProjects ? (
-                    <>
-                      <LoaderCircle
-                        size={18}
-                        className="animate-spin"
-                      />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={18} />
-                      Save Projects
-                    </>
-                  )}
+                  {savingProjects ? <Spinner /> : <Save size={18} />}
+                  {savingProjects ? "Saving Projects Changes..." : "Save Projects"}
                 </button>
-              </div>
+              </footer>
             </>
           )}
         </section>
