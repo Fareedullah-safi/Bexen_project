@@ -1,5 +1,6 @@
 "use client";
 
+import axios from "axios";
 import {
   BookOpen,
   CalendarDays,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import Script from "next/script";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 
 const emptyArticle = {
   day: "",
@@ -36,7 +38,6 @@ export default function BlogSectionAdmin() {
   });
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
   const widgetRef = useRef(null);
-  const [previewImgage, setPreviewImage] = useState("")
 
   // Update one field of the new article
   function handleChange(e) {
@@ -90,12 +91,26 @@ export default function BlogSectionAdmin() {
     widgetRef.current.open();
   }
 
-  // Get the data out (console only for now)
-  function handleAddArticle() {
-    console.log("New article data:", article);
-    console.log("newTitles also", Titles);
-  }
+  // Get and post the data out (console only for now)
+  async function handleAddArticle() {
+    const formData = { article, Titles };
+    console.log(formData);
 
+    try {
+      if (!article?.image) {
+        toast.error("Please upload an image first.");
+        return;
+      }
+
+      const res = await axios.post("/api/homepage/articles-section", formData);
+
+      if (res.data.success) {
+        toast.success(res.data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to add article.");
+    }
+  }
   return (
     <div className="min-h-screen space-y-5 bg-[#f7f9fc] p-4 text-gray-900 sm:p-6 dark:bg-[#0b1117] dark:text-gray-100">
       <Script

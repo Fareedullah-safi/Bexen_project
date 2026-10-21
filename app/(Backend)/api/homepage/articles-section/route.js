@@ -3,9 +3,10 @@ import connectDB from "@/Lib/mongoDB";
 import BlogSection from "@/Models/articles-section/BlogSection";
 import { NextResponse } from "next/server";
 
-// Helper: delete an image from Cloudinary by its public ID
+// Delete an image from Cloudinary
 async function deleteFromCloudinary(publicId) {
   if (!publicId) return;
+
   try {
     await cloudinary.uploader.destroy(publicId);
   } catch (err) {
@@ -13,23 +14,24 @@ async function deleteFromCloudinary(publicId) {
   }
 }
 
-// ── GET: Load blog data ──
-
+// GET: Load blog section
 export async function GET() {
   try {
     await connectDB();
+
     const data = await BlogSection.findOne();
 
-    if (!data) {
-      return NextResponse.json({
-        success: true,
-        data: { sectionTitle: "", highlightedTitle: "", posts: [] },
-      });
-    }
-
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({
+      success: true,
+      data: data || {
+        sectionTitle: "",
+        highlightedTitle: "",
+        posts: [],
+      },
+    });
   } catch (error) {
     console.error("GET Error:", error);
+
     return NextResponse.json(
       { success: false, message: "Failed to load data." },
       { status: 500 },
@@ -37,71 +39,79 @@ export async function GET() {
   }
 }
 
-// ── POST: Save all data + delete removed images ──
-
+// POST: Add one article OR save the complete section
 export async function POST(request) {
   try {
     await connectDB();
 
-    const body = await request.json();
-    const { sectionTitle, highlightedTitle, posts } = body;
+    const { article, Titles } = await request.json();
 
-    if (!sectionTitle || !highlightedTitle) {
+    const newArticle = {
+      day: Number(article.day || ""),
+      month: String(article.month || "OCT").toUpperCase(),
+      image: String(article.image || "").trim(),
+      publicId: String(article.publicId || ""),
+      category: String(article.category || "").trim(),
+      author: String(article.author || "Admin").trim(),
+      title: String(article.title || "").trim(),
+      link: String(article.link || "").trim(),
+    };
+
+    if (
+      !newArticle.day ||
+      !newArticle.image ||
+      !newArticle.category ||
+      !newArticle.title ||
+      !newArticle.link
+    ) {
       return NextResponse.json(
-        { success: false, message: "Section titles are required." },
+        {
+          success: false,
+          message: "Please fill all article fields and upload an image.",
+        },
         { status: 400 },
       );
     }
 
-    if (!Array.isArray(posts)) {
-      return NextResponse.json(
-        { success: false, message: "Posts must be an array." },
-        { status: 400 },
-      );
+    let section = await BlogSection.findOne();
+
+    if (!section) {
+      section = new BlogSection({
+        sectionTitle: Titles?.sectionTitle || "The Ultimate",
+        highlightedTitle: Titles?.highlightedTitle || "Resource.",
+        posts: [newArticle],
+      });
+    } else {
+      section.sectionTitle = Titles?.sectionTitle || section.sectionTitle;
+      section.highlightedTitle =
+        Titles?.highlightedTitle || section.highlightedTitle;
+
+      section.posts.push(newArticle);
     }
 
-    // ── Step 1: Get old posts from MongoDB ──
-    const existing = await BlogSection.findOne();
-    const oldPublicIds = existing
-      ? (existing.posts || []).map((p) => p.publicId).filter(Boolean) // Remove empty strings
-      : [];
+    await section.save();
 
-    // ── Step 2: Get new public IDs from incoming posts ──
-    const newPublicIds = posts.map((p) => p.publicId).filter(Boolean);
-
-    // ── Step 3: Find which images were removed ──
-    const removedPublicIds = oldPublicIds.filter(
-      (id) => !newPublicIds.includes(id),
-    );
-
-    // ── Step 4: Delete removed images from Cloudinary ──
-    if (removedPublicIds.length > 0) {
-      // Delete all removed images in parallel
-      await Promise.all(removedPublicIds.map(deleteFromCloudinary));
-    }
-
-    // ── Step 5: Save updated data to MongoDB ──
-    const saved = await BlogSection.findOneAndUpdate(
-      {},
-      { sectionTitle, highlightedTitle, posts },
-      { new: true, upsert: true, runValidators: true },
-    );
-
-    return NextResponse.json({
-      success: true,
-      message: "Saved successfully.",
-      deletedImages: removedPublicIds.length,
-      data: saved,
-    });
-  } catch (error) {
-    console.error("POST Error:", error);
     return NextResponse.json(
-      { success: false, message: "Failed to save." },
+      {
+        success: true,
+        message: "Article added successfully!",
+        data: section,
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("Add article API error:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: error.message || "Failed to add article.",
+      },
       { status: 500 },
     );
   }
 }
-
+// DELETE: Remove one article using its MongoDB subdocument _id
 export async function DELETE(req) {
   try {
     await connectDB();
@@ -109,7 +119,15 @@ export async function DELETE(req) {
     const { _id } = await req.json();
 
     const section = await BlogSection.findOne();
-    const article = section?.posts.id(_id);
+
+    if (!section) {
+      return NextResponse.json(
+        { success: false, message: "Section not found." },
+        { status: 404 },
+      );
+    }
+
+    const article = section.posts.id(_id);
 
     if (!article) {
       return NextResponse.json(
@@ -118,14 +136,19 @@ export async function DELETE(req) {
       );
     }
 
-    if (article.publicId) {
-      await cloudinary.uploader.destroy(article.publicId);
-    }
+    const publicId = article.publicId;
 
     article.deleteOne();
     await section.save();
 
-    return NextResponse.json({ success: true });
+    if (publicId) {
+      await deleteFromCloudinary(publicId);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Article deleted successfully.",
+    });
   } catch (error) {
     console.error("Delete article error:", error);
 
