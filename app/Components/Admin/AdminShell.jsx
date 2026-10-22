@@ -1,18 +1,16 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useTheme } from "next-themes";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 import axios from "axios";
 import {
   BarChart3,
-  Bell,
   BriefcaseBusiness,
+  Check,
   ChevronDown,
   ExternalLink,
   FileText,
   Info,
+  Languages,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -24,11 +22,14 @@ import {
   Settings,
   ShieldCheck,
   Sun,
+  UserRound,
   Users,
   X,
-  UserRound,
 } from "lucide-react";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
+import { useTheme } from "next-themes";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 /* ============ MENU LINKS ============ */
 
@@ -120,6 +121,12 @@ const navigation = [
   },
 ];
 
+const languages = [
+  { value: "en", label: "English", native: "English", direction: "ltr" },
+  { value: "ps", label: "Pashto", native: "پښتو", direction: "rtl" },
+  { value: "fa", label: "Dari", native: "دری", direction: "rtl" },
+];
+
 /* ============ COMPONENT ============ */
 
 export default function AdminShell({ children }) {
@@ -128,11 +135,16 @@ export default function AdminShell({ children }) {
 
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [openName, setOpenName] = useState(null);
 
-  // Logged-in administrator profile
+  const [language, setLanguage] = useState("en");
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const [isLanguageSaving, setIsLanguageSaving] = useState(false);
+
+  const languageRef = useRef(null);
+  const languageRequestRef = useRef(0);
+
   const [adminUid, setAdminUid] = useState("");
   const [adminName, setAdminName] = useState("Administrator");
   const [adminEmail, setAdminEmail] = useState("");
@@ -153,7 +165,6 @@ export default function AdminShell({ children }) {
 
         if (res.data.success && res.data.admin) {
           const admin = res.data.admin;
-
           setAdminUid(admin.uid || "");
           setAdminEmail(admin.email || "");
         }
@@ -170,7 +181,125 @@ export default function AdminShell({ children }) {
     loadSession();
   }, []);
 
-  // Handle sign out
+  /* ============ LOAD SAVED LANGUAGE ============ */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadLanguage = async () => {
+      try {
+        const res = await axios.get("/api/admin/adminusers/language");
+
+        if (cancelled) return;
+
+        if (res.data.success) {
+          const savedLanguage = languages.some(
+            (item) => item.value === res.data.language,
+          )
+            ? res.data.language
+            : "en";
+
+          setLanguage(savedLanguage);
+          localStorage.setItem("admin-language", savedLanguage);
+        }
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error(
+          "Unable to load saved language:",
+          error.response?.data?.message || error.message,
+        );
+
+        const localLanguage = localStorage.getItem("admin-language");
+
+        if (languages.some((item) => item.value === localLanguage)) {
+          setLanguage(localLanguage);
+        }
+      }
+    };
+
+    loadLanguage();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* ============ SAVE LANGUAGE ============ */
+
+  const handleLanguageChange = async (selectedLanguage) => {
+    if (
+      isLanguageSaving ||
+      !languages.some((item) => item.value === selectedLanguage) ||
+      selectedLanguage === language
+    ) {
+      setLanguageOpen(false);
+      return;
+    }
+
+    const previousLanguage = language;
+    const requestId = ++languageRequestRef.current;
+
+    setLanguage(selectedLanguage);
+    setLanguageOpen(false);
+    setIsLanguageSaving(true);
+
+    try {
+      const res = await axios.post(
+        "/api/admin/adminusers/language",
+        { language: selectedLanguage },
+        { withCredentials: true },
+      );
+
+      if (requestId !== languageRequestRef.current) return;
+
+      if (!res.data.success) {
+        throw new Error(res.data.message || "Unable to save language.");
+      }
+
+      localStorage.setItem("admin-language", selectedLanguage);
+    } catch (error) {
+      if (requestId !== languageRequestRef.current) return;
+
+      setLanguage(previousLanguage);
+
+      console.error(
+        "Unable to save language:",
+        error.response?.data?.message || error.message,
+      );
+    } finally {
+      if (requestId === languageRequestRef.current) {
+        setIsLanguageSaving(false);
+      }
+    }
+  };
+
+  /* ============ CLOSE LANGUAGE DROPDOWN ============ */
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!languageRef.current?.contains(event.target)) {
+        setLanguageOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setLanguageOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  /* ============ SIGN OUT ============ */
+
   const handleSignOut = async () => {
     try {
       await axios.post(
@@ -178,19 +307,17 @@ export default function AdminShell({ children }) {
         {},
         { withCredentials: true },
       );
-      // Navigate only after the logout request completes.
+
       window.location.replace("/adminLogin");
     } catch (error) {
-      console.log("Sign out failed:", error);
+      console.error("Sign out failed:", error);
     }
   };
 
   /* ============ LOAD SAVED PROFILE ============ */
 
   useEffect(() => {
-    if (!adminUid) {
-      return;
-    }
+    if (!adminUid) return;
 
     let cancelled = false;
 
@@ -219,9 +346,7 @@ export default function AdminShell({ children }) {
           error.response?.data || error.message,
         );
       } finally {
-        if (!cancelled) {
-          setIsProfileLoading(false);
-        }
+        if (!cancelled) setIsProfileLoading(false);
       }
     };
 
@@ -245,9 +370,11 @@ export default function AdminShell({ children }) {
 
   const isDark = mounted && theme === "dark";
 
+  const selectedLanguage =
+    languages.find((item) => item.value === language) || languages[0];
+
   const isActive = (href) => {
     if (href === "/admin") return pathname === "/admin";
-
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
@@ -279,8 +406,8 @@ export default function AdminShell({ children }) {
           src={adminImage}
           alt={`${adminName} profile`}
           className="h-full w-full object-cover"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
           }}
         />
       ) : (
@@ -466,13 +593,13 @@ export default function AdminShell({ children }) {
 
       {/* RIGHT SIDE */}
       <div className="lg:pl-[270px]">
-        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-[var(--border)] bg-[var(--surface)]/90 px-4 backdrop-blur-xl sm:px-6">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-[var(--border)] bg-[var(--surface)]/90 px-3 backdrop-blur-xl sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               aria-label="Open sidebar"
               onClick={() => setMobileOpen(true)}
-              className="rounded-xl border border-[var(--border)] p-2.5 text-[var(--foreground)] hover:bg-[var(--surface-soft)] lg:hidden"
+              className="shrink-0 rounded-xl border border-[var(--border)] p-2.5 text-[var(--foreground)] hover:bg-[var(--surface-soft)] lg:hidden"
             >
               <Menu size={20} />
             </button>
@@ -488,84 +615,159 @@ export default function AdminShell({ children }) {
               </span>
             </div>
 
-            <p className="text-sm font-bold text-[var(--foreground)] md:hidden">
+            <p className="truncate text-sm font-bold text-[var(--foreground)] md:hidden">
               Universal Admin
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
+            {/* VIEW SITE */}
             <Link
               href="/"
               target="_blank"
-              className="hidden items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[var(--muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)] sm:flex"
+              className="hidden items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[var(--muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)] lg:flex"
             >
               <ExternalLink size={17} />
               View Site
             </Link>
 
+            {/* ANIMATED LANGUAGE SELECTOR */}
+            <div ref={languageRef} className="relative shrink-0">
+              <button
+                type="button"
+                aria-label="Select dashboard language"
+                aria-haspopup="listbox"
+                aria-expanded={languageOpen}
+                disabled={isLanguageSaving}
+                onClick={() => setLanguageOpen((open) => !open)}
+                className={`group relative flex h-10 min-w-[132px] items-center gap-2 overflow-hidden rounded-xl border border-white/15 bg-gradient-to-r from-[#1E8A8A] to-[#187777] px-3 text-white shadow-md shadow-teal-900/10 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-900/20 focus-visible:ring-2 focus-visible:ring-[#35B5B5]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] focus-visible:outline-none active:translate-y-0 disabled:cursor-wait disabled:opacity-70`}
+              >
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+
+                <Languages size={17} className="relative shrink-0" />
+
+                <span className="relative flex-1 text-left text-sm font-semibold">
+                  {selectedLanguage.native}
+                </span>
+
+                {isLanguageSaving ? (
+                  <span className="relative h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                ) : (
+                  <ChevronDown
+                    size={15}
+                    className={`relative shrink-0 transition-transform duration-300 ${
+                      languageOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                )}
+              </button>
+
+              <div
+                className={`absolute top-[calc(100%+10px)] right-0 z-[60] w-[190px] origin-top-right rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-xl shadow-black/10 transition-all duration-200 ease-out ${
+                  languageOpen
+                    ? "visible translate-y-0 scale-100 opacity-100"
+                    : "invisible -translate-y-2 scale-95 opacity-0"
+                }`}
+                role="listbox"
+                aria-label="Available languages"
+                aria-hidden={!languageOpen}
+              >
+                <div className="px-3 pt-2 pb-2">
+                  <p className="text-[10px] font-bold tracking-[0.16em] text-[var(--muted)] uppercase">
+                    Choose language
+                  </p>
+                </div>
+
+                {languages.map((item) => {
+                  const active = language === item.value;
+
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      tabIndex={languageOpen ? 0 : -1}
+                      disabled={isLanguageSaving}
+                      onClick={() => handleLanguageChange(item.value)}
+                      className={`group/option relative mb-1 flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-left transition-all duration-200 ease-out last:mb-0 hover:translate-x-0.5 focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:outline-none ${
+                        active
+                          ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                          : "text-[var(--foreground)] hover:bg-[var(--surface-soft)]"
+                      } disabled:cursor-wait disabled:opacity-60`}
+                    >
+                      <span
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-all duration-200 group-hover/option:scale-105 ${
+                          active
+                            ? "bg-[var(--accent)] text-white shadow-sm"
+                            : "bg-[var(--surface-soft)] text-[var(--muted)] group-hover/option:bg-[var(--accent-soft)] group-hover/option:text-[var(--accent)]"
+                        }`}
+                      >
+                        {item.value.toUpperCase()}
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold">
+                          {item.native}
+                        </span>
+                        <span
+                          className={`mt-0.5 block text-[11px] ${
+                            active
+                              ? "text-[var(--accent)]/80"
+                              : "text-[var(--muted)]"
+                          }`}
+                        >
+                          {item.label}
+                        </span>
+                      </span>
+
+                      <Check
+                        size={16}
+                        className={`shrink-0 transition-all duration-200 ${
+                          active
+                            ? "scale-100 opacity-100"
+                            : "scale-75 opacity-0"
+                        }`}
+                      />
+
+                      <span
+                        className={`absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-[var(--accent)] transition-opacity duration-200 ${
+                          active
+                            ? "opacity-100"
+                            : "opacity-0 group-hover/option:opacity-50"
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+
+                <div className="mt-1 border-t border-[var(--border)] px-3 py-2">
+                  <p className="text-[10px] text-[var(--muted)]">
+                    Language preference is saved to your account.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* THEME TOGGLE */}
             <button
               type="button"
               onClick={() => setTheme(isDark ? "light" : "dark")}
-              className="rounded-xl border border-[var(--border)] p-2.5 text-[var(--muted)] transition hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)]"
+              className="shrink-0 rounded-xl border border-[var(--border)] p-2.5 text-[var(--muted)] transition hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)]"
               title="Toggle theme"
+              aria-label="Toggle theme"
             >
               {isDark ? <Sun size={19} /> : <Moon size={19} />}
             </button>
 
-            {/* NOTIFICATIONS */}
-            <div className="relative">
-              <button
-                type="button"
-                aria-label="Toggle notifications"
-                onClick={() => {
-                  setNotificationsOpen(!notificationsOpen);
-                  setProfileOpen(false);
-                }}
-                className="relative rounded-xl border border-[var(--border)] p-2.5 text-[var(--muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--foreground)]"
-              >
-                <Bell size={19} />
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
-              </button>
-
-              {notificationsOpen && (
-                <div className="absolute top-14 right-0 w-[300px] rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-2xl">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="font-bold">Notifications</p>
-                    <span className="rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[10px] font-bold text-[var(--accent)]">
-                      3 New
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {[
-                      "New user registered",
-                      "New message received",
-                      "Website analytics updated",
-                    ].map((item) => (
-                      <div
-                        key={item}
-                        className="rounded-xl bg-[var(--surface-soft)] p-3 text-sm text-[var(--muted)]"
-                      >
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* TOP-RIGHT PROFILE */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 type="button"
                 aria-label="Toggle admin profile menu"
                 aria-expanded={profileOpen}
-                onClick={() => {
-                  setProfileOpen(!profileOpen);
-                  setNotificationsOpen(false);
-                }}
-                className="flex items-center gap-2 rounded-xl border border-[var(--border)] p-1.5 pr-2.5 hover:bg-[var(--surface-soft)]"
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-2 rounded-xl border border-[var(--border)] p-1.5 pr-2.5 transition-colors hover:bg-[var(--surface-soft)]"
               >
                 {renderAvatar("h-8 w-8", "text-xs")}
 
@@ -611,16 +813,15 @@ export default function AdminShell({ children }) {
                   </Link>
 
                   <div className="my-2 border-t border-[var(--border)]" />
-                  <Link href={"/adminLogin"}>
-                    <button
-                      type="button"
-                      onClick={handleSignOut}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-500 hover:bg-red-500/10"
-                    >
-                      <LogOut size={17} />
-                      Sign Out
-                    </button>
-                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-500 transition-colors hover:bg-red-500/10"
+                  >
+                    <LogOut size={17} />
+                    Sign Out
+                  </button>
                 </div>
               )}
             </div>

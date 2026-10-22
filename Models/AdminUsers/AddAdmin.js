@@ -21,7 +21,7 @@ const AdminUserSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: ["super-admin", "admin", "editor", "viewer"],
-    }
+    },
   },
   {
     timestamps: true,
