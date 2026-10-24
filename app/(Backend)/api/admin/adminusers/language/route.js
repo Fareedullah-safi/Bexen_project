@@ -19,7 +19,7 @@ export async function GET() {
     await connectDB();
 
     const data = await AdminLanguage.findOne({
-      adminUid: String(admin.uid),
+      adminId: String(admin.uid),
     }).lean();
 
     return NextResponse.json({

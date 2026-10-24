@@ -138,7 +138,7 @@ export default function AdminShell({ children }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [openName, setOpenName] = useState(null);
 
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState(null);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [isLanguageSaving, setIsLanguageSaving] = useState(false);
 
@@ -165,6 +165,7 @@ export default function AdminShell({ children }) {
 
         if (res.data.success && res.data.admin) {
           const admin = res.data.admin;
+
           setAdminUid(admin.uid || "");
           setAdminEmail(admin.email || "");
         }
@@ -188,32 +189,41 @@ export default function AdminShell({ children }) {
 
     const loadLanguage = async () => {
       try {
-        const res = await axios.get("/api/admin/adminusers/language");
+        const res = await axios.get("/api/admin/adminusers/language", {
+          withCredentials: true,
+        });
 
         if (cancelled) return;
 
-        if (res.data.success) {
-          const savedLanguage = languages.some(
-            (item) => item.value === res.data.language,
-          )
-            ? res.data.language
-            : "en";
-
-          setLanguage(savedLanguage);
-          localStorage.setItem("admin-language", savedLanguage);
+        if (!res.data.success) {
+          throw new Error(res.data.message || "Unable to load saved language.");
         }
+
+        const savedLanguage = res.data.language;
+
+        if (!languages.some((item) => item.value === savedLanguage)) {
+          throw new Error(
+            `Invalid language returned by API: ${String(savedLanguage)}`,
+          );
+        }
+
+        setLanguage(savedLanguage);
+        localStorage.setItem("admin-language", savedLanguage);
       } catch (error) {
         if (cancelled) return;
 
         console.error(
-          "Unable to load saved language:",
-          error.response?.data?.message || error.message,
+          "Unable to load language from database:",
+          error.response?.data || error.message,
         );
 
+        // Use the previously saved browser preference only if the API fails.
         const localLanguage = localStorage.getItem("admin-language");
 
         if (languages.some((item) => item.value === localLanguage)) {
           setLanguage(localLanguage);
+        } else {
+          setLanguage("en");
         }
       }
     };
@@ -257,7 +267,14 @@ export default function AdminShell({ children }) {
         throw new Error(res.data.message || "Unable to save language.");
       }
 
-      localStorage.setItem("admin-language", selectedLanguage);
+      const savedLanguage = res.data.language;
+
+      if (!languages.some((item) => item.value === savedLanguage)) {
+        throw new Error("The server returned an invalid language.");
+      }
+
+      setLanguage(savedLanguage);
+      localStorage.setItem("admin-language", savedLanguage);
     } catch (error) {
       if (requestId !== languageRequestRef.current) return;
 
@@ -370,11 +387,11 @@ export default function AdminShell({ children }) {
 
   const isDark = mounted && theme === "dark";
 
-  const selectedLanguage =
-    languages.find((item) => item.value === language) || languages[0];
+  const selectedLanguage = languages.find((item) => item.value === language);
 
   const isActive = (href) => {
     if (href === "/admin") return pathname === "/admin";
+
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
@@ -638,16 +655,16 @@ export default function AdminShell({ children }) {
                 aria-label="Select dashboard language"
                 aria-haspopup="listbox"
                 aria-expanded={languageOpen}
-                disabled={isLanguageSaving}
+                disabled={isLanguageSaving || language === null}
                 onClick={() => setLanguageOpen((open) => !open)}
-                className={`group relative flex h-10 min-w-[132px] items-center gap-2 overflow-hidden rounded-xl border border-white/15 bg-gradient-to-r from-[#1E8A8A] to-[#187777] px-3 text-white shadow-md shadow-teal-900/10 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-900/20 focus-visible:ring-2 focus-visible:ring-[#35B5B5]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] focus-visible:outline-none active:translate-y-0 disabled:cursor-wait disabled:opacity-70`}
+                className="group relative flex h-10 min-w-[132px] items-center gap-2 overflow-hidden rounded-xl border border-white/15 bg-gradient-to-r from-[#1E8A8A] to-[#187777] px-3 text-white shadow-md shadow-teal-900/10 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-900/20 focus-visible:ring-2 focus-visible:ring-[#35B5B5]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] focus-visible:outline-none active:translate-y-0 disabled:cursor-wait disabled:opacity-70"
               >
                 <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
 
                 <Languages size={17} className="relative shrink-0" />
 
                 <span className="relative flex-1 text-left text-sm font-semibold">
-                  {selectedLanguage.native}
+                  {selectedLanguage?.native || "Loading..."}
                 </span>
 
                 {isLanguageSaving ? (
