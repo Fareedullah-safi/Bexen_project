@@ -1,10 +1,18 @@
+
 import mongoose from "mongoose";
 
-const BrandLogoSchema = new mongoose.Schema(
+const BrandLogoTitleSchema = new mongoose.Schema(
   {
-    title: {
-      type: String,
-      required: true,
+    translations: {
+      en: {
+        title: { type: String, default: "" },
+      },
+      ps: {
+        title: { type: String, default: "" },
+      },
+      fa: {
+        title: { type: String, default: "" },
+      },
     },
   },
   {
@@ -13,4 +21,4 @@ const BrandLogoSchema = new mongoose.Schema(
 );
 
 export default mongoose.models.BrandLogoTitle ||
-  mongoose.model("BrandLogoTitle", BrandLogoSchema);
+  mongoose.model("BrandLogoTitle", BrandLogoTitleSchema);

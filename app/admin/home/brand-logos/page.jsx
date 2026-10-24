@@ -1,9 +1,22 @@
 "use client";
 
 import Spinner from "@/app/admin/Components/Admin/Spinner";
+import axios from "axios";
 import { ImagePlus, Link, Trash2Icon, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "ps", label: "پښتو" },
+  { code: "fa", label: "دری" },
+];
+
+const EMPTY_TITLES = {
+  en: "",
+  ps: "",
+  fa: "",
+};
 
 export default function BrandLogos() {
   const fileRefs = useRef({});
@@ -15,13 +28,14 @@ export default function BrandLogos() {
     { id: 3, preview: "", file: null, url: "" },
   ]);
 
-  const [sectionTitle, setSectionTitle] = useState("");
+  const [titleDrafts, setTitleDrafts] = useState(EMPTY_TITLES);
+  const [titleLanguage, setTitleLanguage] = useState("en");
   const [savedData, setSavedData] = useState([]);
   const [deletingLogo, setDeletingLogo] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isFetching, setIsFetching] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [isChangingTitle, setIsChangingTitle] = useState(false);
-  const [isFetchingTitle, setIsFetchingTitle] = useState(false);
+  const [isFetchingTitle, setIsFetchingTitle] = useState(true);
   const [imageErrors, setImageErrors] = useState({});
 
   const revokePreview = (url) => {
@@ -40,6 +54,7 @@ export default function BrandLogos() {
 
   const handleLogo = (id, e) => {
     const file = e.target.files?.[0];
+
     if (!file) return;
 
     if (
@@ -59,6 +74,7 @@ export default function BrandLogos() {
     }
 
     const currentLogo = logos.find((logo) => logo.id === id);
+
     if (currentLogo?.url) {
       e.target.value = "";
       return;
@@ -70,7 +86,9 @@ export default function BrandLogos() {
     setLogos((prev) =>
       prev.map((logo) => {
         if (logo.id !== id) return logo;
+
         revokePreview(logo.preview);
+
         return { ...logo, file, url: "", preview };
       }),
     );
@@ -82,19 +100,23 @@ export default function BrandLogos() {
   const handleUrl = (id, e) => {
     const url = e.target.value;
     const currentLogo = logos.find((logo) => logo.id === id);
+
     if (currentLogo?.file) return;
 
     revokePreview(currentLogo?.preview);
+
     setLogos((prev) =>
       prev.map((logo) =>
         logo.id === id ? { ...logo, file: null, url, preview: url } : logo,
       ),
     );
+
     setImageErrors((prev) => ({ ...prev, [id]: false }));
   };
 
   const handleRemove = (id) => {
     const currentLogo = logos.find((logo) => logo.id === id);
+
     revokePreview(currentLogo?.preview);
 
     setLogos((prev) =>
@@ -104,14 +126,80 @@ export default function BrandLogos() {
     );
 
     setImageErrors((prev) => ({ ...prev, [id]: false }));
-    if (fileRefs.current[id]) fileRefs.current[id].value = "";
+
+    if (fileRefs.current[id]) {
+      fileRefs.current[id].value = "";
+    }
+  };
+
+  const allBoxData = async () => {
+    try {
+      setIsFetching(true);
+
+      const { data } = await axios.get("/api/homepage/brand-logos", {
+        headers: { "Cache-Control": "no-cache" },
+        params: { _t: Date.now() },
+      });
+
+      if (!data?.success) {
+        throw new Error(data?.message || "Failed to load saved logos");
+      }
+
+      setSavedData(Array.isArray(data.data) ? data.data : []);
+    } catch (error) {
+      console.error("Fetch brand logos error:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to load saved logos",
+      );
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  const getSectionTitles = async () => {
+    try {
+      setIsFetchingTitle(true);
+
+      const results = await Promise.all(
+        LANGUAGES.map(async ({ code }) => {
+          const { data } = await axios.get("/api/homepage/brand-logos/title", {
+            params: { lang: code, _t: Date.now() },
+            headers: { "Cache-Control": "no-cache" },
+          });
+
+          if (!data?.success) {
+            throw new Error(data?.message || `Failed to load ${code} title`);
+          }
+
+          // GET returns { success, lang, title }, not a translations object.
+          return [code, typeof data.title === "string" ? data.title : ""];
+        }),
+      );
+
+      setTitleDrafts({
+        ...EMPTY_TITLES,
+        ...Object.fromEntries(results),
+      });
+    } catch (error) {
+      console.error("Fetch language titles error:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to load language titles",
+      );
+    } finally {
+      setIsFetchingTitle(false);
+    }
   };
 
   const handleSubmit = async () => {
     if (isSaving) return;
 
     if (!logos[0].file && !logos[0].url.trim()) {
-      return toast.error("Please add Logo 1");
+      toast.error("Please add Logo 1");
+      return;
     }
 
     try {
@@ -122,7 +210,6 @@ export default function BrandLogos() {
       logos.forEach((logo) => {
         formData.append("ids", String(logo.id));
 
-        // Keep each upload matched to its own logo slot.
         if (logo.file) {
           formData.append(`file_${logo.id}`, logo.file);
         }
@@ -130,32 +217,23 @@ export default function BrandLogos() {
         formData.append(`url_${logo.id}`, logo.url || "");
       });
 
-      const response = await fetch("/api/homepage/brand-logos/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const { data: uploadResult } = await axios.post(
+        "/api/homepage/brand-logos/upload",
+        formData,
+      );
 
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || result.error || "Logo upload failed.",
-        );
+      if (!uploadResult?.success) {
+        throw new Error(uploadResult?.message || "Logo upload failed");
       }
 
-      const postResponse = await fetch("/api/homepage/brand-logos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ logos: result.logos }),
-      });
+      const { data: saveResult } = await axios.post(
+        "/api/homepage/brand-logos",
+        { logos: uploadResult.logos },
+      );
 
-      const postResult = await postResponse.json();
-
-      if (!postResponse.ok || !postResult.success) {
+      if (!saveResult?.success) {
         throw new Error(
-          postResult.message ||
-            postResult.error ||
-            "Failed to save logos to the database.",
+          saveResult?.message || "Failed to save logos to the database",
         );
       }
 
@@ -180,87 +258,73 @@ export default function BrandLogos() {
       await allBoxData();
     } catch (error) {
       console.error("Brand logos save error:", error);
-      toast.error(error.message || "Something went wrong");
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Something went wrong",
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
-  const allBoxData = async () => {
-    if (isFetching) return;
-
-    try {
-      setIsFetching(true);
-      const response = await fetch("/api/homepage/brand-logos", {
-        cache: "no-store",
-      });
-      const data = await response.json();
-
-      console.log(data);
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || data.error || "Failed to load saved logos",
-        );
-      }
-
-      setSavedData(data.data || []);
-    } catch (error) {
-      console.error("Fetch error:", error);
-      toast.error(error.message || "Failed to load saved logos");
-    } finally {
-      setIsFetching(false);
-    }
-  };
-
-  const getSectionTitle = async () => {
-    if (isFetchingTitle) return;
-
-    try {
-      setIsFetchingTitle(true);
-      const response = await fetch("/api/homepage/brand-logos/title", {
-        cache: "no-store",
-      });
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || data.error || "Failed to load section title",
-        );
-      }
-
-      setSectionTitle(data.data?.title || "");
-    } catch (error) {
-      console.error("Title fetch error:", error);
-      toast.error(error.message || "Failed to load section title");
-    } finally {
-      setIsFetchingTitle(false);
-    }
-  };
-
   const handleTitleSubmit = async () => {
-    if (isChangingTitle) return;
-    if (!sectionTitle.trim())
-      return toast.error("Please enter a section title");
+    if (isChangingTitle || isFetchingTitle) return;
+
+    const translations = {
+      en: titleDrafts.en ?? "",
+      ps: titleDrafts.ps ?? "",
+      fa: titleDrafts.fa ?? "",
+    };
+
+    if (Object.values(translations).some((title) => !title.trim())) {
+      toast.error("Please enter titles for all three languages");
+      return;
+    }
 
     try {
       setIsChangingTitle(true);
-      const response = await fetch("/api/homepage/brand-logos/title", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: sectionTitle.trim() }),
+
+      const { data } = await axios.post("/api/homepage/brand-logos/title", {
+        translations,
       });
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || data.error || "Failed to change title");
+      if (!data?.success) {
+        throw new Error(data?.message || "Failed to update language titles");
       }
 
-      toast.success("Title changed successfully");
+      // Your API stores translations as { en: { title }, ps: { title }, fa: { title } }.
+      // Handle a missing or differently shaped response without crashing.
+      const savedTranslations = data?.translations;
+
+      if (savedTranslations) {
+        setTitleDrafts({
+          en:
+            typeof savedTranslations.en === "string"
+              ? savedTranslations.en
+              : (savedTranslations.en?.title ?? translations.en),
+          ps:
+            typeof savedTranslations.ps === "string"
+              ? savedTranslations.ps
+              : (savedTranslations.ps?.title ?? translations.ps),
+          fa:
+            typeof savedTranslations.fa === "string"
+              ? savedTranslations.fa
+              : (savedTranslations.fa?.title ?? translations.fa),
+        });
+      } else {
+        // The API may confirm success without returning the saved document.
+        setTitleDrafts(translations);
+      }
+
+      toast.success("All language titles updated successfully");
     } catch (error) {
-      console.error("Title change error:", error);
-      toast.error(error.message || "Something went wrong");
+      console.error("Update language titles error:", error);
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Something went wrong",
+      );
     } finally {
       setIsChangingTitle(false);
     }
@@ -271,23 +335,24 @@ export default function BrandLogos() {
 
     try {
       setDeletingLogo(publicId);
-      const response = await fetch("/api/homepage/brand-logos", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId, logoId: _id }),
+
+      const { data } = await axios.delete("/api/homepage/brand-logos", {
+        data: { publicId, logoId: _id },
       });
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || data.error || "Failed to delete logo");
+      if (!data?.success) {
+        throw new Error(data?.message || "Failed to delete logo");
       }
 
       toast.success("Logo deleted successfully");
       await allBoxData();
     } catch (error) {
       console.error("Delete logo error:", error);
-      toast.error(error.message || "Something went wrong");
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Something went wrong",
+      );
     } finally {
       setDeletingLogo(null);
     }
@@ -295,7 +360,7 @@ export default function BrandLogos() {
 
   useEffect(() => {
     allBoxData();
-    getSectionTitle();
+    getSectionTitles();
   }, []);
 
   const savedLogoCount = savedData.reduce(
@@ -303,12 +368,22 @@ export default function BrandLogos() {
     0,
   );
 
+  // Show the existing Spinner until initial data has loaded.
+  if (isFetchingTitle || isFetching) {
+    return (
+      <div className="flex min-h-[300px] w-full items-center justify-center bg-[var(--background)] text-[var(--foreground)]">
+        <Spinner />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full bg-[var(--background)] text-[var(--foreground)]">
       <div className="mb-10 flex items-center gap-4">
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
           <ImagePlus size={27} />
         </div>
+
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Brand Logos</h1>
           <p className="mt-1 text-base text-[var(--muted)]">
@@ -319,24 +394,64 @@ export default function BrandLogos() {
 
       <div className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <div className="border-b border-[var(--border)] p-7 sm:p-8">
-          <label className="mb-3 block text-base font-semibold">
-            Section Title
-          </label>
+          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <label className="block text-base font-semibold">
+                Section Title
+              </label>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Select a language to edit its title.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2" aria-label="Title language">
+              {LANGUAGES.map((language) => (
+                <button
+                  key={language.code}
+                  type="button"
+                  onClick={() => setTitleLanguage(language.code)}
+                  disabled={isChangingTitle}
+                  aria-pressed={titleLanguage === language.code}
+                  className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    titleLanguage === language.code
+                      ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                      : "border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] hover:border-[var(--accent)]"
+                  }`}
+                >
+                  {language.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <input
             type="text"
-            value={sectionTitle}
-            onChange={(e) => setSectionTitle(e.target.value)}
-            placeholder="Enter section title"
-            disabled={isChangingTitle || isFetchingTitle}
+            value={titleDrafts[titleLanguage] ?? ""}
+            onChange={(e) =>
+              setTitleDrafts((prev) => ({
+                ...prev,
+                [titleLanguage]: e.target.value,
+              }))
+            }
+            placeholder={`Enter ${LANGUAGES.find((language) => language.code === titleLanguage)?.label} title`}
+            disabled={isChangingTitle}
             className="w-full rounded-2xl border border-[var(--border)] bg-[var(--background)] px-5 py-4 text-base text-[var(--foreground)] transition outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-60"
           />
+
           <button
             type="button"
             onClick={handleTitleSubmit}
             disabled={isChangingTitle || isFetchingTitle}
             className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-6 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isChangingTitle ? <Spinner /> : "Change Title"}
+            {isChangingTitle ? (
+              <>
+                <Spinner />
+                Updating All...
+              </>
+            ) : (
+              "Update All Languages"
+            )}
           </button>
         </div>
 
@@ -348,6 +463,7 @@ export default function BrandLogos() {
                 Add your company logos.
               </p>
             </div>
+
             <span className="w-fit rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent)]">
               Logo 1 required
             </span>
@@ -377,18 +493,18 @@ export default function BrandLogos() {
                       src={logo.preview}
                       alt={`Logo ${logo.id}`}
                       className="h-full w-full object-contain"
-                      onError={() => {
+                      onError={() =>
                         setImageErrors((prev) => ({
                           ...prev,
                           [logo.id]: true,
-                        }));
-                      }}
-                      onLoad={() => {
+                        }))
+                      }
+                      onLoad={() =>
                         setImageErrors((prev) => ({
                           ...prev,
                           [logo.id]: false,
-                        }));
-                      }}
+                        }))
+                      }
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center text-[var(--muted)]">
@@ -432,6 +548,7 @@ export default function BrandLogos() {
                       <Upload size={18} />
                       Upload Logo
                     </label>
+
                     <input
                       ref={(element) => {
                         fileRefs.current[logo.id] = element;
@@ -449,6 +566,7 @@ export default function BrandLogos() {
                         size={17}
                         className="absolute top-1/2 left-4 -translate-y-1/2 text-[var(--muted)]"
                       />
+
                       <input
                         type="url"
                         value={logo.url}
@@ -472,7 +590,10 @@ export default function BrandLogos() {
               className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-7 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {isSaving ? (
-                <Spinner />
+                <>
+                  <Spinner />
+                  Saving...
+                </>
               ) : (
                 <>
                   <Upload size={18} />
@@ -493,6 +614,7 @@ export default function BrandLogos() {
                 Logos currently saved in your database.
               </p>
             </div>
+
             <span className="w-fit rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent)]">
               {savedLogoCount} saved
             </span>
@@ -507,6 +629,7 @@ export default function BrandLogos() {
               {savedData.flatMap((item) =>
                 item.logos?.map((logo) => {
                   const deleteKey = `${item._id}-${logo._id}`;
+
                   return (
                     <div
                       key={deleteKey}
