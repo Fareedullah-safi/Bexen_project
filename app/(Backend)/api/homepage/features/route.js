@@ -3,267 +3,293 @@ import {
   requireEditPermission,
 } from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
-import dbConnect from "@/Lib/mongoDB";
+import connectDB from "@/Lib/mongoDB";
 import Features from "@/Models/Features";
+import { NextResponse } from "next/server";
 
-const ALLOWED_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/svg+xml",
-  "image/webp",
-];
+const languages = ["en", "ps", "fa"];
 
-const MAX_SIZE_IN_BYTES = 2 * 1024 * 1024;
+/* ==================== CLOUDINARY HELPERS ==================== */
 
-async function uploadToCloudinary(file, folder) {
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-
-  const result = await new Promise((resolve, reject) => {
-    cloudinary.uploader
-      .upload_stream(
-        {
-          folder,
-          resource_type: "image",
-        },
-        (err, result) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(result);
-          }
-        },
-      )
-      .end(buffer);
-  });
-
-  const { secure_url, public_id } = result;
-
-  return {
-    url: secure_url,
-    publicId: public_id,
-  };
-}
-
-async function deleteFromCloudinary(publicId) {
+async function deleteCloudinaryImage(publicId) {
   if (!publicId) return;
 
-  await cloudinary.uploader.destroy(publicId);
+  try {
+    await cloudinary.uploader.destroy(publicId, {
+      resource_type: "image",
+    });
+  } catch (error) {
+    console.error("Cloudinary image deletion failed:", error);
+  }
 }
 
-export async function GET() {
+/* ==================== GET FEATURES ==================== */
+
+export async function GET(request) {
   try {
-    await dbConnect();
+    await connectDB();
 
-    const doc = await Features.findOne({}).lean();
+    const lang = new URL(request.url).searchParams.get("lang") || "en";
 
-    return Response.json({
+    if (!languages.includes(lang)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid language" },
+        { status: 400 },
+      );
+    }
+
+    const features = await Features.findOne().lean();
+    const translation = features?.translations?.[lang] || {};
+
+    return NextResponse.json({
       success: true,
-      data: doc || null,
-    });
-  } catch (err) {
-    console.error("GET FEATURES ERROR:", err);
+      data: {
+        tagline:
+          translation.tagline || (lang === "en" ? features?.tagline || "" : ""),
+        title:
+          translation.title || (lang === "en" ? features?.title || "" : ""),
 
-    return Response.json(
-      {
-        success: false,
-        error: err.message,
+        cards: (features?.cards || []).map((card) => ({
+          _id: String(card._id),
+          title:
+            card.translations?.[lang]?.title ||
+            (lang === "en" ? card.title || "" : ""),
+          description:
+            card.translations?.[lang]?.description ||
+            (lang === "en" ? card.description || "" : ""),
+          icon: card.icon || { url: "", publicId: "" },
+        })),
       },
-      {
-        status: 500,
-      },
+    });
+  } catch (error) {
+    console.error("Get features:", error);
+
+    return NextResponse.json(
+      { success: false, message: "Failed to load features" },
+      { status: 500 },
     );
   }
 }
 
-export async function POST(req) {
+/* ==================== SAVE FEATURES ==================== */
+
+export async function POST(request) {
   try {
     const permission = await requireEditPermission();
 
     if (!permission.authorized) {
-      return permission.response;
-    }
-    const formData = await req.formData();
-
-    const tagline = (formData.get("tagline") || "").toString();
-    const title = (formData.get("title") || "").toString();
-    const cardsRaw = formData.get("cards");
-
-    if (!cardsRaw) {
-      return Response.json(
-        {
-          success: false,
-          error: "Missing cards data",
-        },
-        {
-          status: 400,
-        },
+      return NextResponse.json(
+        { success: false, message: "Permission denied" },
+        { status: 403 },
       );
     }
 
-    const cardsMeta = JSON.parse(cardsRaw);
+    await connectDB();
 
-    await dbConnect();
+    const form = await request.formData();
 
-    const existing = await Features.findOne({});
+    let translations;
+    let cards;
 
-    const cards = [];
+    try {
+      translations = JSON.parse(form.get("translations") || "{}");
+      cards = JSON.parse(form.get("cards") || "[]");
+    } catch {
+      return NextResponse.json(
+        { success: false, message: "Invalid JSON form data" },
+        { status: 400 },
+      );
+    }
 
-    for (let i = 0; i < cardsMeta.length; i++) {
-      const {
-        title: cardTitle,
-        description,
-        iconMode,
-        iconUrl,
-        iconPublicId,
-      } = cardsMeta[i];
+    if (
+      !Array.isArray(cards) ||
+      !translations ||
+      typeof translations !== "object"
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Invalid features data" },
+        { status: 400 },
+      );
+    }
 
-      let icon = {
-        url: "",
-        publicId: "",
-      };
+    let features = await Features.findOne();
 
-      if (iconMode === "file") {
-        const file = formData.get(`icon_${i}`);
+    if (!features) {
+      features = new Features({ cards: [] });
+    }
 
-        if (file && typeof file === "object" && file.size > 0) {
-          if (!ALLOWED_TYPES.includes(file.type)) {
-            return Response.json(
-              {
-                success: false,
-                error: `Invalid icon type for card ${i + 1}`,
-              },
-              {
-                status: 400,
-              },
-            );
-          }
+    /* Save section translations */
 
-          if (file.size > MAX_SIZE_IN_BYTES) {
-            return Response.json(
-              {
-                success: false,
-                error: `Icon too large for card ${i + 1} (max 2MB)`,
-              },
-              {
-                status: 400,
-              },
-            );
-          }
+    for (const lang of languages) {
+      features.set(
+        `translations.${lang}.tagline`,
+        translations[lang]?.tagline || "",
+      );
 
-          icon = await uploadToCloudinary(file, "admin-uploads/icons");
-        }
-      } else if (iconMode === "url") {
-        icon = {
-          url: (iconUrl || "").trim(),
-          publicId: (iconPublicId || "").trim(),
-        };
+      features.set(
+        `translations.${lang}.title`,
+        translations[lang]?.title || "",
+      );
+    }
+
+    /* Save cards and their translations */
+
+    for (let i = 0; i < cards.length; i++) {
+      const item = cards[i];
+
+      if (!item || typeof item !== "object") {
+        return NextResponse.json(
+          { success: false, message: "Invalid feature card" },
+          { status: 400 },
+        );
       }
 
-      cards.push({
-        title: (cardTitle || "").trim(),
-        description: (description || "").trim(),
-        icon,
-      });
+      let card = item._id ? features.cards.id(item._id) : null;
+
+      if (item._id && !card) {
+        return NextResponse.json(
+          { success: false, message: "Feature card not found" },
+          { status: 400 },
+        );
+      }
+
+      if (!card) {
+        card = features.cards.create({});
+        features.cards.push(card);
+      }
+
+      for (const lang of languages) {
+        card.set(
+          `translations.${lang}.title`,
+          item.translations?.[lang]?.title || "",
+        );
+
+        card.set(
+          `translations.${lang}.description`,
+          item.translations?.[lang]?.description || "",
+        );
+      }
+
+      /*
+       * Cloudinary images are uploaded directly from the frontend widget.
+       * The API only saves their secure URL and public ID.
+       */
+
+      const oldPublicId = card.icon?.publicId || "";
+      const iconUrl =
+        typeof item.iconUrl === "string" ? item.iconUrl.trim() : "";
+      const iconPublicId =
+        typeof item.iconPublicId === "string" ? item.iconPublicId.trim() : "";
+
+      if (item.clearIcon === true) {
+        card.icon = {
+          url: "",
+          publicId: "",
+        };
+
+        if (oldPublicId) {
+          await deleteCloudinaryImage(oldPublicId);
+        }
+      } else if (iconPublicId) {
+        /*
+         * Save the new Cloudinary image reference.
+         * Delete the old image only if its public ID changed.
+         */
+
+        card.icon = {
+          url: iconUrl,
+          publicId: iconPublicId,
+        };
+
+        if (oldPublicId && oldPublicId !== iconPublicId) {
+          await deleteCloudinaryImage(oldPublicId);
+        }
+      } else if (item.iconMode === "url") {
+        /*
+         * Compatibility with existing external-URL icon records.
+         * Do not delete a Cloudinary image unless the icon was changed.
+         */
+
+        card.icon = {
+          url: iconUrl,
+          publicId: "",
+        };
+
+        if (oldPublicId) {
+          await deleteCloudinaryImage(oldPublicId);
+        }
+      }
+      /*
+       * If no new icon or removal was submitted, keep the existing icon.
+       */
     }
 
-    const newPublicIds = cards
-      .map(({ icon }) => icon?.publicId)
-      .filter(Boolean);
+    await features.save();
 
-    const oldPublicIds = (existing?.cards || [])
-      .map(({ icon }) => icon?.publicId)
-      .filter(Boolean);
-
-    const toDelete = oldPublicIds.filter((id) => !newPublicIds.includes(id));
-
-    let saved;
-
-    if (existing) {
-      existing.tagline = tagline.trim();
-      existing.title = title.trim();
-      existing.cards = cards;
-
-      saved = await existing.save();
-    } else {
-      saved = await Features.create({
-        tagline: tagline.trim(),
-        title: title.trim(),
-        cards,
-      });
-    }
-
-    await Promise.all(
-      toDelete.map((publicId) => deleteFromCloudinary(publicId)),
-    );
-
-    return Response.json({
+    return NextResponse.json({
       success: true,
-      data: saved,
+      message: "Features saved successfully",
+      data: {
+        translations: features.translations,
+        cards: features.cards,
+      },
     });
-  } catch (err) {
-    console.error("POST FEATURES ERROR:", err);
+  } catch (error) {
+    console.error("Save features:", error);
 
-    return Response.json(
-      {
-        success: false,
-        error: err.message,
-      },
-      {
-        status: 500,
-      },
+    return NextResponse.json(
+      { success: false, message: "Failed to save features" },
+      { status: 500 },
     );
   }
 }
 
-// delete logic
+/* ==================== DELETE FEATURE CARD ==================== */
 
 export async function DELETE(request) {
   try {
-    //USER ADMIN CHECKS
     const permission = await requireDeletePermission();
 
-    console.log("DELETE AUTHORIZATION:", {
-      authorized: permission.authorized,
-      role: permission.admin?.role,
-    });
-
     if (!permission.authorized) {
-      return permission.response;
+      return NextResponse.json(
+        { success: false, message: "Permission denied" },
+        { status: 403 },
+      );
     }
-    //USER ADMIN CHECKS
-    await dbConnect();
+
+    await connectDB();
 
     const { cardId } = await request.json();
+    const features = await Features.findOne();
+    const card = features?.cards.id(cardId);
 
-    if (!cardId) {
-      return Response.json({ error: "Card ID is required" }, { status: 400 });
+    if (!card) {
+      return NextResponse.json(
+        { success: false, message: "Card not found" },
+        { status: 404 },
+      );
     }
 
-    const updatedData = await Features.findOneAndUpdate(
-      { "cards._id": cardId },
-      {
-        $pull: {
-          cards: {
-            _id: cardId,
-          },
-        },
-      },
-      { new: true },
-    );
+    const publicId = card.icon?.publicId;
 
-    if (!updatedData) {
-      return Response.json({ error: "Card not Found" }, { status: 404 });
+    features.cards.pull({ _id: cardId });
+
+    await features.save();
+
+    if (publicId) {
+      await deleteCloudinaryImage(publicId);
     }
 
-    return Response.json({
+    return NextResponse.json({
       success: true,
-      message: "Card deleted successfully",
-      data: updatedData,
+      message: "Feature deleted successfully",
     });
   } catch (error) {
-    console.error("Delete card error:", error);
+    console.error("Delete feature:", error);
 
-    return Response.json({ error: "Failed to delete card" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: "Failed to delete feature" },
+      { status: 500 },
+    );
   }
 }

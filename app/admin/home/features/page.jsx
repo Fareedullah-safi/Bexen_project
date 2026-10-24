@@ -3,15 +3,38 @@
 "use client";
 
 import Spinner from "@/app/admin/Components/Admin/Spinner";
-import { ImagePlus, Link, Plus, Save, Trash2 } from "lucide-react";
+import { ImagePlus, Plus, Save, Trash2 } from "lucide-react";
+import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+const LANGUAGES = [
+  { id: "en", label: "English" },
+  { id: "ps", label: "پښتو" },
+  { id: "fa", label: "دری" },
+];
+
+const emptySectionTranslation = () => ({
+  tagline: "",
+  title: "",
+});
+
+const emptyCardTranslation = () => ({
+  title: "",
+  description: "",
+});
+
+const createEmptyTranslations = () => ({
+  en: emptySectionTranslation(),
+  ps: emptySectionTranslation(),
+  fa: emptySectionTranslation(),
+});
+
 /* ==================== ICON PICKER ==================== */
 
-function IconPicker({ icon, onChange }) {
-  const fileRef = useRef(null);
+function IconPicker({ icon, onChange, cloudinaryReady }) {
   const [imageError, setImageError] = useState(false);
+  const widgetRef = useRef(null);
 
   useEffect(() => {
     setImageError(false);
@@ -19,63 +42,106 @@ function IconPicker({ icon, onChange }) {
 
   useEffect(() => {
     return () => {
-      if (icon.preview?.startsWith("blob:")) {
-        URL.revokeObjectURL(icon.preview);
-      }
+      widgetRef.current = null;
     };
-  }, [icon.preview]);
+  }, []);
 
-  const chooseFile = (e) => {
-    const file = e.target.files?.[0];
+  const openCloudinaryWidget = () => {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-    if (!file) return;
-
-    onChange({
-      mode: "file",
-      file,
-      preview: URL.createObjectURL(file),
-      url: "",
-      publicId: "",
-    });
-  };
-
-  const changeUrl = (e) => {
-    const value = e.target.value;
-
-    onChange({
-      mode: "url",
-      file: null,
-      preview: value.trim(),
-      url: value,
-      publicId: "",
-    });
-  };
-
-  const switchMode = (mode) => {
-    if (fileRef.current) {
-      fileRef.current.value = "";
+    if (!cloudName || !uploadPreset) {
+      toast.error("Please configure your Cloudinary environment variables.");
+      return;
     }
 
-    onChange({
-      mode,
-      file: null,
-      preview: "",
-      url: "",
-      publicId: "",
-    });
+    if (!cloudinaryReady || !window.cloudinary?.createUploadWidget) {
+      toast.error("Cloudinary uploader is still loading.");
+      return;
+    }
+
+    if (widgetRef.current) {
+      widgetRef.current.open();
+      return;
+    }
+
+    const widget = window.cloudinary.createUploadWidget(
+      {
+        cloudName,
+        uploadPreset,
+        folder: "bexon/images",
+        resourceType: "image",
+        sources: ["local", "url"],
+        multiple: false,
+        maxFiles: 1,
+        maxFileSize: 5 * 1024 * 1024,
+        clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "svg"],
+        showAdvancedOptions: false,
+        cropping: false,
+        singleUploadAutoClose: true,
+        styles: {
+          palette: {
+            window: "#FFFFFF",
+            windowBorder: "#E4E7EC",
+            tabIcon: "#1E8A8A",
+            menuIcons: "#1E8A8A",
+            textDark: "#101828",
+            textLight: "#FFFFFF",
+            link: "#1E8A8A",
+            action: "#1E8A8A",
+            inactiveTabIcon: "#667085",
+            error: "#D92D20",
+            inProgress: "#1E8A8A",
+            complete: "#12B76A",
+            sourceBg: "#F7F9FC",
+          },
+        },
+      },
+      (error, result) => {
+        if (error) {
+          console.error("Cloudinary upload error:", error);
+          toast.error("Image upload failed. Please try again.");
+          return;
+        }
+
+        if (result?.event === "success") {
+          const uploaded = result.info;
+
+          if (!uploaded?.secure_url || !uploaded?.public_id) {
+            toast.error("Cloudinary did not return a valid image.");
+            return;
+          }
+
+          onChange({
+            mode: "cloudinary",
+            file: null,
+            preview: uploaded.secure_url,
+            url: uploaded.secure_url,
+            publicId: uploaded.public_id,
+            clear: false,
+          });
+
+          toast.success("Image uploaded successfully.");
+        }
+
+        if (result?.event === "close") {
+          widgetRef.current = null;
+        }
+      },
+    );
+
+    widgetRef.current = widget;
+    widget.open();
   };
 
   const clearIcon = () => {
-    if (fileRef.current) {
-      fileRef.current.value = "";
-    }
-
     onChange({
-      mode: "file",
+      mode: "cloudinary",
       file: null,
       preview: "",
       url: "",
       publicId: "",
+      clear: true,
     });
   };
 
@@ -84,34 +150,6 @@ function IconPicker({ icon, onChange }) {
       <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
         Icon
       </label>
-
-      <div className="flex w-full rounded-xl border border-[var(--border)] p-1">
-        <button
-          type="button"
-          onClick={() => switchMode("file")}
-          className={`flex h-9 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition ${
-            icon.mode === "file"
-              ? "bg-[var(--accent)] text-white"
-              : "text-[var(--muted)] hover:text-[var(--accent)]"
-          }`}
-        >
-          <ImagePlus size={14} />
-          From PC
-        </button>
-
-        <button
-          type="button"
-          onClick={() => switchMode("url")}
-          className={`flex h-9 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition ${
-            icon.mode === "url"
-              ? "bg-[var(--accent)] text-white"
-              : "text-[var(--muted)] hover:text-[var(--accent)]"
-          }`}
-        >
-          <Link size={14} />
-          URL
-        </button>
-      </div>
 
       <div className="mt-3 flex items-center gap-3">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
@@ -129,51 +167,41 @@ function IconPicker({ icon, onChange }) {
         </div>
 
         <div className="min-w-0 flex-1">
-          {icon.mode === "file" ? (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                onChange={chooseFile}
-                className="hidden"
-              />
+          <button
+            type="button"
+            onClick={openCloudinaryWidget}
+            disabled={!cloudinaryReady}
+            className="h-11 w-full rounded-xl border border-[var(--border)] text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {icon.publicId ? "Change Icon" : "Upload Icon"}
+          </button>
 
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="h-11 w-full rounded-xl border border-[var(--border)] text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-              >
-                {icon.file ? "Change Icon" : "Choose Icon"}
-              </button>
-
-              {icon.file && (
-                <p className="mt-1 truncate text-xs text-[var(--muted)]">
-                  {icon.file.name}
-                </p>
-              )}
-            </>
-          ) : (
-            <input
-              type="url"
-              value={icon.url}
-              onChange={changeUrl}
-              placeholder="https://example.com/icon.svg"
-              className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]"
-            />
-          )}
+          <p className="mt-1 truncate text-xs text-[var(--muted)]">
+            {icon.publicId
+              ? "Cloudinary image selected"
+              : cloudinaryReady
+                ? "Upload from PC or enter an image URL"
+                : "Loading uploader..."}
+          </p>
         </div>
 
         {icon.preview && (
           <button
             type="button"
             onClick={clearIcon}
+            aria-label="Clear icon"
             className="rounded-lg border border-red-500/20 p-2 text-red-500 transition hover:bg-red-500/10"
           >
             <Trash2 size={15} />
           </button>
         )}
       </div>
+
+      {icon.clear && (
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Icon removal will be applied when you save.
+        </p>
+      )}
     </div>
   );
 }
@@ -181,118 +209,265 @@ function IconPicker({ icon, onChange }) {
 /* ==================== HELPERS ==================== */
 
 const createEmptyIcon = () => ({
-  mode: "file",
+  mode: "cloudinary",
   file: null,
   preview: "",
   url: "",
   publicId: "",
+  clear: false,
 });
 
 const createEmptyCard = () => ({
   _id: "",
-  title: "",
-  description: "",
+  clientId: `${Date.now()}-${Math.random()}`,
+  translations: {
+    en: emptyCardTranslation(),
+    ps: emptyCardTranslation(),
+    fa: emptyCardTranslation(),
+  },
   icon: createEmptyIcon(),
 });
 
-const normalizeFormData = (data) => ({
-  tagline: data?.tagline || "",
-  title: data?.title || "",
-  cards: (data?.cards || []).map((card) => {
-    const { url = "", publicId = "" } = card.icon || {};
+const normalizeIcon = (icon) => {
+  const url = icon?.url || "";
+  const publicId = icon?.publicId || "";
 
-    return {
-      _id: card._id || "",
-      title: card.title || "",
-      description: card.description || "",
-      icon: {
-        mode: "url",
-        file: null,
-        preview: url,
-        url,
-        publicId,
+  return {
+    mode: "cloudinary",
+    file: null,
+    preview: url,
+    url,
+    publicId,
+    clear: false,
+  };
+};
+
+const normalizeSavedCards = (cards = []) =>
+  cards.map((card) => ({
+    _id: card._id || "",
+    clientId: card._id || `${Date.now()}-${Math.random()}`,
+    translations: {
+      en: {
+        title: card.translations?.en?.title || "",
+        description: card.translations?.en?.description || "",
       },
-    };
-  }),
-});
+      ps: {
+        title: card.translations?.ps?.title || "",
+        description: card.translations?.ps?.description || "",
+      },
+      fa: {
+        title: card.translations?.fa?.title || "",
+        description: card.translations?.fa?.description || "",
+      },
+    },
+    icon: normalizeIcon(card.icon),
+  }));
 
 /* ==================== FEATURES ==================== */
 
 export default function Features() {
-  const [form, setForm] = useState({
-    tagline: "",
-    title: "",
-    cards: [],
-  });
+  const [language, setLanguage] = useState("en");
+
+  const [translations, setTranslations] = useState(createEmptyTranslations);
+  const [cards, setCards] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [languageReady, setLanguageReady] = useState(false);
+  const [cloudinaryReady, setCloudinaryReady] = useState(false);
 
-  /* ==================== FETCH DATA ==================== */
+  const currentTranslation =
+    translations[language] || emptySectionTranslation();
+
+  /* ==================== LOAD ALL LANGUAGE DRAFTS ==================== */
 
   useEffect(() => {
-    const loadData = async () => {
+    let cancelled = false;
+
+    const loadFeatures = async () => {
+      setFetching(true);
+
       try {
-        const response = await fetch("/api/homepage/features", {
-          cache: "no-store",
+        const [enResponse, psResponse, faResponse, languageResponse] =
+          await Promise.all([
+            fetch("/api/homepage/features?lang=en", {
+              cache: "no-store",
+            }),
+            fetch("/api/homepage/features?lang=ps", {
+              cache: "no-store",
+            }),
+            fetch("/api/homepage/features?lang=fa", {
+              cache: "no-store",
+            }),
+            fetch("/api/admin/adminusers/language", {
+              cache: "no-store",
+            }),
+          ]);
+
+        const [enResult, psResult, faResult, languageResult] =
+          await Promise.all([
+            enResponse.json(),
+            psResponse.json(),
+            faResponse.json(),
+            languageResponse.json(),
+          ]);
+
+        if (
+          !enResponse.ok ||
+          !psResponse.ok ||
+          !faResponse.ok ||
+          !enResult.success ||
+          !psResult.success ||
+          !faResult.success
+        ) {
+          throw new Error("Failed to load feature translations");
+        }
+
+        if (cancelled) return;
+
+        const languageData = {
+          en: enResult.data || {},
+          ps: psResult.data || {},
+          fa: faResult.data || {},
+        };
+
+        const nextTranslations = createEmptyTranslations();
+
+        for (const lang of ["en", "ps", "fa"]) {
+          nextTranslations[lang] = {
+            tagline: languageData[lang].tagline || "",
+            title: languageData[lang].title || "",
+          };
+        }
+
+        const englishCards = languageData.en.cards || [];
+
+        const nextCards = englishCards.map((card, index) => {
+          const getTranslation = (lang) => {
+            const matchingCard = (languageData[lang].cards || []).find(
+              (item) => item._id === card._id,
+            );
+
+            const fallbackCard = (languageData[lang].cards || [])[index];
+            const item = matchingCard || fallbackCard;
+
+            return {
+              title: item?.title || "",
+              description: item?.description || "",
+            };
+          };
+
+          return {
+            _id: card._id || "",
+            clientId: card._id || `loaded-${index}`,
+            translations: {
+              en: getTranslation("en"),
+              ps: getTranslation("ps"),
+              fa: getTranslation("fa"),
+            },
+            icon: normalizeIcon(card.icon),
+          };
         });
 
-        const result = await response.json();
+        setTranslations(nextTranslations);
+        setCards(nextCards);
 
-        if (!response.ok || result?.success === false) {
-          throw new Error(
-            result?.message || result?.error || "Failed to load data",
-          );
-        }
+        const savedLanguage = languageResult?.success
+          ? languageResult.language
+          : "en";
 
-        if (result?.data) {
-          setForm(normalizeFormData(result.data));
-        }
+        setLanguage(
+          ["en", "ps", "fa"].includes(savedLanguage) ? savedLanguage : "en",
+        );
       } catch (error) {
         console.error("Load features error:", error);
-        toast.error(error.message || "Failed to load features data");
+
+        if (!cancelled) {
+          toast.error(error.message || "Failed to load features");
+        }
       } finally {
-        setFetching(false);
+        if (!cancelled) {
+          setFetching(false);
+          setLanguageReady(true);
+        }
       }
     };
 
-    loadData();
+    loadFeatures();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* ==================== LANGUAGE SELECTOR ==================== */
+
+  useEffect(() => {
+    const handleLanguageChange = (event) => {
+      const nextLanguage = event.detail?.language;
+
+      if (["en", "ps", "fa"].includes(nextLanguage)) {
+        setLanguage(nextLanguage);
+      }
+    };
+
+    window.addEventListener("admin-language-change", handleLanguageChange);
+
+    return () => {
+      window.removeEventListener("admin-language-change", handleLanguageChange);
+    };
   }, []);
 
   /* ==================== FORM HANDLERS ==================== */
 
   const setField = (name, value) => {
-    setForm((prev) => ({
+    setTranslations((prev) => ({
       ...prev,
-      [name]: value,
+      [language]: {
+        ...prev[language],
+        [name]: value,
+      },
     }));
   };
 
-  const setCard = (index, name, value) => {
-    setForm((prev) => ({
-      ...prev,
-      cards: prev.cards.map((card, i) =>
-        i === index ? { ...card, [name]: value } : card,
+  const setCardTranslation = (index, name, value) => {
+    setCards((prev) =>
+      prev.map((card, cardIndex) =>
+        cardIndex === index
+          ? {
+              ...card,
+              translations: {
+                ...card.translations,
+                [language]: {
+                  ...card.translations[language],
+                  [name]: value,
+                },
+              },
+            }
+          : card,
       ),
-    }));
+    );
+  };
+
+  const setCardIcon = (index, icon) => {
+    setCards((prev) =>
+      prev.map((card, cardIndex) =>
+        cardIndex === index ? { ...card, icon } : card,
+      ),
+    );
   };
 
   const addCard = () => {
-    setForm((prev) => ({
-      ...prev,
-      cards: [...prev.cards, createEmptyCard()],
-    }));
+    setCards((prev) => [...prev, createEmptyCard()]);
   };
 
   /* ==================== DELETE CARD ==================== */
 
   const removeCard = async (cardId, index) => {
-    if (!cardId) {
-      setForm((prev) => ({
-        ...prev,
-        cards: prev.cards.filter((_, i) => i !== index),
-      }));
+    if (loading) return;
 
+    if (!cardId) {
+      setCards((prev) => prev.filter((_, i) => i !== index));
       return;
     }
 
@@ -308,15 +483,10 @@ export default function Features() {
       const result = await response.json();
 
       if (!response.ok || result?.success === false) {
-        throw new Error(
-          result?.message || result?.error || "Failed to delete card",
-        );
+        throw new Error(result?.message || "Failed to delete card");
       }
 
-      setForm((prev) => ({
-        ...prev,
-        cards: prev.cards.filter((card) => card._id !== cardId),
-      }));
+      setCards((prev) => prev.filter((card) => card._id !== cardId));
 
       toast.success("Card deleted successfully");
     } catch (error) {
@@ -325,7 +495,7 @@ export default function Features() {
     }
   };
 
-  /* ==================== SAVE FEATURES ==================== */
+  /* ==================== SAVE ALL LANGUAGES ONCE ==================== */
 
   const handleSubmit = async () => {
     if (loading) return;
@@ -335,26 +505,31 @@ export default function Features() {
     try {
       const formData = new FormData();
 
-      formData.append("tagline", form.tagline.trim());
-      formData.append("title", form.title.trim());
+      formData.append("translations", JSON.stringify(translations));
 
-      const cards = form.cards.map((card, index) => {
-        if (card.icon.mode === "file" && card.icon.file) {
-          formData.append(`icon_${index}`, card.icon.file);
-        }
+      const submittedCards = cards.map((card) => ({
+        _id: card._id || "",
+        translations: {
+          en: {
+            title: card.translations.en.title.trim(),
+            description: card.translations.en.description.trim(),
+          },
+          ps: {
+            title: card.translations.ps.title.trim(),
+            description: card.translations.ps.description.trim(),
+          },
+          fa: {
+            title: card.translations.fa.title.trim(),
+            description: card.translations.fa.description.trim(),
+          },
+        },
+        iconMode: card.icon.mode,
+        iconUrl: card.icon.url.trim(),
+        iconPublicId: card.icon.publicId || "",
+        clearIcon: Boolean(card.icon.clear),
+      }));
 
-        return {
-          _id: card._id || "",
-          title: card.title.trim(),
-          description: card.description.trim(),
-          iconMode: card.icon.mode,
-          iconUrl: card.icon.mode === "url" ? card.icon.url.trim() : "",
-          iconPublicId:
-            card.icon.mode === "url" ? card.icon.publicId || "" : "",
-        };
-      });
-
-      formData.append("cards", JSON.stringify(cards));
+      formData.append("cards", JSON.stringify(submittedCards));
 
       const response = await fetch("/api/homepage/features", {
         method: "POST",
@@ -364,16 +539,29 @@ export default function Features() {
       const result = await response.json();
 
       if (!response.ok || result?.success === false) {
-        throw new Error(
-          result?.message || result?.error || "Failed to save features",
-        );
+        throw new Error(result?.message || "Failed to save features");
       }
 
       if (result?.data) {
-        setForm(normalizeFormData(result.data));
+        setTranslations({
+          en: {
+            ...emptySectionTranslation(),
+            ...result.data.translations?.en,
+          },
+          ps: {
+            ...emptySectionTranslation(),
+            ...result.data.translations?.ps,
+          },
+          fa: {
+            ...emptySectionTranslation(),
+            ...result.data.translations?.fa,
+          },
+        });
+
+        setCards(normalizeSavedCards(result.data.cards || []));
       }
 
-      toast.success("Changes saved successfully!");
+      toast.success("All language changes saved successfully!");
     } catch (error) {
       console.error("Save features error:", error);
       toast.error(error.message || "Something went wrong");
@@ -384,7 +572,7 @@ export default function Features() {
 
   /* ==================== LOADING ==================== */
 
-  if (fetching) {
+  if (fetching || !languageReady) {
     return (
       <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
         <Spinner />
@@ -399,15 +587,49 @@ export default function Features() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">
+      <Script
+        src="https://upload-widget.cloudinary.com/latest/global/all.js"
+        strategy="afterInteractive"
+        onReady={() => setCloudinaryReady(true)}
+      />
+
       <div className="mb-6">
-        <p className="text-sm font-semibold text-[var(--accent)]">Home Page</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[var(--accent)]">
+              Home Page
+            </p>
 
-        <h1 className="mt-1 text-2xl font-black sm:text-3xl lg:text-4xl">
-          Features
-        </h1>
+            <h1 className="mt-1 text-2xl font-black sm:text-3xl lg:text-4xl">
+              Features
+            </h1>
 
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          Edit the heading and the feature cards.
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              Edit the heading and the feature cards.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {LANGUAGES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setLanguage(item.id)}
+                className={`rounded-xl border px-5 py-2.5 text-sm font-semibold transition ${
+                  language === item.id
+                    ? "border-[#1E8A8A] bg-[#1E8A8A] text-white shadow-sm"
+                    : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[#1E8A8A] hover:text-[#1E8A8A]"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-2 text-xs text-[var(--muted)]">
+          Editing: {LANGUAGES.find((item) => item.id === language)?.label}
+          {" · "}Your drafts in other languages are preserved.
         </p>
       </div>
 
@@ -426,7 +648,7 @@ export default function Features() {
 
             <input
               type="text"
-              value={form.tagline}
+              value={currentTranslation.tagline}
               onChange={(e) => setField("tagline", e.target.value)}
               className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 text-sm outline-none focus:border-[var(--accent)]"
             />
@@ -439,7 +661,7 @@ export default function Features() {
 
             <input
               type="text"
-              value={form.title}
+              value={currentTranslation.title}
               onChange={(e) => setField("title", e.target.value)}
               className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 text-sm outline-none focus:border-[var(--accent)]"
             />
@@ -453,74 +675,85 @@ export default function Features() {
             <h2 className="text-xl font-semibold">Feature Cards</h2>
 
             <p className="mt-1 text-sm font-medium text-[var(--muted)]">
-              {form.cards.length} Card
+              {cards.length} Card
             </p>
           </div>
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {form.cards.map((card, index) => (
-            <div
-              key={card._id || `new-${index}`}
-              className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold">Card {index + 1}</span>
+          {cards.map((card, index) => {
+            const cardTranslation =
+              card.translations[language] || emptyCardTranslation();
 
-                <button
-                  type="button"
-                  onClick={() => removeCard(card._id, index)}
-                  className="rounded-lg border border-red-500/20 p-1.5 text-red-500 transition hover:bg-red-500/10"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
+            return (
+              <div
+                key={card._id || card.clientId}
+                className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">
+                    Card {index + 1}
+                  </span>
 
-              <div className="mt-3 space-y-4">
-                <IconPicker
-                  icon={card.icon}
-                  onChange={(icon) => setCard(index, "icon", icon)}
-                />
-
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
-                    Title
-                  </label>
-
-                  <input
-                    type="text"
-                    value={card.title}
-                    onChange={(e) => setCard(index, "title", e.target.value)}
-                    placeholder="Card title"
-                    className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => removeCard(card._id, index)}
+                    className="rounded-lg border border-red-500/20 p-1.5 text-red-500 transition hover:bg-red-500/10"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
-                    Description
-                  </label>
-
-                  <textarea
-                    rows={5}
-                    value={card.description}
-                    onChange={(e) =>
-                      setCard(index, "description", e.target.value)
-                    }
-                    placeholder="Card description"
-                    className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-sm outline-none focus:border-[var(--accent)]"
+                <div className="mt-3 space-y-4">
+                  <IconPicker
+                    icon={card.icon}
+                    onChange={(icon) => setCardIcon(index, icon)}
+                    cloudinaryReady={cloudinaryReady}
                   />
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+                      Title
+                    </label>
+
+                    <input
+                      type="text"
+                      value={cardTranslation.title}
+                      onChange={(e) =>
+                        setCardTranslation(index, "title", e.target.value)
+                      }
+                      placeholder="Card title"
+                      className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+                      Description
+                    </label>
+
+                    <textarea
+                      rows={5}
+                      value={cardTranslation.description}
+                      onChange={(e) =>
+                        setCardTranslation(index, "description", e.target.value)
+                      }
+                      placeholder="Card description"
+                      className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-sm outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
-          {form.cards.length === 0 && (
+          {cards.length === 0 && (
             <p className="col-span-full py-8 text-center text-sm text-[var(--muted)]">
               No cards yet. Click &quot;Add Card&quot; to create one.
             </p>
           )}
         </div>
+
         <button
           type="button"
           onClick={addCard}
@@ -535,8 +768,10 @@ export default function Features() {
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
               Ready to save your changes?
             </p>
+
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Features will upload automatically when you save.
+              Save all three language drafts and the selected Cloudinary image
+              references.
             </p>
           </div>
 

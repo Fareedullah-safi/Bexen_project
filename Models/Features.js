@@ -1,57 +1,51 @@
 import mongoose from "mongoose";
 
-const IconSchema = new mongoose.Schema(
-  {
-    url: {
-      type: String,
-      default: "",
-    },
-    publicId: {
-      type: String,
-      default: "",
-    },
-  },
-  { _id: false },
-);
-
-const CardSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-
-  description: {
-    type: String,
-    default: "",
-    trim: true,
-  },
-
-  icon: {
-    url: String,
-    publicId: String,
-  },
-});
-
 const FeaturesSchema = new mongoose.Schema(
   {
-    tagline: {
-      type: String,
-      default: "",
-      trim: true,
+    // Section heading in each language
+    translations: {
+      en: {
+        tagline: { type: String, default: "" },
+        title: { type: String, default: "" },
+      },
+      ps: {
+        tagline: { type: String, default: "" },
+        title: { type: String, default: "" },
+      },
+      fa: {
+        tagline: { type: String, default: "" },
+        title: { type: String, default: "" },
+      },
     },
 
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    // All feature cards
+    cards: [
+      {
+        // Text in each language
+        translations: {
+          en: {
+            title: { type: String, default: "" },
+            description: { type: String, default: "" },
+          },
+          ps: {
+            title: { type: String, default: "" },
+            description: { type: String, default: "" },
+          },
+          fa: {
+            title: { type: String, default: "" },
+            description: { type: String, default: "" },
+          },
+        },
 
-    cards: [CardSchema],
+        // Shared icon for all languages
+        icon: {
+          url: { type: String, default: "" },
+          publicId: { type: String, default: "" },
+        },
+      },
+    ],
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
 
 const Features =
