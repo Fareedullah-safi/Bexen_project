@@ -7,40 +7,6 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Normalize image data
-function normalizeImage(image) {
-  if (!image || typeof image !== "object") {
-    return { url: "", publicId: "" };
-  }
-
-  return {
-    url: typeof image.url === "string" ? image.url.trim() : "",
-    publicId: typeof image.publicId === "string" ? image.publicId.trim() : "",
-  };
-}
-
-// Check whether an image exists
-function hasImage(image) {
-  return Boolean(image?.url && image?.publicId);
-}
-
-// Delete an old Cloudinary image if it has been replaced
-async function deleteOldImage(oldPublicId, newPublicId) {
-  if (!oldPublicId || oldPublicId === newPublicId) return;
-
-  try {
-    const result = await cloudinary.uploader.destroy(oldPublicId, {
-      resource_type: "image",
-    });
-
-    if (result.result !== "ok" && result.result !== "not found") {
-      console.error("Cloudinary deletion failed:", result);
-    }
-  } catch (error) {
-    console.error("Cloudinary deletion error:", error);
-  }
-}
-
 // GET: Fetch About Us data
 export async function GET() {
   try {
@@ -48,41 +14,21 @@ export async function GET() {
 
     const data = await AboutUs.findOne({}).lean();
 
-    if (!data) {
-      return NextResponse.json({
-        success: true,
-        data: null,
-      });
-    }
-
-    const mainImage = normalizeImage(data.mainImage);
-    const savedThumbnail = normalizeImage(data.thumbnailImage);
-    const legacyThumbnail = normalizeImage(data.clientImage);
-
     return NextResponse.json({
       success: true,
-      data: {
-        ...data,
-        mainImage,
-        thumbnailImage: hasImage(savedThumbnail)
-          ? savedThumbnail
-          : legacyThumbnail,
-      },
+      data,
     });
   } catch (error) {
     console.error("About Us GET Error:", error);
 
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to fetch About Us data.",
-      },
+      { success: false, message: "Failed to fetch About Us data." },
       { status: 500 },
     );
   }
 }
 
-// POST: Create or update About Us data
+// POST: Save About Us data
 export async function POST(request) {
   const permission = await requireEditPermission();
 
@@ -94,59 +40,68 @@ export async function POST(request) {
     await connectDB();
 
     const body = await request.json();
-    const existing = await AboutUs.findOne({}).lean();
 
-    // Support both the current and legacy thumbnail field names.
-    const thumbnailImage = body.thumbnailImage ?? body.clientImage;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid About Us data." },
+        { status: 400 },
+      );
+    }
 
-    const mainImage =
-      body.mainImage !== undefined
-        ? normalizeImage(body.mainImage)
-        : normalizeImage(existing?.mainImage);
+    // Get existing data before updating it.
+    const oldData = await AboutUs.findOne({}).lean();
 
-    const newThumbnail =
-      thumbnailImage !== undefined
-        ? normalizeImage(thumbnailImage)
-        : hasImage(normalizeImage(existing?.thumbnailImage))
-          ? normalizeImage(existing.thumbnailImage)
-          : normalizeImage(existing?.clientImage);
+    // Preserve existing images if they aren't sent.
+    body.mainImage ??= oldData?.mainImage ?? {
+      url: "",
+      publicId: "",
+    };
 
-    // Remove MongoDB-managed and legacy fields from the request.
+    body.thumbnailImage ??= oldData?.thumbnailImage ?? {
+      url: "",
+      publicId: "",
+    };
+
+    // Remove fields that should not be updated from the request.
     delete body._id;
     delete body.__v;
     delete body.createdAt;
     delete body.updatedAt;
     delete body.clientImage;
 
-    // Save all About Us fields and both images.
+    // Save or create the About Us document.
     const data = await AboutUs.findOneAndUpdate(
       {},
       {
-        $set: {
-          ...body,
-          mainImage,
-          thumbnailImage: newThumbnail,
-        },
-        $unset: {
-          clientImage: 1,
-        },
+        $set: body,
+        $unset: { clientImage: 1 },
       },
       {
         upsert: true,
-        returnDocument: "after",
+        new: true,
         runValidators: true,
-        setDefaultsOnInsert: true,
       },
     );
 
-    // Delete replaced images only after the database update succeeds.
-    await Promise.all([
-      deleteOldImage(existing?.mainImage?.publicId, data?.mainImage?.publicId),
-      deleteOldImage(
-        existing?.thumbnailImage?.publicId || existing?.clientImage?.publicId,
-        data?.thumbnailImage?.publicId,
-      ),
-    ]);
+    // Delete the old main image if it was replaced.
+    if (
+      oldData?.mainImage?.publicId &&
+      oldData.mainImage.publicId !== data.mainImage?.publicId
+    ) {
+      await cloudinary.uploader.destroy(oldData.mainImage.publicId, {
+        resource_type: "image",
+      });
+    }
+
+    // Delete the old thumbnail if it was replaced.
+    if (
+      oldData?.thumbnailImage?.publicId &&
+      oldData.thumbnailImage.publicId !== data.thumbnailImage?.publicId
+    ) {
+      await cloudinary.uploader.destroy(oldData.thumbnailImage.publicId, {
+        resource_type: "image",
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -157,10 +112,7 @@ export async function POST(request) {
     console.error("About Us POST Error:", error);
 
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to save About Us data.",
-      },
+      { success: false, message: "Failed to save About Us data." },
       { status: 500 },
     );
   }

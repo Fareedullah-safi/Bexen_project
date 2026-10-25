@@ -4,7 +4,6 @@ import Spinner from "@/app/admin/Components/Admin/Spinner";
 import {
   AlertCircle,
   CheckCircle2,
-  FileImage,
   ImagePlus,
   Link as LinkIcon,
   LoaderCircle,
@@ -16,107 +15,71 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+const languages = [
+  { code: "en", label: "English" },
+  { code: "fa", label: "دری (Dari)" },
+  { code: "ps", label: "پښتو (Pashto)" },
+];
+
+const fields = [
+  "experienceNumber",
+  "experienceLabel",
+  "experienceText",
+  "sectionLabel",
+  "title",
+  "description",
+  "buttonText",
+  "clientName",
+  "clientRole",
+];
+
 const initialData = {
-  experienceNumber: "13+",
-  experienceLabel: "Years of Experience",
-  experienceText: "Decades of Experience, Endless Innovation",
-  sectionLabel: "Get to Know Us",
-  title: "",
-  description: "",
-  buttonText: "Learn More",
+  experienceNumber: { en: "13+", fa: "", ps: "" },
+  experienceLabel: {
+    en: "Years of Experience",
+    fa: "",
+    ps: "",
+  },
+  experienceText: {
+    en: "Decades of Experience, Endless Innovation",
+    fa: "",
+    ps: "",
+  },
+  sectionLabel: { en: "Get to Know Us", fa: "", ps: "" },
+  title: { en: "", fa: "", ps: "" },
+  description: { en: "", fa: "", ps: "" },
+  buttonText: { en: "Learn More", fa: "", ps: "" },
   buttonLink: "/about",
   mainImage: "",
   thumbnailImage: "",
-  clientName: "",
-  clientRole: "",
   videoLink: "",
+  clientName: { en: "", fa: "", ps: "" },
+  clientRole: { en: "", fa: "", ps: "" },
 };
 
-const getImageUrl = (image) =>
-  typeof image === "string" ? image : image?.url || "";
-
-const requiredFields = [
-  ["experienceNumber", "Experience Number"],
-  ["experienceLabel", "Experience Label"],
-  ["experienceText", "Experience Text"],
-  ["sectionLabel", "Section Label"],
-  ["title", "Title"],
-  ["description", "Description"],
-  ["buttonText", "Button Text"],
-  ["buttonLink", "Button Link"],
-  ["clientName", "Client Name"],
-  ["clientRole", "Client Role"],
-];
-
-const isFile = (value) => typeof File !== "undefined" && value instanceof File;
-
-const isSupportedImage = (file) =>
-  ["image/jpeg", "image/png", "image/webp"].includes(file.type);
-
-const isValidYouTubeUrl = (value) => {
-  try {
-    const url = new URL(value.trim());
-    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-
-    let videoId = "";
-
-    if (hostname === "youtu.be") {
-      videoId = url.pathname.split("/").filter(Boolean)[0] || "";
-    } else if (
-      hostname === "youtube.com" ||
-      hostname === "m.youtube.com" ||
-      hostname === "youtube-nocookie.com"
-    ) {
-      if (url.pathname === "/watch") {
-        videoId = url.searchParams.get("v") || "";
-      } else {
-        const parts = url.pathname.split("/").filter(Boolean);
-
-        if (["embed", "shorts", "live", "v"].includes(parts[0])) {
-          videoId = parts[1] || "";
-        }
-      }
-    }
-
-    return /^[a-zA-Z0-9_-]{11}$/.test(videoId);
-  } catch {
-    return false;
-  }
-};
-
-export default function page() {
+export default function AboutUsAdmin() {
   const [formData, setFormData] = useState(initialData);
-
+  const [language, setLanguage] = useState("en");
   const [imageIds, setImageIds] = useState({
     mainImage: "",
     thumbnailImage: "",
   });
-
   const [previews, setPreviews] = useState({
     mainImage: "",
     thumbnailImage: "",
   });
-
   const [imageErrors, setImageErrors] = useState({
     mainImage: false,
     thumbnailImage: false,
   });
-
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [hasSavedData, setHasSavedData] = useState(false);
   const [isDark, setIsDark] = useState(true);
 
   const fileInputRefs = useRef({});
   const previewUrls = useRef(new Set());
 
-  const revokePreview = (url) => {
-    if (url && previewUrls.current.has(url)) {
-      URL.revokeObjectURL(url);
-      previewUrls.current.delete(url);
-    }
-  };
-
+  // Load the current theme.
   useEffect(() => {
     const updateTheme = () => {
       setIsDark(document.documentElement.classList.contains("dark"));
@@ -134,11 +97,9 @@ export default function page() {
     return () => observer.disconnect();
   }, []);
 
-  // Load saved MongoDB data into every input.
+  // Load About Us data from MongoDB.
   useEffect(() => {
-    let active = true;
-
-    const getAboutUsData = async () => {
+    async function loadData() {
       try {
         const response = await fetch("/api/homepage/about-us", {
           cache: "no-store",
@@ -147,289 +108,253 @@ export default function page() {
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          throw new Error(result.message || "Failed to load About Us data.");
+          throw new Error(result.message || "Failed to load About Us.");
         }
 
-        if (!active) return;
+        if (!result.data) return;
 
-        if (result.data) {
-          const data = result.data;
+        const data = result.data;
 
-          const thumbnailData = data.thumbnailImage ?? data.clientImage ?? "";
+        // Support old string values and new translated objects.
+        fields.forEach((field) => {
+          const value = data[field];
 
-          const mainImageUrl = getImageUrl(data.mainImage);
-          const thumbnailImageUrl = getImageUrl(thumbnailData);
+          data[field] =
+            typeof value === "string"
+              ? { en: value, fa: "", ps: "" }
+              : {
+                  en: value?.en || "",
+                  fa: value?.fa || "",
+                  ps: value?.ps || "",
+                };
+        });
 
-          setFormData({
-            ...initialData,
-            ...data,
-            mainImage: mainImageUrl,
-            thumbnailImage: thumbnailImageUrl,
-            videoLink: data.videoLink || "",
-          });
+        const mainImage = data.mainImage || {};
+        const thumbnailImage = data.thumbnailImage || {};
 
-          setImageIds({
-            mainImage: data.mainImage?.publicId || "",
-            thumbnailImage: thumbnailData?.publicId || "",
-          });
+        setFormData({
+          ...initialData,
+          ...data,
+          mainImage: mainImage.url || "",
+          thumbnailImage: thumbnailImage.url || "",
+        });
 
-          setPreviews({
-            mainImage: mainImageUrl,
-            thumbnailImage: thumbnailImageUrl,
-          });
+        setImageIds({
+          mainImage: mainImage.publicId || "",
+          thumbnailImage: thumbnailImage.publicId || "",
+        });
 
-          setImageErrors({
-            mainImage: false,
-            thumbnailImage: false,
-          });
-
-          setHasSavedData(true);
-        }
+        setPreviews({
+          mainImage: mainImage.url || "",
+          thumbnailImage: thumbnailImage.url || "",
+        });
       } catch (error) {
         console.error("About Us GET Error:", error);
-
-        if (active) {
-          toast.error(error.message || "Failed to load saved About Us data.");
-        }
+        toast.error(error.message || "Failed to load About Us.");
       } finally {
-        if (active) setIsFetching(false);
+        setIsFetching(false);
       }
-    };
+    }
 
-    getAboutUsData();
-
-    return () => {
-      active = false;
-    };
+    loadData();
   }, []);
 
+  // Clean up temporary image previews.
   useEffect(() => {
     return () => {
-      previewUrls.current.forEach((url) => {
-        URL.revokeObjectURL(url);
-      });
+      previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
 
       previewUrls.current.clear();
     };
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  // Update a text field in the selected language only.
+  function handleChange(event) {
+    const { name, value } = event.target;
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+    if (fields.includes(name)) {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: {
+          ...prev[name],
+          [language]: value,
+        },
+      }));
+    } else {
+      // Links are shared between languages.
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+  }
 
-  const handleImageChange = (e, field) => {
-    const file = e.target.files?.[0];
+  // Select an image from the computer.
+  function handleImageChange(event, field) {
+    const file = event.target.files?.[0];
 
     if (!file) return;
 
-    if (!isSupportedImage(file)) {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       toast.error("Only JPG, PNG, and WEBP images are allowed.");
-      e.target.value = "";
+      event.target.value = "";
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Image must be 5 MB or smaller.");
-      e.target.value = "";
+      event.target.value = "";
       return;
     }
 
-    const previewUrl = URL.createObjectURL(file);
+    if (previews[field] && previewUrls.current.has(previews[field])) {
+      URL.revokeObjectURL(previews[field]);
+      previewUrls.current.delete(previews[field]);
+    }
 
-    previewUrls.current.add(previewUrl);
-    revokePreview(previews[field]);
+    const preview = URL.createObjectURL(file);
+    previewUrls.current.add(preview);
 
-    setFormData((prev) => ({
-      ...prev,
-      [field]: file,
-    }));
+    setFormData((prev) => ({ ...prev, [field]: file }));
+    setPreviews((prev) => ({ ...prev, [field]: preview }));
+    setImageIds((prev) => ({ ...prev, [field]: "" }));
+    setImageErrors((prev) => ({ ...prev, [field]: false }));
 
-    setPreviews((prev) => ({
-      ...prev,
-      [field]: previewUrl,
-    }));
+    event.target.value = "";
+  }
 
-    setImageErrors((prev) => ({
-      ...prev,
-      [field]: false,
-    }));
+  // Use an image URL instead of selecting a file.
+  function handleImageUrl(field, value) {
+    if (previews[field] && previewUrls.current.has(previews[field])) {
+      URL.revokeObjectURL(previews[field]);
+      previewUrls.current.delete(previews[field]);
+    }
 
-    setImageIds((prev) => ({
-      ...prev,
-      [field]: "",
-    }));
-
-    e.target.value = "";
-  };
-
-  const handleImageUrl = (field, value) => {
-    revokePreview(previews[field]);
-
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-
+    setFormData((prev) => ({ ...prev, [field]: value }));
     setPreviews((prev) => ({
       ...prev,
       [field]: value.trim(),
     }));
+    setImageIds((prev) => ({ ...prev, [field]: "" }));
+    setImageErrors((prev) => ({ ...prev, [field]: false }));
+  }
 
-    setImageErrors((prev) => ({
-      ...prev,
-      [field]: false,
-    }));
+  // Remove the selected image.
+  function removeImage(field) {
+    if (previews[field] && previewUrls.current.has(previews[field])) {
+      URL.revokeObjectURL(previews[field]);
+      previewUrls.current.delete(previews[field]);
+    }
 
-    // A changed URL must be uploaded to Cloudinary before saving.
-    setImageIds((prev) => ({
-      ...prev,
-      [field]: "",
-    }));
-  };
-
-  const removeImage = (field) => {
-    revokePreview(previews[field]);
-
-    setFormData((prev) => ({
-      ...prev,
-      [field]: "",
-    }));
-
-    setPreviews((prev) => ({
-      ...prev,
-      [field]: "",
-    }));
-
-    setImageErrors((prev) => ({
-      ...prev,
-      [field]: false,
-    }));
-
-    setImageIds((prev) => ({
-      ...prev,
-      [field]: "",
-    }));
+    setFormData((prev) => ({ ...prev, [field]: "" }));
+    setPreviews((prev) => ({ ...prev, [field]: "" }));
+    setImageIds((prev) => ({ ...prev, [field]: "" }));
+    setImageErrors((prev) => ({ ...prev, [field]: false }));
 
     if (fileInputRefs.current[field]) {
       fileInputRefs.current[field].value = "";
     }
-  };
+  }
 
-  const validateForm = () => {
-    const videoLink = String(formData.videoLink || "").trim();
+  // Check the form before saving.
+  function validateForm() {
+    for (const field of fields) {
+      if (!formData[field]?.[language]?.trim()) {
+        toast.error(
+          `${field.replace(/([A-Z])/g, " $1")} is required in ${
+            languages.find((item) => item.code === language)?.label
+          }.`,
+        );
 
-    if (!videoLink) {
+        return false;
+      }
+    }
+
+    if (!formData.buttonLink.trim()) {
+      toast.error("Button Link is required.");
+      return false;
+    }
+
+    if (!formData.videoLink.trim()) {
       toast.error("YouTube Video Link is required.");
       return false;
     }
 
-    if (!isValidYouTubeUrl(videoLink)) {
-      toast.error("Enter a valid YouTube video URL.");
-      return false;
-    }
+    try {
+      const url = new URL(formData.videoLink.trim());
 
-    for (const [field, label] of requiredFields) {
-      if (!String(formData[field] ?? "").trim()) {
-        toast.error(`${label} is required.`);
-        return false;
+      if (
+        ![
+          "youtube.com",
+          "www.youtube.com",
+          "m.youtube.com",
+          "youtu.be",
+        ].includes(url.hostname)
+      ) {
+        throw new Error();
       }
+    } catch {
+      toast.error("Enter a valid YouTube URL.");
+      return false;
     }
 
     for (const field of ["mainImage", "thumbnailImage"]) {
-      const image = formData[field];
-      const label = field === "mainImage" ? "Main Image" : "Video Thumbnail";
+      if (!formData[field]) {
+        toast.error(
+          field === "mainImage"
+            ? "Main Image is required."
+            : "Video Thumbnail is required.",
+        );
 
-      if (!image) {
-        toast.error(`${label} is required.`);
-        return false;
-      }
-
-      if (typeof image === "string") {
-        try {
-          const url = new URL(image.trim());
-
-          if (!["http:", "https:"].includes(url.protocol)) {
-            throw new Error("Invalid URL protocol.");
-          }
-        } catch {
-          toast.error(
-            `Enter a valid image URL or upload the ${label} from your PC.`,
-          );
-          return false;
-        }
-      }
-    }
-
-    const link = formData.buttonLink.trim();
-
-    if (link.startsWith("//")) {
-      toast.error("Button Link must be an internal path or HTTP/HTTPS URL.");
-      return false;
-    }
-
-    if (!link.startsWith("/")) {
-      try {
-        const url = new URL(link);
-
-        if (!["http:", "https:"].includes(url.protocol)) {
-          throw new Error("Invalid URL protocol.");
-        }
-      } catch {
-        toast.error("Enter a valid button link, such as /about.");
         return false;
       }
     }
 
     return true;
-  };
+  }
 
-  const handleSave = async (e) => {
-    e.preventDefault();
+  // Save translations and upload any new images.
+  async function handleSave(event) {
+    event.preventDefault();
 
     if (isSaving || !validateForm()) return;
 
     setIsSaving(true);
 
     try {
-      // Preserve existing images until they are changed.
       const images = {
         mainImage: {
           url:
             typeof formData.mainImage === "string"
               ? formData.mainImage.trim()
-              : previews.mainImage,
+              : "",
           publicId: imageIds.mainImage,
         },
         thumbnailImage: {
           url:
             typeof formData.thumbnailImage === "string"
               ? formData.thumbnailImage.trim()
-              : previews.thumbnailImage,
+              : "",
           publicId: imageIds.thumbnailImage,
         },
       };
 
+      // Upload new files or external image URLs to Cloudinary.
       const uploadData = new FormData();
       let hasImagesToUpload = false;
 
       for (const field of ["mainImage", "thumbnailImage"]) {
-        const image = formData[field];
+        const value = formData[field];
 
-        if (isFile(image)) {
-          uploadData.append(field, image);
+        if (typeof File !== "undefined" && value instanceof File) {
+          uploadData.append(field, value);
           hasImagesToUpload = true;
         } else if (
-          typeof image === "string" &&
-          image.trim() &&
+          typeof value === "string" &&
+          value.trim() &&
           !imageIds[field]
         ) {
-          // Pasted external URLs are also uploaded to Cloudinary.
-          uploadData.append(`${field}Url`, image.trim());
+          uploadData.append(`${field}Url`, value.trim());
           hasImagesToUpload = true;
         }
       }
@@ -450,40 +375,31 @@ export default function page() {
         }
 
         for (const field of ["mainImage", "thumbnailImage"]) {
-          const image = formData[field];
+          const value = formData[field];
 
           const needsUpload =
-            isFile(image) ||
-            (typeof image === "string" && image.trim() && !imageIds[field]);
+            (typeof File !== "undefined" && value instanceof File) ||
+            (typeof value === "string" && value.trim() && !imageIds[field]);
 
           if (!needsUpload) continue;
 
-          const uploadedImage = uploadResult.images?.[field];
+          const uploaded = uploadResult.images?.[field];
 
-          if (!uploadedImage?.url || !uploadedImage?.publicId) {
-            throw new Error(
-              `Cloudinary did not return a valid ${field} URL and public ID.`,
-            );
+          if (!uploaded?.url || !uploaded?.publicId) {
+            throw new Error(`Cloudinary upload failed for ${field}.`);
           }
 
           images[field] = {
-            url: uploadedImage.url,
-            publicId: uploadedImage.publicId,
+            url: uploaded.url,
+            publicId: uploaded.publicId,
           };
         }
       }
 
+      // Send every language so the other translations are preserved.
       const payload = {
-        experienceNumber: formData.experienceNumber.trim(),
-        experienceLabel: formData.experienceLabel.trim(),
-        experienceText: formData.experienceText.trim(),
-        sectionLabel: formData.sectionLabel.trim(),
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        buttonText: formData.buttonText.trim(),
+        ...Object.fromEntries(fields.map((field) => [field, formData[field]])),
         buttonLink: formData.buttonLink.trim(),
-        clientName: formData.clientName.trim(),
-        clientRole: formData.clientRole.trim(),
         videoLink: formData.videoLink.trim(),
         mainImage: images.mainImage,
         thumbnailImage: images.thumbnailImage,
@@ -491,62 +407,44 @@ export default function page() {
 
       const response = await fetch("/api/homepage/about-us", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to save About Us data.");
+        throw new Error(result.message || "Failed to save About Us.");
       }
 
-      const savedData = result.data || payload;
+      const saved = result.data;
 
-      const savedThumbnail =
-        savedData.thumbnailImage ?? savedData.clientImage ?? "";
-
-      const mainImageUrl = getImageUrl(savedData.mainImage);
-      const thumbnailImageUrl = getImageUrl(savedThumbnail);
-
-      revokePreview(previews.mainImage);
-      revokePreview(previews.thumbnailImage);
-
-      setFormData({
-        ...initialData,
-        ...savedData,
-        mainImage: mainImageUrl,
-        thumbnailImage: thumbnailImageUrl,
-        videoLink: savedData.videoLink || "",
-      });
+      setFormData((prev) => ({
+        ...prev,
+        ...saved,
+        mainImage: saved.mainImage?.url || images.mainImage.url,
+        thumbnailImage: saved.thumbnailImage?.url || images.thumbnailImage.url,
+      }));
 
       setImageIds({
-        mainImage: savedData.mainImage?.publicId || "",
-        thumbnailImage: savedThumbnail?.publicId || "",
+        mainImage: saved.mainImage?.publicId || images.mainImage.publicId,
+        thumbnailImage:
+          saved.thumbnailImage?.publicId || images.thumbnailImage.publicId,
       });
 
       setPreviews({
-        mainImage: mainImageUrl,
-        thumbnailImage: thumbnailImageUrl,
+        mainImage: saved.mainImage?.url || images.mainImage.url,
+        thumbnailImage: saved.thumbnailImage?.url || images.thumbnailImage.url,
       });
 
-      setImageErrors({
-        mainImage: false,
-        thumbnailImage: false,
-      });
-
-      setHasSavedData(true);
-
-      toast.success("About Us saved successfully!");
+      toast.success("About Us saved successfully.");
     } catch (error) {
       console.error("About Us Save Error:", error);
-      toast.error(error.message || "Something went wrong.");
+      toast.error(error.message || "Failed to save About Us.");
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
   const pageClass = isDark
     ? "bg-[#0b1117] text-[#f2f4f7]"
@@ -556,7 +454,7 @@ export default function page() {
     ? "border-[#263442] bg-[#111a23]"
     : "border-[#e4e7ec] bg-white";
 
-  const inputClass = `w-full rounded-xl border px-4 py-3 text-sm outline-none transition focus:border-[#35B5B5] focus:ring-2 focus:ring-[#1E8A8A]/20 ${
+  const inputClass = `w-full rounded-xl border px-4 py-3 text-sm outline-none focus:border-[#35B5B5] focus:ring-2 focus:ring-[#1E8A8A]/20 ${
     isDark
       ? "border-[#263442] bg-[#16212c] text-[#f2f4f7] placeholder:text-gray-500"
       : "border-[#e4e7ec] bg-white text-[#101828] placeholder:text-gray-400"
@@ -568,165 +466,142 @@ export default function page() {
 
   const mutedTextClass = isDark ? "text-gray-400" : "text-gray-500";
 
-  const renderInput = (
-    label,
-    name,
-    placeholder,
-    required = true,
-    type = "text",
-  ) => (
-    <div key={name}>
-      <label htmlFor={name} className={labelClass}>
-        {label}
-        {required && <span className="ml-1 text-red-400">*</span>}
-      </label>
-
-      <input
-        id={name}
-        name={name}
-        type={type}
-        value={formData[name] ?? ""}
-        onChange={handleChange}
-        placeholder={placeholder}
-        className={inputClass}
-        required={required}
-      />
-    </div>
-  );
-
-  const renderImageField = (label, field) => (
-    <div key={field} className="min-w-0">
-      <label className={labelClass}>
-        {label} <span className="text-red-400">*</span>
-      </label>
-
-      {previews[field] ? (
-        <div
-          className={`relative overflow-hidden rounded-xl border p-3 ${
-            isDark
-              ? "border-[#263442] bg-[#16212c]"
-              : "border-[#e4e7ec] bg-[#f8fafc]"
-          }`}
-        >
-          <div className="relative flex h-52 w-full items-center justify-center overflow-hidden rounded-lg">
-            {imageErrors[field] ? (
-              <div className="flex flex-col items-center gap-2 px-4 text-center">
-                <AlertCircle size={30} className="text-amber-500" />
-
-                <p className="text-sm font-medium">Image could not be loaded</p>
-
-                <p className={`text-xs ${mutedTextClass}`}>
-                  Check the URL or choose another image.
-                </p>
-              </div>
-            ) : (
-              <img
-                src={previews[field]}
-                alt={label}
-                className="h-full w-full object-contain"
-                onError={() => {
-                  setImageErrors((prev) => ({
-                    ...prev,
-                    [field]: true,
-                  }));
-                }}
-                onLoad={() => {
-                  setImageErrors((prev) => ({
-                    ...prev,
-                    [field]: false,
-                  }));
-                }}
-              />
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => removeImage(field)}
-            className="absolute top-5 right-5 rounded-lg border border-red-400/20 bg-red-500/90 p-2 text-white transition hover:bg-red-600"
-            aria-label={`Remove ${label}`}
-          >
-            <Trash2 size={17} />
-          </button>
-
-          <div
-            className={`mt-3 flex items-center gap-2 text-xs ${
-              imageErrors[field] ? "text-amber-500" : "text-emerald-500"
-            }`}
-          >
-            {imageErrors[field] ? (
-              <AlertCircle size={15} />
-            ) : (
-              <CheckCircle2 size={15} />
-            )}
-
-            {imageErrors[field] ? "Image unavailable" : "Image selected"}
-          </div>
-        </div>
-      ) : (
-        <label
-          className={`flex h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 text-center transition hover:border-[#1E8A8A] hover:bg-[#1E8A8A]/5 ${
-            isDark
-              ? "border-[#263442] bg-[#16212c]"
-              : "border-[#d0d5dd] bg-[#f8fafc]"
-          }`}
-        >
-          <span className="mb-3 rounded-xl bg-[#1E8A8A]/15 p-4 text-[#35B5B5]">
-            <ImagePlus size={27} />
-          </span>
-
-          <span
-            className={`text-sm font-medium ${
-              isDark ? "text-gray-200" : "text-gray-700"
-            }`}
-          >
-            Upload {label}
-          </span>
-
-          <span className={`mt-2 text-xs ${mutedTextClass}`}>
-            JPG, PNG or WEBP · Maximum 5 MB
-          </span>
-
-          <input
-            ref={(node) => {
-              fileInputRefs.current[field] = node;
-            }}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(e) => handleImageChange(e, field)}
-          />
+  function renderInput(label, name, placeholder, type = "text") {
+    return (
+      <div key={name}>
+        <label htmlFor={name} className={labelClass}>
+          {label} <span className="text-red-400">*</span>
         </label>
-      )}
-
-      <div className="relative mt-3">
-        <LinkIcon
-          size={16}
-          className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-500"
-        />
 
         <input
-          type="url"
-          value={typeof formData[field] === "string" ? formData[field] : ""}
-          onChange={(e) => handleImageUrl(field, e.target.value)}
-          placeholder="Or paste an image URL"
-          className={`${inputClass} pl-10`}
+          id={name}
+          name={name}
+          type={type}
+          value={
+            fields.includes(name)
+              ? formData[name]?.[language] || ""
+              : formData[name] || ""
+          }
+          onChange={handleChange}
+          placeholder={placeholder}
+          className={inputClass}
+          required
+          dir={language === "en" ? "ltr" : "auto"}
         />
       </div>
+    );
+  }
 
-      <p className={`mt-2 text-xs ${mutedTextClass}`}>
-        Saving uploads this image to Cloudinary and stores its Cloudinary URL.
-      </p>
-    </div>
-  );
+  function renderImageField(label, field) {
+    return (
+      <div key={field} className="min-w-0">
+        <label className={labelClass}>{label}</label>
+
+        {previews[field] ? (
+          <div
+            className={`relative rounded-xl border p-3 ${
+              isDark
+                ? "border-[#263442] bg-[#16212c]"
+                : "border-[#e4e7ec] bg-[#f8fafc]"
+            }`}
+          >
+            <div className="flex h-52 items-center justify-center overflow-hidden rounded-lg">
+              {imageErrors[field] ? (
+                <div className="text-center">
+                  <AlertCircle className="mx-auto mb-2 text-amber-500" />
+                  Image could not be loaded
+                </div>
+              ) : (
+                <img
+                  src={previews[field]}
+                  alt={label}
+                  className="h-full w-full object-contain"
+                  onError={() =>
+                    setImageErrors((prev) => ({
+                      ...prev,
+                      [field]: true,
+                    }))
+                  }
+                  onLoad={() =>
+                    setImageErrors((prev) => ({
+                      ...prev,
+                      [field]: false,
+                    }))
+                  }
+                />
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => removeImage(field)}
+              className="absolute top-5 right-5 rounded-lg bg-red-500 p-2 text-white hover:bg-red-600"
+              aria-label={`Remove ${label}`}
+            >
+              <Trash2 size={17} />
+            </button>
+
+            <p className="mt-3 flex items-center gap-2 text-xs text-emerald-500">
+              <CheckCircle2 size={15} />
+              Image selected
+            </p>
+          </div>
+        ) : (
+          <label
+            className={`flex h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 text-center hover:border-[#1E8A8A] ${
+              isDark
+                ? "border-[#263442] bg-[#16212c]"
+                : "border-[#d0d5dd] bg-[#f8fafc]"
+            }`}
+          >
+            <span className="mb-3 rounded-xl bg-[#1E8A8A]/15 p-4 text-[#35B5B5]">
+              <ImagePlus size={27} />
+            </span>
+
+            <span className="text-sm font-medium">Upload {label}</span>
+
+            <span className={`mt-2 text-xs ${mutedTextClass}`}>
+              JPG, PNG or WEBP · Maximum 5 MB
+            </span>
+
+            <input
+              ref={(node) => {
+                fileInputRefs.current[field] = node;
+              }}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(event) => handleImageChange(event, field)}
+            />
+          </label>
+        )}
+
+        <div className="relative mt-3">
+          <LinkIcon
+            size={16}
+            className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-500"
+          />
+
+          <input
+            type="url"
+            value={typeof formData[field] === "string" ? formData[field] : ""}
+            onChange={(event) => handleImageUrl(field, event.target.value)}
+            placeholder="Or paste an image URL"
+            className={`${inputClass} pl-10`}
+          />
+        </div>
+
+        <p className={`mt-2 text-xs ${mutedTextClass}`}>
+          New images and external URLs are uploaded to Cloudinary when saved.
+        </p>
+      </div>
+    );
+  }
 
   if (isFetching) {
     return (
-      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
+      <div className="flex min-h-96 items-center justify-center bg-[var(--background)]">
         <Spinner />
-        <p className="text-sm font-medium text-[var(--muted)]">
-          Loading About Us...
-        </p>
       </div>
     );
   }
@@ -741,58 +616,71 @@ export default function page() {
               Homepage Management
             </div>
 
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              About Us Section
-            </h1>
+            <h1 className="text-2xl font-bold sm:text-3xl">About Us Section</h1>
 
-            <p className={`mt-2 max-w-xl text-sm leading-6 ${mutedTextClass}`}>
-              Manage the content, images and client information displayed on
-              your website.
+            <p className={`mt-2 text-sm ${mutedTextClass}`}>
+              Manage your translated content and section images.
             </p>
           </div>
 
-          <div
-            className={`flex w-fit items-center gap-2 rounded-full border px-4 py-2 text-xs ${
-              isDark
-                ? "border-[#263442] bg-[#16212c] text-gray-300"
-                : "border-[#e4e7ec] bg-white text-gray-600"
-            }`}
-          >
-            {hasSavedData ? (
-              <>
-                <CheckCircle2 size={15} className="text-emerald-500" />
-                Saved data loaded
-              </>
-            ) : (
-              <>
-                <FileImage size={15} className={mutedTextClass} />
-                New section
-              </>
-            )}
+          {/* Three teal language-selection buttons */}
+          <div className="min-w-0 sm:min-w-[320px]">
+            <label className={`${labelClass} mb-3`}>Content Language</label>
+
+            <div
+              className="inline-flex w-full flex-wrap items-center gap-1.5 rounded-2xl border border-[#1E8A8A]/20 bg-[#1E8A8A]/5 p-1.5 shadow-sm"
+              role="group"
+              aria-label="Content language"
+            >
+              {languages.map((item) => {
+                const isActive = language === item.code;
+
+                return (
+                  <button
+                    key={item.code}
+                    type="button"
+                    onClick={() => setLanguage(item.code)}
+                    disabled={isSaving}
+                    aria-pressed={isActive}
+                    className={`relative flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#1E8A8A] focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
+                      isActive
+                        ? "bg-[#1E8A8A] text-white shadow-md shadow-[#1E8A8A]/20"
+                        : isDark
+                          ? "text-gray-400 hover:bg-[#1E8A8A]/15 hover:text-[#35B5B5]"
+                          : "text-gray-600 hover:bg-[#1E8A8A]/10 hover:text-[#1E8A8A]"
+                    }`}
+                  >
+                    {item.code === "en"
+                      ? "English"
+                      : item.code === "fa"
+                        ? "دری"
+                        : "پښتو"}
+
+                    {isActive && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className={`mt-2 text-xs ${mutedTextClass}`}>
+              Select a language to edit its content.
+            </p>
           </div>
         </header>
 
         <form onSubmit={handleSave} className="space-y-6">
           <section
-            className={`overflow-hidden rounded-2xl border shadow-xl shadow-black/5 ${cardClass}`}
+            className={`overflow-hidden rounded-2xl border shadow-xl ${cardClass}`}
           >
-            <div
-              className={`border-b px-5 py-5 sm:px-7 ${
-                isDark ? "border-[#263442]" : "border-[#e4e7ec]"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="rounded-xl bg-[#1E8A8A]/15 p-3 text-[#35B5B5]">
-                  <FileImage size={21} />
-                </span>
+            <div className="border-b border-[var(--border)] px-5 py-5 sm:px-7">
+              <h2 className="font-semibold">Section Content</h2>
 
-                <div>
-                  <h2 className="font-semibold">Section Content</h2>
-                  <p className={`mt-1 text-xs ${mutedTextClass}`}>
-                    All fields are required.
-                  </p>
-                </div>
-              </div>
+              <p className={`mt-1 text-xs ${mutedTextClass}`}>
+                Editing:{" "}
+                {languages.find((item) => item.code === language)?.label}
+              </p>
             </div>
 
             <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-7">
@@ -807,7 +695,7 @@ export default function page() {
               {renderInput(
                 "Experience Text",
                 "experienceText",
-                "Decades of Experience, Endless Innovation",
+                "Our experience",
               )}
 
               {renderInput("Section Label", "sectionLabel", "Get to Know Us")}
@@ -826,43 +714,31 @@ export default function page() {
                 <textarea
                   id="description"
                   name="description"
-                  value={formData.description}
+                  rows={5}
+                  value={formData.description?.[language] || ""}
                   onChange={handleChange}
                   placeholder="Write your About Us description..."
-                  rows={5}
                   required
+                  dir={language === "en" ? "ltr" : "auto"}
                   className={`${inputClass} resize-y leading-6`}
                 />
 
                 <p className={`mt-2 text-right text-xs ${mutedTextClass}`}>
-                  {formData.description.length} characters
+                  {(formData.description?.[language] || "").length} characters
                 </p>
               </div>
             </div>
           </section>
 
           <section
-            className={`overflow-hidden rounded-2xl border shadow-xl shadow-black/5 ${cardClass}`}
+            className={`overflow-hidden rounded-2xl border shadow-xl ${cardClass}`}
           >
-            <div
-              className={`border-b px-5 py-5 sm:px-7 ${
-                isDark ? "border-[#263442]" : "border-[#e4e7ec]"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="rounded-xl bg-[#1E8A8A]/15 p-3 text-[#35B5B5]">
-                  <ImagePlus size={21} />
-                </span>
+            <div className="border-b border-[var(--border)] px-5 py-5 sm:px-7">
+              <h2 className="font-semibold">Section Images</h2>
 
-                <div>
-                  <h2 className="font-semibold">Section Images</h2>
-
-                  <p className={`mt-1 text-xs ${mutedTextClass}`}>
-                    Upload the main image and video thumbnail, or provide image
-                    URLs. Images are saved to Cloudinary.
-                  </p>
-                </div>
-              </div>
+              <p className={`mt-1 text-xs ${mutedTextClass}`}>
+                Images are shared across all languages.
+              </p>
             </div>
 
             <div className="grid gap-6 p-5 sm:grid-cols-2 sm:p-7">
@@ -872,7 +748,7 @@ export default function page() {
 
               <div className="sm:col-span-2">
                 <label htmlFor="videoLink" className={labelClass}>
-                  YouTube Video Link <span className="text-red-400">*</span>
+                  YouTube Video Link
                 </label>
 
                 <div className="relative">
@@ -888,46 +764,23 @@ export default function page() {
                     value={formData.videoLink}
                     onChange={handleChange}
                     placeholder="https://www.youtube.com/watch?v=..."
-                    className={`${inputClass} pl-10`}
                     required
-                    aria-describedby="videoLinkHelp"
+                    className={`${inputClass} pl-10`}
                   />
                 </div>
-
-                <p
-                  id="videoLinkHelp"
-                  className={`mt-2 text-xs ${mutedTextClass}`}
-                >
-                  Enter a valid YouTube video URL. YouTube watch, Shorts, embed,
-                  and youtu.be links are supported.
-                </p>
-
-                {formData.videoLink.trim() &&
-                  isValidYouTubeUrl(formData.videoLink) && (
-                    <p className="mt-2 flex items-center gap-2 text-xs text-emerald-500">
-                      <CheckCircle2 size={14} />
-                      Valid YouTube video link
-                    </p>
-                  )}
               </div>
             </div>
           </section>
 
           <section
-            className={`overflow-hidden rounded-2xl border shadow-xl shadow-black/5 ${cardClass}`}
+            className={`overflow-hidden rounded-2xl border shadow-xl ${cardClass}`}
           >
-            <div
-              className={`border-b px-5 py-5 sm:px-7 ${
-                isDark ? "border-[#263442]" : "border-[#e4e7ec]"
-              }`}
-            >
-              <div>
-                <h2 className="font-semibold">Client Information</h2>
+            <div className="border-b border-[var(--border)] px-5 py-5 sm:px-7">
+              <h2 className="font-semibold">Client Information</h2>
 
-                <p className={`mt-1 text-xs ${mutedTextClass}`}>
-                  Enter the client details displayed in your section.
-                </p>
-              </div>
+              <p className={`mt-1 text-xs ${mutedTextClass}`}>
+                These text fields also support each language.
+              </p>
             </div>
 
             <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-7">
@@ -945,7 +798,7 @@ export default function page() {
             }`}
           >
             <p className={`text-xs ${mutedTextClass}`}>
-              <span className="text-red-400">*</span> All fields are required.
+              Save your changes in the selected language.
             </p>
 
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -953,10 +806,10 @@ export default function page() {
                 type="button"
                 onClick={() => window.location.reload()}
                 disabled={isSaving}
-                className={`flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition disabled:opacity-50 ${
+                className={`flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium ${
                   isDark
-                    ? "border-[#263442] text-gray-300 hover:bg-white/5"
-                    : "border-[#e4e7ec] text-gray-700 hover:bg-gray-50"
+                    ? "border-[#263442] text-gray-300"
+                    : "border-[#e4e7ec] text-gray-700"
                 }`}
               >
                 <RotateCcw size={16} />
@@ -966,7 +819,7 @@ export default function page() {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="flex items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#1E8A8A]/10 transition hover:bg-[#249b98] disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#249b98] disabled:opacity-60"
               >
                 {isSaving ? (
                   <>

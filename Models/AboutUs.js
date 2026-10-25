@@ -1,5 +1,23 @@
 import mongoose from "mongoose";
 
+const TranslationSchema = new mongoose.Schema(
+  {
+    en: {
+      type: String,
+      default: "",
+    },
+    fa: {
+      type: String,
+      default: "",
+    },
+    ps: {
+      type: String,
+      default: "",
+    },
+  },
+  { _id: false },
+);
+
 const ImageSchema = new mongoose.Schema(
   {
     url: {
@@ -17,33 +35,33 @@ const ImageSchema = new mongoose.Schema(
 const AboutUsSchema = new mongoose.Schema(
   {
     experienceNumber: {
-      type: String,
-      default: "13+",
+      type: TranslationSchema,
+      default: () => ({}),
     },
 
     experienceLabel: {
-      type: String,
-      default: "Years of Experience",
+      type: TranslationSchema,
+      default: () => ({}),
     },
 
     experienceText: {
-      type: String,
-      default: "",
+      type: TranslationSchema,
+      default: () => ({}),
     },
 
     sectionLabel: {
-      type: String,
-      default: "Get to Know Us",
+      type: TranslationSchema,
+      default: () => ({}),
     },
 
     title: {
-      type: String,
-      default: "",
+      type: TranslationSchema,
+      default: () => ({}),
     },
 
     description: {
-      type: String,
-      default: "",
+      type: TranslationSchema,
+      default: () => ({}),
     },
 
     mainImage: {
@@ -52,8 +70,8 @@ const AboutUsSchema = new mongoose.Schema(
     },
 
     buttonText: {
-      type: String,
-      default: "Learn More",
+      type: TranslationSchema,
+      default: () => ({}),
     },
 
     buttonLink: {
@@ -72,13 +90,13 @@ const AboutUsSchema = new mongoose.Schema(
     },
 
     clientName: {
-      type: String,
-      default: "",
+      type: TranslationSchema,
+      default: () => ({}),
     },
 
     clientRole: {
-      type: String,
-      default: "",
+      type: TranslationSchema,
+      default: () => ({}),
     },
   },
   {

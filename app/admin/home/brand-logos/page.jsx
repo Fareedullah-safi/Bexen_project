@@ -404,23 +404,34 @@ export default function BrandLogos() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2" aria-label="Title language">
-              {LANGUAGES.map((language) => (
-                <button
-                  key={language.code}
-                  type="button"
-                  onClick={() => setTitleLanguage(language.code)}
-                  disabled={isChangingTitle}
-                  aria-pressed={titleLanguage === language.code}
-                  className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                    titleLanguage === language.code
-                      ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-                      : "border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] hover:border-[var(--accent)]"
-                  }`}
-                >
-                  {language.label}
-                </button>
-              ))}
+            <div
+              className="inline-flex flex-wrap items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-1.5 shadow-sm"
+              aria-label="Title language"
+            >
+              {LANGUAGES.map((language) => {
+                const isActive = titleLanguage === language.code;
+
+                return (
+                  <button
+                    key={language.code}
+                    type="button"
+                    onClick={() => setTitleLanguage(language.code)}
+                    disabled={isChangingTitle}
+                    aria-pressed={isActive}
+                    className={`relative flex min-h-10 items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
+                      isActive
+                        ? "bg-[var(--accent)] text-white shadow-[var(--accent)]/20 shadow-md"
+                        : "text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+                    }`}
+                  >
+                    {language.label}
+
+                    {isActive && (
+                      <span className="ml-2 h-1.5 w-1.5 rounded-full bg-white" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
