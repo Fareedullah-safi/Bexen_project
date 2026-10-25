@@ -4,186 +4,91 @@ import {
 } from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
-import Cards from "@/Models/Projects/Cards";
+import Projects from "@/Models/Projects/Projects";
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-
+// GET: Load data
 export async function GET() {
   try {
     await connectDB();
-
-    const projects = await Cards.find().sort({ order: 1 });
-
-    return NextResponse.json({ success: true, projects });
+    const data = await Projects.findOne({});
+    return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("GET Large Projects Error:", error);
-
     return NextResponse.json(
-      { success: false, message: "Failed to fetch projects" },
+      { success: false, message: error.message },
       { status: 500 },
     );
   }
 }
 
+// POST: Save header and projects
 export async function POST(request) {
   try {
     const permission = await requireEditPermission();
+    if (!permission.authorized)
+      return NextResponse.json(
+        { message: "Permission denied." },
+        { status: 403 },
+      );
 
-    if (!permission.authorized) {
-      return permission.response;
-    }
     await connectDB();
 
-    const formData = await request.formData();
-    const projectsData = formData.get("projects");
+    const { header, projects } = await request.json();
+    let data = await Projects.findOne({});
+    if (!data) data = await Projects.create({});
 
-    if (!projectsData) {
-      return NextResponse.json(
-        { success: false, message: "Projects data is required" },
-        { status: 400 },
-      );
-    }
+    if (header) data.header = header;
+    if (Array.isArray(projects)) data.projects = projects;
 
-    const projects = JSON.parse(projectsData);
+    await data.save();
 
-    if (!Array.isArray(projects)) {
-      return NextResponse.json(
-        { success: false, message: "Projects must be an array" },
-        { status: 400 },
-      );
-    }
-
-    const savedProjects = [];
-
-    for (let index = 0; index < projects.length; index++) {
-      const project = projects[index];
-      const file = formData.get(`image_${index}`);
-
-      let image = project.image || "";
-      let publicId = project.publicId || "";
-
-      if (file && typeof file === "object" && file.size > 0) {
-        if (!file.type.startsWith("image/")) {
-          return NextResponse.json(
-            {
-              success: false,
-              message: `Invalid image at project ${index + 1}`,
-            },
-            { status: 400 },
-          );
-        }
-
-        if (file.size > 5 * 1024 * 1024) {
-          return NextResponse.json(
-            { success: false, message: `Image ${index + 1} exceeds 5MB` },
-            { status: 400 },
-          );
-        }
-
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
-
-        const uploadResult = await new Promise((resolve, reject) => {
-          const stream = cloudinary.uploader.upload_stream(
-            {
-              folder: "bexon/large-projects",
-              resource_type: "image",
-            },
-            (error, result) => {
-              if (error) reject(error);
-              else resolve(result);
-            },
-          );
-
-          stream.end(buffer);
-        });
-
-        image = uploadResult.secure_url;
-        publicId = uploadResult.public_id;
-      }
-
-      savedProjects.push({
-        tag: project.tag || "",
-        title: project.title || "",
-        image,
-        publicId,
-        order: index,
-      });
-    }
-
-    await Cards.deleteMany({});
-    const result = await Cards.insertMany(savedProjects);
-
-    return NextResponse.json({
-      success: true,
-      message: "Large projects saved successfully",
-      projects: result,
-    });
+    return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("POST Large Projects Error:", error);
-
     return NextResponse.json(
-      { success: false, message: "Failed to save large projects" },
+      { success: false, message: error.message },
       { status: 500 },
     );
   }
 }
 
+// DELETE: Remove a project
 export async function DELETE(request) {
   try {
-    //USER ADMIN CHECKS
     const permission = await requireDeletePermission();
+    if (!permission.authorized)
+      return NextResponse.json(
+        { message: "Permission denied." },
+        { status: 403 },
+      );
 
-    console.log("DELETE AUTHORIZATION:", {
-      authorized: permission.authorized,
-      role: permission.admin?.role,
-    });
-
-    if (!permission.authorized) {
-      return permission.response;
-    }
-    //USER ADMIN CHECKS
     await connectDB();
 
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get("id");
-
-    if (!id) {
+    const id = new URL(request.url).searchParams.get("id");
+    if (!mongoose.isValidObjectId(id))
       return NextResponse.json(
-        { success: false, message: "Project id is required" },
+        { message: "Invalid project ID." },
         { status: 400 },
       );
-    }
 
-    const project = await Cards.findById(id);
+    const data = await Projects.findOne({});
+    const project = data?.projects.id(id);
 
-    if (!project) {
+    if (!project)
       return NextResponse.json(
-        { success: false, message: "Project not found" },
+        { message: "Project not found." },
         { status: 404 },
       );
-    }
 
-    if (project.publicId) {
-      try {
-        await cloudinary.uploader.destroy(project.publicId);
-      } catch (cloudinaryError) {
-        console.error("Cloudinary delete error:", cloudinaryError);
-      }
-    }
+    if (project.publicId) await cloudinary.uploader.destroy(project.publicId);
 
-    await Cards.findByIdAndDelete(id);
+    data.projects.pull({ _id: id });
+    await data.save();
 
-    return NextResponse.json({
-      success: true,
-      message: "Large project deleted successfully",
-    });
+    return NextResponse.json({ success: true, message: "Project deleted." });
   } catch (error) {
-    console.error("DELETE Large Project Error:", error);
-
     return NextResponse.json(
-      { success: false, message: "Failed to delete project" },
+      { success: false, message: error.message },
       { status: 500 },
     );
   }

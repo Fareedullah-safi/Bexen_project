@@ -10,33 +10,20 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const languages = ["en", "fa", "ps"];
-
 const error = (message, status = 400) =>
   NextResponse.json({ success: false, error: message }, { status });
 
-const translate = (value) =>
-  typeof value === "string"
-    ? { en: value, fa: "", ps: "" }
-    : Object.fromEntries(
-        languages.map((lang) => [
-          lang,
-          typeof value?.[lang] === "string" ? value[lang] : "",
-        ]),
-      );
-
-const validId = (id) => typeof id === "string" && mongoose.isValidObjectId(id);
+const translate = (value) => ({
+  en: typeof value === "string" ? value : value?.en || "",
+  fa: typeof value === "string" ? "" : value?.fa || "",
+  ps: typeof value === "string" ? "" : value?.ps || "",
+});
 
 async function destroyImage(publicId) {
-  if (!publicId) return;
-
-  try {
+  if (publicId)
     await cloudinary.uploader.destroy(publicId, {
       resource_type: "image",
     });
-  } catch (err) {
-    console.error("Cloudinary destroy failed:", err);
-  }
 }
 
 export async function GET() {
@@ -62,23 +49,35 @@ export async function POST(req) {
     if (!Array.isArray(body.solutions) || !body.solutions.length)
       return error("Add at least one solution");
 
-    const solutions = body.solutions.map((item) => ({
-      ...(validId(item.id) ? { _id: item.id } : {}),
-      title: translate(item.title),
-      description: translate(item.description),
-      image: item.image || "",
-      publicId: item.publicId || "",
-    }));
+    const solutions = [];
 
-    for (const item of solutions) {
-      if (!languages.some((lang) => item.title[lang].trim()))
-        return error("Each solution needs a title");
+    for (const item of body.solutions) {
+      const title = translate(item.title);
+      const description = translate(item.description);
 
-      if (!languages.some((lang) => item.description[lang].trim()))
-        return error("Each solution needs a description");
+      if (!title.en.trim() && !title.fa.trim() && !title.ps.trim())
+        return error("Every solution needs a title");
+
+      if (
+        !description.en.trim() &&
+        !description.fa.trim() &&
+        !description.ps.trim()
+      )
+        return error("Every solution needs a description");
 
       if (!!item.image !== !!item.publicId)
         return error("Image and public ID must match");
+
+      const solution = {
+        title,
+        description,
+        image: item.image || "",
+        publicId: item.publicId || "",
+      };
+
+      if (mongoose.isValidObjectId(item.id)) solution._id = item.id;
+
+      solutions.push(solution);
     }
 
     const data = await Solutions.findOneAndUpdate(
@@ -90,18 +89,20 @@ export async function POST(req) {
         highlight: translate(body.highlight),
         solutions,
       },
-      { new: true, upsert: true, runValidators: true },
+      { returnDocument: "after", upsert: true, runValidators: true },
     );
 
-    const currentPublicIds = new Set(
-      solutions.map((item) => item.publicId).filter(Boolean),
-    );
+    if (previous) {
+      for (const old of previous.solutions) {
+        let stillUsed = false;
 
-    const oldPublicIds = (previous?.solutions || [])
-      .map((item) => item.publicId)
-      .filter((id) => id && !currentPublicIds.has(id));
+        for (const current of solutions) {
+          if (current.publicId === old.publicId) stillUsed = true;
+        }
 
-    await Promise.all(oldPublicIds.map(destroyImage));
+        if (old.publicId && !stillUsed) await destroyImage(old.publicId);
+      }
+    }
 
     return NextResponse.json({ success: true, data });
   } catch (err) {
@@ -119,7 +120,7 @@ export async function DELETE(req) {
 
     const { cardId } = await req.json();
 
-    if (!validId(cardId)) return error("Invalid solution ID");
+    if (!mongoose.isValidObjectId(cardId)) return error("Invalid solution ID");
 
     const data = await Solutions.findOne({
       "solutions._id": cardId,
@@ -130,16 +131,18 @@ export async function DELETE(req) {
     if (data.solutions.length <= 1)
       return error("At least one solution is required");
 
-    const solution = data.solutions.find(
-      (item) => item._id.toString() === cardId,
-    );
+    const solution = data.solutions.id(cardId);
 
     await Solutions.updateOne(
       { _id: data._id },
       { $pull: { solutions: { _id: cardId } } },
     );
 
-    await destroyImage(solution?.publicId);
+    try {
+      await destroyImage(solution?.publicId);
+    } catch (err) {
+      console.error("Cloudinary deletion failed:", err);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

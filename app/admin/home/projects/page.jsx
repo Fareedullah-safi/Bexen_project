@@ -8,311 +8,222 @@ import {
   FolderKanban,
   ImagePlus,
   Info,
-  Link as LinkIcon,
   LoaderCircle,
   Plus,
   Save,
   Trash2,
-  Upload,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-/* =========================================================
-1. STYLES
-========================================================= */
+const API = "/api/homepage/projects";
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "fa", label: "Dari" },
+  { code: "ps", label: "Pashto" },
+];
 
 const panelClass =
   "rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8";
-
 const inputClass =
   "w-full rounded-2xl border border-[var(--border)] bg-[var(--background)] px-4 py-3.5 text-sm text-[var(--foreground)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10";
-
 const labelClass = "mb-2 block text-sm font-semibold text-[var(--foreground)]";
-
 const saveButtonClass =
-  "flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-8 text-sm font-semibold text-white transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:opacity-60";
+  "flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-6 text-sm font-semibold text-white hover:bg-[#167777] disabled:opacity-60";
 
-const moveButtonClass =
-  "flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-40";
+const translation = () => ({ en: "", fa: "", ps: "" });
 
-/* =========================================================
-2. CONSTANTS
-========================================================= */
+const emptyHeader = () => ({
+  badgeText: translation(),
+  headingLine: translation(),
+  highlightWord: translation(),
+  description: translation(),
+  buttonText: translation(),
+  buttonLink: "/projects",
+});
 
-const PROJECTS_API = "/api/homepage/projects";
-const HEADER_API = "/api/homepage/projects/header";
+const newProject = () => ({
+  clientKey: `draft-${Date.now()}-${Math.random()}`,
+  tag: translation(),
+  title: translation(),
+  image: "",
+  publicId: "",
+});
+
+const formatProject = (project) => ({
+  ...newProject(),
+  ...project,
+  clientKey: project._id || `draft-${Date.now()}-${Math.random()}`,
+  tag:
+    typeof project.tag === "string"
+      ? { ...translation(), en: project.tag }
+      : { ...translation(), ...project.tag },
+  title:
+    typeof project.title === "string"
+      ? { ...translation(), en: project.title }
+      : { ...translation(), ...project.title },
+  image: project.image || "",
+  publicId: project.publicId || "",
+});
 
 const headerFields = [
-  {
-    name: "badgeText",
-    label: "Badge Text",
-    placeholder: "PROUD PROJECTS",
-  },
+  { name: "badgeText", label: "Badge Text", placeholder: "PROUD PROJECTS" },
   {
     name: "headingLine",
     label: "Heading Line",
     placeholder: "Breaking Boundaries,",
   },
-  {
-    name: "highlightWord",
-    label: "Highlight Word",
-    placeholder: "Dreams.",
-  },
+  { name: "highlightWord", label: "Highlight Word", placeholder: "Dreams." },
   {
     name: "description",
     label: "Description",
     placeholder: "We work closely with our clients...",
     textarea: true,
   },
-  {
-    name: "buttonText",
-    label: "Button Text",
-    placeholder: "More Projects",
-  },
+  { name: "buttonText", label: "Button Text", placeholder: "More Projects" },
   {
     name: "buttonLink",
     label: "Button Link",
     placeholder: "/projects",
+    shared: true,
   },
 ];
 
-/* =========================================================
-3. HELPERS
-========================================================= */
-
-function createEmptyProject() {
-  return {
-    clientKey: `draft-${Date.now()}-${Math.random()}`,
-    _id: null,
-    tag: "",
-    title: "",
-    image: "",
-    publicId: "",
-    imageFile: null,
-    imagePreview: "",
-  };
-}
-
-function formatProjectFromApi(project) {
-  return {
-    clientKey: project._id,
-    _id: project._id,
-    tag: project.tag || "",
-    title: project.title || "",
-    image: project.image || "",
-    publicId: project.publicId || "",
-    imageFile: null,
-    imagePreview: "",
-  };
-}
-
-/* =========================================================
-4. IMAGE PREVIEW
-========================================================= */
-
-function ProjectImage({ source, alt }) {
-  const [failedSource, setFailedSource] = useState("");
-
-  useEffect(() => {
-    setFailedSource("");
-  }, [source]);
-
-  const showImage = Boolean(source) && failedSource !== source;
-
+function LanguageSelector({ language, setLanguage, disabled }) {
   return (
-    <div className="flex h-44 items-center justify-center overflow-hidden bg-[var(--background)]">
-      {showImage ? (
-        <img
-          src={source}
-          alt={alt}
-          className="h-full w-full object-cover"
-          onError={() => setFailedSource(source)}
-        />
-      ) : (
-        <div className="flex flex-col items-center text-[var(--muted)]">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
-            <ImagePlus size={24} />
-          </div>
-
-          <p className="mt-2 text-xs font-medium text-[var(--foreground)]">
-            {source
-              ? "Could not load image. Check the URL."
-              : "No image selected"}
-          </p>
-        </div>
-      )}
+    <div className="inline-flex flex-wrap gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-1.5">
+      {LANGUAGES.map((item) => (
+        <button
+          key={item.code}
+          type="button"
+          disabled={disabled}
+          onClick={() => setLanguage(item.code)}
+          className={`min-h-10 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+            language === item.code
+              ? "bg-[#1E8A8A] text-white"
+              : "text-[var(--muted)] hover:bg-[var(--accent-soft)]"
+          }`}
+        >
+          {item.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-/* =========================================================
-5. PROJECT CARD
-========================================================= */
-
 function ProjectCard({
   project,
   index,
-  totalProjects,
+  total,
+  language,
   busy,
-  deletingKey,
   onChange,
   onMove,
   onDelete,
-  onImageUrlChange,
-  onImageFileChange,
 }) {
-  const isDeleting = deletingKey === project.clientKey;
-  const imageSource = project.imagePreview || project.image;
-
   return (
     <div className="rounded-3xl border border-[var(--border)] bg-[var(--background)] p-5 sm:p-6">
       <div className="mb-5 flex items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A] text-sm font-bold text-white">
-            {String(index + 1).padStart(2, "0")}
-          </span>
-
-          <div className="min-w-0">
-            <p className="truncate text-base font-bold text-[var(--foreground)]">
-              {project.title || "Untitled Project"}
-            </p>
-
-            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              Tag: {project.tag || "Large"}
-            </span>
-          </div>
+        <div className="min-w-0">
+          <p className="truncate font-bold text-[var(--foreground)]">
+            {index + 1}. {project.title[language] || "Untitled Project"}
+          </p>
+          <p className="text-xs text-[var(--muted)]">
+            {LANGUAGES.find((item) => item.code === language)?.label} content
+          </p>
         </div>
-
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex gap-2">
           <button
             type="button"
             title="Move up"
-            disabled={index === 0 || busy}
-            onClick={() => onMove(project.clientKey, -1)}
-            className={moveButtonClass}
+            disabled={busy || index === 0}
+            onClick={() => onMove(index, -1)}
+            className="rounded-xl border border-[var(--border)] p-2 disabled:opacity-40"
           >
             <ArrowUp size={16} />
           </button>
-
           <button
             type="button"
             title="Move down"
-            disabled={index === totalProjects - 1 || busy}
-            onClick={() => onMove(project.clientKey, 1)}
-            className={moveButtonClass}
+            disabled={busy || index === total - 1}
+            onClick={() => onMove(index, 1)}
+            className="rounded-xl border border-[var(--border)] p-2 disabled:opacity-40"
           >
             <ArrowDown size={16} />
           </button>
-
           <button
             type="button"
             title="Delete project"
             disabled={busy}
             onClick={() => onDelete(project)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface)] text-red-500 transition hover:bg-red-500 hover:text-white disabled:opacity-60"
+            className="rounded-xl p-2 text-red-500 hover:bg-red-500 hover:text-white disabled:opacity-40"
           >
-            {isDeleting ? (
-              <LoaderCircle size={16} className="animate-spin" />
-            ) : (
-              <Trash2 size={16} />
-            )}
+            <Trash2 size={16} />
           </button>
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
-          <div>
-            <label className={labelClass}>Tag / Category</label>
-
-            <input
-              value={project.tag}
-              disabled={busy}
-              onChange={(e) =>
-                onChange(project.clientKey, { tag: e.target.value })
-              }
-              placeholder="e.g. Connect, Business"
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Project Title</label>
-
-            <textarea
-              value={project.title}
-              disabled={busy}
-              onChange={(e) =>
-                onChange(project.clientKey, { title: e.target.value })
-              }
-              rows={3}
-              placeholder="e.g. Event Management Platform"
-              className={`${inputClass} resize-y`}
-            />
-          </div>
+          {[
+            {
+              field: "tag",
+              label: "Tag / Category",
+              placeholder: "e.g. Business",
+            },
+            {
+              field: "title",
+              label: "Project Title",
+              placeholder: "Project title in selected language",
+              textarea: true,
+            },
+          ].map((item) => (
+            <div key={item.field}>
+              <label className={labelClass}>{item.label}</label>
+              {item.textarea ? (
+                <textarea
+                  rows={3}
+                  disabled={busy}
+                  value={project[item.field][language] || ""}
+                  onChange={(e) =>
+                    onChange(project.clientKey, item.field, e.target.value)
+                  }
+                  placeholder={item.placeholder}
+                  className={`${inputClass} resize-y`}
+                />
+              ) : (
+                <input
+                  disabled={busy}
+                  value={project[item.field][language] || ""}
+                  onChange={(e) =>
+                    onChange(project.clientKey, item.field, e.target.value)
+                  }
+                  placeholder={item.placeholder}
+                  className={inputClass}
+                />
+              )}
+            </div>
+          ))}
         </div>
 
         <div>
-          <label className={labelClass}>Large Cover Image</label>
-
-          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-            <ProjectImage
-              source={imageSource}
-              alt={project.title || "Large project"}
-            />
-
-            <div className="space-y-3 p-4">
-              <div className="relative">
-                <LinkIcon
-                  size={15}
-                  className="absolute top-1/2 left-4 -translate-y-1/2 text-[var(--muted)]"
-                />
-
-                <input
-                  type="url"
-                  value={project.image}
-                  disabled={busy}
-                  onChange={(e) =>
-                    onImageUrlChange(project.clientKey, e.target.value)
-                  }
-                  placeholder="Paste image URL..."
-                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] py-2.5 pr-4 pl-10 text-xs text-[var(--foreground)] outline-none focus:border-[#1E8A8A]"
-                />
+          <label className={labelClass}>Project Cover Image</label>
+          <div className="flex h-44 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+            {project.image ? (
+              <img
+                src={project.image}
+                alt={project.title[language] || "Project"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="text-center text-[var(--muted)]">
+                <ImagePlus size={28} className="mx-auto text-[#1E8A8A]" />
+                <p className="mt-2 text-xs">No image selected</p>
               </div>
-
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-[var(--border)]" />
-                <span className="text-[10px] font-bold text-[var(--muted)]">
-                  OR
-                </span>
-                <div className="h-px flex-1 bg-[var(--border)]" />
-              </div>
-
-              <label
-                className={`flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-2.5 text-xs font-semibold text-white transition hover:bg-[#1E8A8A] ${
-                  busy ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-                }`}
-              >
-                <Upload size={14} />
-                Upload Image
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={busy}
-                  className="hidden"
-                  onChange={(e) => {
-                    onImageFileChange(project.clientKey, e.target.files?.[0]);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            </div>
+            )}
           </div>
-
-          <p className="mt-2 flex items-start gap-1.5 text-xs text-[var(--muted)]">
-            <Info size={13} className="mt-0.5 shrink-0" />
-            Recommended: 999 × 666 — Large Display · Max 5MB
+          <p className="mt-2 flex gap-1.5 text-xs text-[var(--muted)]">
+            <Info size={13} /> Recommended 999 × 666.
           </p>
         </div>
       </div>
@@ -320,486 +231,220 @@ function ProjectCard({
   );
 }
 
-/* =========================================================
-6. MAIN PAGE
-========================================================= */
-
 export default function ProjectsAdmin() {
-  const [header, setHeader] = useState({
-    badgeText: "",
-    headingLine: "",
-    highlightWord: "",
-    description: "",
-    buttonText: "",
-    buttonLink: "/",
-  });
-
-  const [loadingHeader, setLoadingHeader] = useState(true);
-  const [headerError, setHeaderError] = useState(false);
-
+  const [language, setLanguage] = useState("en");
+  const [header, setHeader] = useState(emptyHeader);
   const [projects, setProjects] = useState([]);
-  const [loadingProjects, setLoadingProjects] = useState(true);
-  const [projectsError, setProjectsError] = useState(false);
-  const [savingProjects, setSavingProjects] = useState(false);
-  const [deletingKey, setDeletingKey] = useState(null);
-  const [reloadProjects, setReloadProjects] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  const [savingHeader, setSavingHeader] = useState(false);
-  const [headerCooldown, setHeaderCooldown] = useState(false);
-  const [fetching, setfetching] = useState(true);
+  const busy = saving || deleting;
 
-  const requestInProgress = useRef(false);
-  const cooldownTimer = useRef(null);
+  // Load data
+  async function loadData() {
+    setLoading(true);
+    setLoadError(false);
 
-  const busy = savingProjects || deletingKey !== null;
+    try {
+      const { data } = await axios.get(API);
+      const saved = data.data || {};
 
-  /* =========================================================
-  LOAD SAVED HEADER DATA INTO ALL INPUTS
-  ========================================================= */
+      setHeader({ ...emptyHeader(), ...saved.header });
+      setProjects((saved.projects || []).map(formatProject));
+    } catch (error) {
+      console.error(error);
+      setLoadError(true);
+      toast.error("Failed to load projects.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let active = true;
-
-    async function loadHeader() {
-      setLoadingHeader(true);
-      setHeaderError(false);
-
-      try {
-        const { data } = await axios.get(HEADER_API);
-
-        if (!active) return;
-
-        // Handle common API response formats.
-        const savedHeader =
-          data?.header ?? data?.data?.header ?? data?.data ?? data;
-
-        setHeader({
-          badgeText: savedHeader?.badgeText ?? "",
-          headingLine: savedHeader?.headingLine ?? "",
-          highlightWord: savedHeader?.highlightWord ?? "",
-          description: savedHeader?.description ?? "",
-          buttonText: savedHeader?.buttonText ?? "",
-          buttonLink: savedHeader?.buttonLink ?? "/",
-        });
-        setfetching(false);
-      } catch (error) {
-        console.error("Load project header error:", error);
-
-        if (active) {
-          setHeaderError(true);
-          toast.error(
-            error.response?.data?.message || "Failed to load project header.",
-          );
-        }
-      } finally {
-        if (active) {
-          setLoadingHeader(false);
-        }
-      }
-    }
-
-    loadHeader();
-
-    return () => {
-      active = false;
-    };
+    loadData();
   }, []);
 
-  /* =========================================================
-  LOAD PROJECT CARDS
-  ========================================================= */
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadProjects() {
-      setLoadingProjects(true);
-      setProjectsError(false);
-
-      try {
-        const { data } = await axios.get(PROJECTS_API);
-
-        if (!Array.isArray(data?.projects)) {
-          throw new Error("Invalid projects response");
-        }
-
-        if (active) {
-          setProjects(data.projects.map(formatProjectFromApi));
-        }
-      } catch (error) {
-        console.error("Load large projects error:", error);
-
-        if (active) {
-          setProjectsError(true);
-        }
-      } finally {
-        if (active) {
-          setLoadingProjects(false);
-        }
-      }
-    }
-
-    loadProjects();
-
-    return () => {
-      active = false;
-    };
-  }, [reloadProjects]);
-
-  useEffect(() => {
-    return () => clearTimeout(cooldownTimer.current);
-  }, []);
-
-  /* =========================================================
-  HEADER FUNCTIONS
-  ========================================================= */
-
-  function updateHeader(e) {
-    const { name, value } = e.target;
-
+  // Update one header field
+  function updateHeader(field, value) {
     setHeader((prev) => ({
       ...prev,
-      [name]: value,
+      [field]:
+        field === "buttonLink" ? value : { ...prev[field], [language]: value },
     }));
   }
 
-  async function saveHeader() {
-    if (savingHeader || headerCooldown) return;
-
-    const hasEmptyField = Object.values(header).some((value) => !value.trim());
-
-    if (hasEmptyField) {
-      toast.error("Please fill in all header fields.");
-      return;
-    }
-
-    const link = header.buttonLink.trim();
-
-    const validLink =
-      /^\/[a-zA-Z0-9/_-]*$/.test(link) && !link.startsWith("//");
-
-    if (!validLink) {
-      toast.error(
-        "Button Link must start with / and contain only letters, numbers, /, - or _.",
-      );
-      return;
-    }
-
-    setSavingHeader(true);
-    setHeaderCooldown(true);
-
-    try {
-      await axios.post(HEADER_API, {
-        ...header,
-        buttonLink: link,
-      });
-
-      toast.success("Header updated successfully.");
-    } catch (error) {
-      console.error("Save header error:", error);
-
-      toast.error(error.response?.data?.message || "Failed to save header.");
-    } finally {
-      setSavingHeader(false);
-
-      cooldownTimer.current = setTimeout(() => {
-        setHeaderCooldown(false);
-      }, 10000);
-    }
-  }
-
-  async function retryLoadHeader() {
-    setLoadingHeader(true);
-    setHeaderError(false);
-
-    try {
-      const { data } = await axios.get(HEADER_API);
-
-      const savedHeader =
-        data?.header ?? data?.data?.header ?? data?.data ?? data;
-
-      setHeader({
-        badgeText: savedHeader?.badgeText ?? "",
-        headingLine: savedHeader?.headingLine ?? "",
-        highlightWord: savedHeader?.highlightWord ?? "",
-        description: savedHeader?.description ?? "",
-        buttonText: savedHeader?.buttonText ?? "",
-        buttonLink: savedHeader?.buttonLink ?? "/",
-      });
-    } catch (error) {
-      console.error("Retry header load error:", error);
-      setHeaderError(true);
-
-      toast.error(
-        error.response?.data?.message || "Failed to load project header.",
-      );
-    } finally {
-      setLoadingHeader(false);
-    }
-  }
-
-  /* =========================================================
-  PROJECT FUNCTIONS
-  ========================================================= */
-
-  function addProject() {
-    if (requestInProgress.current) return;
-
-    setProjects((prev) => [...prev, createEmptyProject()]);
-  }
-
-  function updateProject(clientKey, changes) {
-    if (requestInProgress.current) return;
-
+  // Update one project field
+  function updateProject(key, field, value) {
     setProjects((prev) =>
       prev.map((project) =>
-        project.clientKey === clientKey ? { ...project, ...changes } : project,
+        project.clientKey === key
+          ? { ...project, [field]: { ...project[field], [language]: value } }
+          : project,
       ),
     );
   }
 
-  function changeImageUrl(clientKey, url) {
-    updateProject(clientKey, {
-      image: url,
-      imageFile: null,
-      imagePreview: "",
-    });
-  }
-
-  function changeImageFile(clientKey, file) {
-    if (!file || requestInProgress.current) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file.");
-      return;
-    }
-
-    if (file.size === 0 || file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be larger than 0 bytes and no more than 5MB.");
-      return;
-    }
-
-    updateProject(clientKey, {
-      image: "",
-      imageFile: file,
-      imagePreview: "",
-    });
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      setProjects((prev) =>
-        prev.map((project) =>
-          project.clientKey === clientKey && project.imageFile === file
-            ? {
-                ...project,
-                imagePreview: reader.result || "",
-              }
-            : project,
-        ),
-      );
-    };
-
-    reader.onerror = () => {
-      toast.error("Could not preview this image.");
-    };
-
-    reader.readAsDataURL(file);
-  }
-
-  function moveProject(clientKey, direction) {
-    if (requestInProgress.current) return;
-
+  // Change project order
+  function moveProject(index, direction) {
     setProjects((prev) => {
-      const index = prev.findIndex((item) => item.clientKey === clientKey);
-
-      const newIndex = index + direction;
-
-      if (index < 0 || newIndex < 0 || newIndex >= prev.length) {
-        return prev;
-      }
+      const next = index + direction;
+      if (next < 0 || next >= prev.length) return prev;
 
       const updated = [...prev];
-
-      [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
-
+      [updated[index], updated[next]] = [updated[next], updated[index]];
       return updated;
     });
   }
 
-  async function deleteProject(project) {
-    if (requestInProgress.current) return;
+  // Save header and all projects together
+  async function saveAll() {
+    if (busy) return;
 
-    if (!project._id) {
-      setProjects((prev) =>
-        prev.filter((item) => item.clientKey !== project.clientKey),
-      );
+    const missingHeader = headerFields.some(
+      (field) => !field.shared && !header[field.name]?.[language]?.trim(),
+    );
+
+    if (missingHeader) {
+      toast.error("Fill in all header fields for the selected language.");
       return;
     }
 
-    requestInProgress.current = true;
-    setDeletingKey(project.clientKey);
-
-    try {
-      await axios.delete(PROJECTS_API, {
-        params: { id: project._id },
-      });
-
-      setProjects((prev) =>
-        prev.filter((item) => item.clientKey !== project.clientKey),
-      );
-
-      toast.success("Project deleted.");
-    } catch (error) {
-      console.error("Delete project error:", error);
-
-      toast.error(error.response?.data?.message || "Failed to delete project.");
-    } finally {
-      requestInProgress.current = false;
-      setDeletingKey(null);
-    }
-  }
-
-  async function saveProjects() {
-    if (requestInProgress.current || loadingProjects || projectsError) {
+    if (!/^\/(?!\/)[a-zA-Z0-9/_-]*$/.test(header.buttonLink.trim())) {
+      toast.error("Enter a valid button path, such as /projects.");
       return;
     }
 
-    if (projects.length === 0) {
+    if (!projects.length) {
       toast.error("Add at least one project.");
       return;
     }
 
-    for (let i = 0; i < projects.length; i++) {
-      const project = projects[i];
+    const invalid = projects.findIndex(
+      (p) =>
+        !p.tag[language]?.trim() ||
+        !p.title[language]?.trim() ||
+        !p.image.trim(),
+    );
 
-      if (!project.tag.trim() || !project.title.trim()) {
-        toast.error(`Add a tag and title to project ${i + 1}.`);
-        return;
-      }
-
-      if (!project.image.trim() && !project.imageFile) {
-        toast.error(`Add an image to project ${i + 1}.`);
-        return;
-      }
+    if (invalid !== -1) {
+      toast.error(
+        `Complete the tag, title and image for project ${invalid + 1}.`,
+      );
+      return;
     }
 
-    const formData = new FormData();
+    setSaving(true);
 
-    formData.append(
-      "projects",
-      JSON.stringify(
-        projects.map((project, index) => ({
-          tag: project.tag.trim(),
-          title: project.title.trim(),
-          image: project.image.trim(),
+    try {
+      const { data } = await axios.post(API, {
+        header,
+        projects: projects.map((project, index) => ({
+          ...(project._id ? { _id: project._id } : {}),
+          tag: project.tag,
+          title: project.title,
+          image: project.image,
           publicId: project.publicId,
           order: index,
         })),
-      ),
-    );
+      });
 
-    projects.forEach((project, index) => {
-      if (project.imageFile) {
-        formData.append(`image_${index}`, project.imageFile);
-      }
-    });
+      if (!data.success) throw new Error(data.message || "Save failed.");
 
-    requestInProgress.current = true;
-    setSavingProjects(true);
-
-    try {
-      const { data } = await axios.post(PROJECTS_API, formData);
-
-      if (!Array.isArray(data?.projects)) {
-        throw new Error("Invalid save response");
-      }
-
-      setProjects(data.projects.map(formatProjectFromApi));
-
-      toast.success(data.message || "Projects saved.");
+      setHeader({ ...emptyHeader(), ...data.data.header });
+      setProjects((data.data.projects || []).map(formatProject));
+      toast.success("All changes saved.");
     } catch (error) {
-      console.error("Save projects error:", error);
-
+      console.error("Save projects:", error);
       toast.error(
-        error.response?.data?.message ||
-          error.message ||
-          "Failed to save projects.",
+        error.response?.data?.message || error.message || "Save failed.",
       );
     } finally {
-      requestInProgress.current = false;
-      setSavingProjects(false);
+      setSaving(false);
     }
   }
 
-  /* =========================================================
-  UI
-  ========================================================= */
-  if (fetching) {
+  // Delete a project
+  async function deleteProject(project) {
+    if (!project._id) {
+      setProjects((prev) =>
+        prev.filter((p) => p.clientKey !== project.clientKey),
+      );
+      return;
+    }
+
+    if (projects.length <= 1) {
+      toast.error("Keep at least one project.");
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      await axios.delete(API, { params: { id: project._id } });
+      setProjects((prev) =>
+        prev.filter((p) => p.clientKey !== project.clientKey),
+      );
+      toast.success("Project deleted.");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete project.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  if (loading) {
     return (
-      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
+      <div className="flex min-h-96 flex-col items-center justify-center gap-3">
         <Spinner />
-        <p className="text-sm font-medium text-(--muted)]">
-          Loading Projects...
-        </p>
+        <p className="text-sm text-[var(--muted)]">Loading Projects...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-[var(--muted)]">Could not load projects.</p>
+        <button
+          onClick={loadData}
+          className="mt-4 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white"
+        >
+          Try again
+        </button>
       </div>
     );
   }
 
   return (
     <div className="w-full">
-      <div className="mb-10 flex items-center gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
-          <FolderKanban size={27} />
+      <div className="mb-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+            <FolderKanban size={27} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-[var(--foreground)]">
+              Proud Projects
+            </h1>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Manage your homepage project showcase.
+            </p>
+          </div>
         </div>
-
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[var(--foreground)]">
-            Proud Projects
-          </h1>
-
-          <p className="mt-1 text-base text-[var(--muted)]">
-            Manage the project showcase section on your homepage.
-          </p>
-        </div>
+        <LanguageSelector
+          language={language}
+          setLanguage={setLanguage}
+          disabled={busy}
+        />
       </div>
 
       <div className="space-y-8">
-        {/* HEADER SECTION */}
-
         <section className={panelClass}>
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
-                01
-              </span>
-
-              <h2 className="text-lg font-bold text-[var(--foreground)]">
-                Section Header Content
-              </h2>
-            </div>
-
-            <span className="rounded-full bg-[#1E8A8A]/10 px-3 py-1.5 text-xs font-semibold text-[#1E8A8A]">
-              Single Settings
-            </span>
-          </div>
-
-          {headerError && (
-            <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-              <p className="text-sm text-red-500">
-                Could not load saved header data.
-              </p>
-
-              <button
-                type="button"
-                onClick={retryLoadHeader}
-                disabled={loadingHeader}
-                className="text-sm font-semibold text-[#1E8A8A] disabled:opacity-50"
-              >
-                {loadingHeader ? "Loading..." : "Try again"}
-              </button>
-            </div>
-          )}
+          <h2 className="mb-6 text-lg font-bold text-[var(--foreground)]">
+            01 · Section Header Content
+          </h2>
 
           <div className="grid gap-5 md:grid-cols-2">
             {headerFields.map((field) => (
@@ -807,28 +452,30 @@ export default function ProjectsAdmin() {
                 key={field.name}
                 className={field.textarea ? "md:col-span-2" : ""}
               >
-                <label htmlFor={field.name} className={labelClass}>
+                <label className={labelClass}>
                   {field.label}
+                  {field.shared && (
+                    <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+                      Shared across languages
+                    </span>
+                  )}
                 </label>
-
                 {field.textarea ? (
                   <textarea
-                    id={field.name}
-                    name={field.name}
-                    value={header[field.name]}
-                    onChange={updateHeader}
-                    disabled={loadingHeader}
-                    placeholder={field.placeholder}
                     rows={3}
-                    className={`${inputClass} resize-y`}
+                    value={header[field.name]?.[language] || ""}
+                    onChange={(e) => updateHeader(field.name, e.target.value)}
+                    placeholder={field.placeholder}
+                    className={inputClass}
                   />
                 ) : (
                   <input
-                    id={field.name}
-                    name={field.name}
-                    value={header[field.name]}
-                    onChange={updateHeader}
-                    disabled={loadingHeader}
+                    value={
+                      field.shared
+                        ? header[field.name] || ""
+                        : header[field.name]?.[language] || ""
+                    }
+                    onChange={(e) => updateHeader(field.name, e.target.value)}
                     placeholder={field.placeholder}
                     className={inputClass}
                   />
@@ -837,151 +484,82 @@ export default function ProjectsAdmin() {
             ))}
           </div>
 
-          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-6 text-[var(--foreground)]">
-            <span className="inline-flex rounded-lg bg-[var(--surface)] px-3 py-1 text-xs font-bold text-[var(--foreground)]">
-              {header.badgeText || "PROUD PROJECTS"}
+          <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-6">
+            <span className="rounded-lg bg-[var(--surface)] px-3 py-1 text-xs font-bold">
+              {header.badgeText?.[language] || "PROUD PROJECTS"}
             </span>
-
-            <p className="mt-3 text-2xl leading-tight font-medium">
-              {header.headingLine || "Breaking Boundaries,"}
+            <p className="mt-3 text-2xl text-[var(--foreground)]">
+              {header.headingLine?.[language] || "Breaking Boundaries,"}
               <br />
-              Building{" "}
               <span className="text-[#1E8A8A]">
-                {header.highlightWord || "Dreams."}
+                {header.highlightWord?.[language] || "Dreams."}
               </span>
             </p>
-
-            <p className="mt-2 max-w-lg text-sm text-[var(--muted)]">
-              {header.description ||
-                "We work closely with our clients to understand their unique needs and craft tailored solutions."}
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              {header.description?.[language] || "Section description preview"}
             </p>
-          </div>
-
-          <div className="mt-6 flex justify-end border-t border-[var(--border)] pt-6">
-            <button
-              type="button"
-              disabled={
-                loadingHeader || headerError || savingHeader || headerCooldown
-              }
-              onClick={saveHeader}
-              className={saveButtonClass}
-            >
-              {savingHeader ? (
-                <>
-                  <LoaderCircle size={18} className="animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save size={18} />
-                  {loadingHeader
-                    ? "Loading..."
-                    : headerCooldown
-                      ? "Please wait..."
-                      : "Change Section Header"}
-                </>
-              )}
-            </button>
           </div>
         </section>
 
-        {/* LARGE PROJECTS SECTION */}
-
         <section className={panelClass}>
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
-                02
-              </span>
+          <h2 className="mb-6 text-lg font-bold text-[var(--foreground)]">
+            02 · Large Projects
+          </h2>
 
-              <h2 className="text-lg font-bold text-[var(--foreground)]">
-                Large Projects
-              </h2>
-            </div>
+          {!projects.length && (
+            <p className="rounded-2xl bg-[var(--background)] p-6 text-center text-sm text-[var(--muted)]">
+              No projects yet. Add one below.
+            </p>
+          )}
 
-            <span className="w-fit rounded-full bg-emerald-500/10 px-4 py-1.5 text-xs font-bold tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
-              Large Card
-            </span>
+          <div className="space-y-6">
+            {projects.map((project, index) => (
+              <ProjectCard
+                key={project.clientKey}
+                project={project}
+                index={index}
+                total={projects.length}
+                language={language}
+                busy={busy}
+                onChange={updateProject}
+                onMove={moveProject}
+                onDelete={deleteProject}
+              />
+            ))}
           </div>
 
-          {loadingProjects ? (
-            <div className="flex items-center justify-center py-16">
-              <Spinner />
-            </div>
-          ) : projectsError ? (
-            <div className="rounded-2xl bg-[var(--background)] p-6 text-center">
-              <p className="text-sm text-[var(--muted)]">
-                Could not load projects.
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setProjects((prev) => [...prev, newProject()])}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] py-4 text-sm font-semibold text-[var(--muted)] hover:border-[#1E8A8A] hover:text-[#1E8A8A]"
+          >
+            <Plus size={18} /> Add New Large Project
+          </button>
+
+          <footer className="sticky bottom-4 z-10 mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
+            <div>
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                Ready to save your changes?
               </p>
-
-              <button
-                type="button"
-                onClick={() => setReloadProjects((prev) => prev + 1)}
-                className="mt-3 text-sm font-semibold text-[#1E8A8A]"
-              >
-                Try again
-              </button>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                Save the header and all projects together.
+              </p>
             </div>
-          ) : (
-            <>
-              {projects.length === 0 && (
-                <p className="rounded-2xl bg-[var(--background)] p-6 text-center text-sm text-[var(--muted)]">
-                  No projects yet. Add one below.
-                </p>
+            <button
+              type="button"
+              onClick={saveAll}
+              disabled={busy}
+              className={saveButtonClass}
+            >
+              {saving ? (
+                <LoaderCircle size={18} className="animate-spin" />
+              ) : (
+                <Save size={18} />
               )}
-
-              <div className="space-y-6">
-                {projects.map((project, index) => (
-                  <ProjectCard
-                    key={project.clientKey}
-                    project={project}
-                    index={index}
-                    totalProjects={projects.length}
-                    busy={busy}
-                    deletingKey={deletingKey}
-                    onChange={updateProject}
-                    onMove={moveProject}
-                    onDelete={deleteProject}
-                    onImageUrlChange={changeImageUrl}
-                    onImageFileChange={changeImageFile}
-                  />
-                ))}
-              </div>
-
-              <button
-                type="button"
-                disabled={busy}
-                onClick={addProject}
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] py-4 text-sm font-semibold text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-60"
-              >
-                <Plus size={18} />
-                Add New Large Project
-              </button>
-
-              <footer className="sticky bottom-4 z-10 mt-4 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
-                <div>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    Ready to save your changes?
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Images upload automatically when you update.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={saveProjects}
-                  disabled={savingProjects}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167575] focus-visible:ring-4 focus-visible:ring-[#1E8A8A]/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {savingProjects ? <Spinner /> : <Save size={18} />}
-                  {savingProjects
-                    ? "Saving Projects Changes..."
-                    : "Save Projects"}
-                </button>
-              </footer>
-            </>
-          )}
+              {saving ? "Saving All..." : "Save All Changes"}
+            </button>
+          </footer>
         </section>
       </div>
     </div>
