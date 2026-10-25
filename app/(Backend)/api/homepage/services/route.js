@@ -5,181 +5,145 @@ import {
 import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
 import Solutions from "@/Models/Services";
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-// Helper: Upload to Cloudinary
-async function uploadToCloudinary(file) {
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
+const languages = ["en", "fa", "ps"];
 
-  return new Promise((resolve, reject) => {
-    cloudinary.uploader
-      .upload_stream({ folder: "homepage/services" }, (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
-      })
-      .end(buffer);
-  });
-}
+const error = (message, status = 400) =>
+  NextResponse.json({ success: false, error: message }, { status });
 
-// Helper: Delete from Cloudinary
-async function deleteFromCloudinary(publicId) {
+const translate = (value) =>
+  typeof value === "string"
+    ? { en: value, fa: "", ps: "" }
+    : Object.fromEntries(
+        languages.map((lang) => [
+          lang,
+          typeof value?.[lang] === "string" ? value[lang] : "",
+        ]),
+      );
+
+const validId = (id) => typeof id === "string" && mongoose.isValidObjectId(id);
+
+async function destroyImage(publicId) {
   if (!publicId) return;
+
   try {
-    await cloudinary.uploader.destroy(publicId);
-  } catch (error) {
-    console.error("Cloudinary Delete Error:", error);
+    await cloudinary.uploader.destroy(publicId, {
+      resource_type: "image",
+    });
+  } catch (err) {
+    console.error("Cloudinary destroy failed:", err);
   }
 }
 
-/* ---------------- 1. GET: Load Data ---------------- */
 export async function GET() {
   try {
     await connectDB();
-    const data = await Solutions.findOne();
-    return NextResponse.json({ success: true, data: data || null });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: "Failed to fetch data" },
-      { status: 500 },
-    );
+    const data = await Solutions.findOne().lean();
+    return NextResponse.json({ success: true, data });
+  } catch {
+    return error("Failed to load solutions", 500);
   }
 }
 
-/* ---------------- 2. POST: Save & Upload ---------------- */
 export async function POST(req) {
   try {
     const permission = await requireEditPermission();
+    if (!permission.authorized) return error("Unauthorized", 403);
 
-    if (!permission.authorized) {
-      return permission.response;
-    }
     await connectDB();
-    const formData = await req.formData();
 
-    const badge = formData.get("badge") || "";
-    const headingOne = formData.get("headingOne") || "";
-    const headingTwo = formData.get("headingTwo") || "";
-    const highlight = formData.get("highlight") || "";
+    const body = await req.json();
+    const previous = await Solutions.findOne();
 
-    const titles = formData.getAll("titles");
-    const descriptions = formData.getAll("descriptions");
-    const existingImages = formData.getAll("existingImages");
-    const existingPublicIds = formData.getAll("existingPublicIds");
-    const files = formData.getAll("files");
+    if (!Array.isArray(body.solutions) || !body.solutions.length)
+      return error("Add at least one solution");
 
-    if (titles.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Please add at least one solution card" },
-        { status: 400 },
-      );
+    const solutions = body.solutions.map((item) => ({
+      ...(validId(item.id) ? { _id: item.id } : {}),
+      title: translate(item.title),
+      description: translate(item.description),
+      image: item.image || "",
+      publicId: item.publicId || "",
+    }));
+
+    for (const item of solutions) {
+      if (!languages.some((lang) => item.title[lang].trim()))
+        return error("Each solution needs a title");
+
+      if (!languages.some((lang) => item.description[lang].trim()))
+        return error("Each solution needs a description");
+
+      if (!!item.image !== !!item.publicId)
+        return error("Image and public ID must match");
     }
 
-    const solutions = [];
-    let fileCounter = 0;
-
-    for (let i = 0; i < titles.length; i++) {
-      let imageUrl = existingImages[i] || "";
-      let publicId = existingPublicIds[i] || "";
-
-      const hasNewFile = formData.get(`hasFile_${i}`) === "true";
-
-      if (hasNewFile) {
-        const file = files[fileCounter];
-        fileCounter++;
-
-        if (file && file.size > 0) {
-          if (publicId) await deleteFromCloudinary(publicId);
-
-          const uploaded = await uploadToCloudinary(file);
-          imageUrl = uploaded.secure_url;
-          publicId = uploaded.public_id;
-        }
-      }
-
-      solutions.push({
-        title: titles[i],
-        description: descriptions[i],
-        image: imageUrl,
-        publicId: publicId,
-      });
-    }
-
-    const savedData = await Solutions.findOneAndUpdate(
+    const data = await Solutions.findOneAndUpdate(
       {},
-      { badge, headingOne, headingTwo, highlight, solutions },
-      { new: true, upsert: true },
+      {
+        badge: translate(body.badge),
+        headingOne: translate(body.headingOne),
+        headingTwo: translate(body.headingTwo),
+        highlight: translate(body.highlight),
+        solutions,
+      },
+      { new: true, upsert: true, runValidators: true },
     );
 
-    return NextResponse.json({ success: true, data: savedData });
-  } catch (error) {
-    console.error("POST error:", error);
-    return NextResponse.json(
-      { success: false, error: error.message || "Failed to save" },
-      { status: 500 },
+    const currentPublicIds = new Set(
+      solutions.map((item) => item.publicId).filter(Boolean),
     );
+
+    const oldPublicIds = (previous?.solutions || [])
+      .map((item) => item.publicId)
+      .filter((id) => id && !currentPublicIds.has(id));
+
+    await Promise.all(oldPublicIds.map(destroyImage));
+
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    console.error("Save solutions failed:", err);
+    return error("Failed to save solutions", 500);
   }
 }
 
-/* ---------------- 3. DELETE: Using only MongoDB cardId ---------------- */
 export async function DELETE(req) {
   try {
-    // USER ADMIN CHECKS
     const permission = await requireDeletePermission();
+    if (!permission.authorized) return error("Unauthorized", 403);
 
-    console.log("DELETE AUTHORIZATION:", {
-      authorized: permission.authorized,
-      role: permission.admin?.role,
-    });
-
-    if (!permission.authorized) {
-      return permission.response;
-    }
-
-    // USER ADMIN CHECKS
     await connectDB();
+
     const { cardId } = await req.json();
 
-    if (!cardId) {
-      return NextResponse.json(
-        { success: false, error: "Card ID is required" },
-        { status: 400 },
-      );
-    }
+    if (!validId(cardId)) return error("Invalid solution ID");
 
-    // 1. Find document and locate the card to get its publicId
-    const doc = await Solutions.findOne({ "solutions._id": cardId });
-
-    if (!doc) {
-      return NextResponse.json(
-        { success: false, error: "Card not found" },
-        { status: 404 },
-      );
-    }
-
-    const targetCard = doc.solutions.find(
-      (card) => card._id.toString() === cardId.toString(),
-    );
-
-    // 2. Remove from Cloudinary if it had an uploaded image
-    if (targetCard?.publicId) {
-      await deleteFromCloudinary(targetCard.publicId);
-    }
-
-    // 3. Pull card from MongoDB array using its _id
-    await Solutions.updateOne({}, { $pull: { solutions: { _id: cardId } } });
-
-    return NextResponse.json({
-      success: true,
-      message: "Card deleted successfully",
+    const data = await Solutions.findOne({
+      "solutions._id": cardId,
     });
-  } catch (error) {
-    console.error("DELETE error:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to delete card" },
-      { status: 500 },
+
+    if (!data) return error("Solution not found", 404);
+
+    if (data.solutions.length <= 1)
+      return error("At least one solution is required");
+
+    const solution = data.solutions.find(
+      (item) => item._id.toString() === cardId,
     );
+
+    await Solutions.updateOne(
+      { _id: data._id },
+      { $pull: { solutions: { _id: cardId } } },
+    );
+
+    await destroyImage(solution?.publicId);
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Delete solution failed:", err);
+    return error("Failed to delete solution", 500);
   }
 }

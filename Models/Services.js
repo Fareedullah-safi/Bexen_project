@@ -1,46 +1,66 @@
 import mongoose, { Schema } from "mongoose";
 
+const TranslationSchema = new Schema(
+  {
+    en: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    fa: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    ps: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
+  { _id: false },
+);
+
 const SolutionsSchema = new Schema(
   {
     badge: {
-      type: String,
-      default: "OUR SOLUTIONS",
-      trim: true,
+      type: TranslationSchema,
+      default: () => ({}),
     },
     headingOne: {
-      type: String,
-      default: "Solutions to Transform",
-      trim: true,
+      type: TranslationSchema,
+      default: () => ({}),
     },
     headingTwo: {
-      type: String,
-      default: "Your",
-      trim: true,
+      type: TranslationSchema,
+      default: () => ({}),
     },
     highlight: {
-      type: String,
-      default: "Business.",
-      trim: true,
+      type: TranslationSchema,
+      default: () => ({}),
     },
+
     solutions: [
       {
         title: {
-          type: String,
+          type: TranslationSchema,
           required: [true, "Card title is required"],
-          trim: true,
+          default: () => ({}),
         },
         description: {
-          type: String,
+          type: TranslationSchema,
           required: [true, "Card description is required"],
-          trim: true,
+          default: () => ({}),
         },
         image: {
           type: String,
           required: [true, "Card image is required"],
+          trim: true,
         },
         publicId: {
           type: String,
           default: "",
+          trim: true,
         },
       },
     ],
