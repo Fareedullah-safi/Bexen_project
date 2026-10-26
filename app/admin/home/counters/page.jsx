@@ -1,10 +1,9 @@
 "use client";
 
+import AdminLanguageBall from "@/app/admin/Components/Admin/AdminLanguageBall";
 import Spinner from "@/app/admin/Components/Admin/Spinner";
 import axios from "axios";
 import {
-  ArrowDown,
-  ArrowUp,
   ChevronDown,
   ChevronUp,
   ImagePlus,
@@ -12,1099 +11,1017 @@ import {
   MessageSquareQuote,
   Plus,
   Save,
-  Search,
   Trash2,
   Upload,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import Script from "next/script";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+const languages = [
+  { code: "en", label: "English" },
+  { code: "ps", label: "پښتو" },
+  { code: "fa", label: "دری" },
+];
+
+const emptyTranslation = () => ({
+  en: "",
+  ps: "",
+  fa: "",
+});
+
+const translation = (englishText = "") => ({
+  en: englishText,
+  ps: "",
+  fa: "",
+});
+
+const initialSection = {
+  badgeText: translation("CLIENTS FEEDBACK"),
+  highlightWord: translation("Stories"),
+  headingLineOne: translation("Success Stories Fuel"),
+  headingLineTwo: translation("our Innovation."),
+  description: translation(
+    "Manage the stats and review cards for your testimonial section.",
+  ),
+};
+
+const initialStats = [
+  { value: translation("93%"), label: translation("Projects Completed") },
+  { value: translation("20M"), label: translation("Reach Worldwide") },
+  { value: translation("8.5X"), label: translation("Faster Growth") },
+  { value: translation("100+"), label: translation("Awards Archived") },
+];
+
+// Create a new review before it has a MongoDB ID.
+function emptyReview() {
+  return {
+    _id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: emptyTranslation(),
+    role: emptyTranslation(),
+    text: emptyTranslation(),
+    image: "",
+    publicId: "",
+  };
+}
+
+// Make sure every translated field has en, ps, and fa properties.
+function getTranslation(value) {
+  if (value && typeof value === "object") {
+    return {
+      en: value.en || "",
+      ps: value.ps || "",
+      fa: value.fa || "",
+    };
+  }
+
+  // Support older records where a field was stored as a string.
+  return {
+    en: typeof value === "string" ? value : "",
+    ps: "",
+    fa: "",
+  };
+}
+
+// Prepare a review returned by MongoDB for the frontend.
+function normalizeReview(review) {
+  return {
+    ...review,
+    name: getTranslation(review.name),
+    role: getTranslation(review.role),
+    text: getTranslation(review.text),
+    image: review.image || "",
+    publicId: review.publicId || "",
+  };
+}
+
 export default function ReviewsAdminPanel() {
+  const [language, setLanguage] = useState("en");
+
+  const [section, setSection] = useState(initialSection);
+  const [stats, setStats] = useState(initialStats);
+  const [reviews, setReviews] = useState([]);
+  const [draft, setDraft] = useState(emptyReview());
+  const [openReviewId, setOpenReviewId] = useState(null);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [cloudinaryReady, setCloudinaryReady] = useState(false);
+
+  const cloudinaryWidget = useRef(null);
+  const uploadTarget = useRef("draft");
+
+  // Bexon styling.
   const input =
     "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#0C1E21] outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-2 focus:ring-[#1E8A8A]/10 dark:border-white/10 dark:bg-[#16212C] dark:text-white dark:placeholder:text-gray-500";
-
-  // ─── PROFESSIONAL BUTTON STYLES ───
-
-  // Primary action button (Save, Add)
-  const button =
-    "group inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#1E8A8A] to-[#176F6F] px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-[#1E8A8A]/20 transition-all duration-200 hover:shadow-md hover:shadow-[#1E8A8A]/30 hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:shadow-sm disabled:hover:brightness-100 disabled:active:scale-100";
-
-  // Secondary button (Choose, Edit, Move, Add Statistic)
-  const smallButton =
-    "group inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:border-[#1E8A8A] hover:bg-[#1E8A8A]/5 hover:text-[#1E8A8A] hover:shadow-md active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:bg-white disabled:hover:text-gray-700 disabled:hover:shadow-sm disabled:active:scale-100 dark:border-white/10 dark:bg-[#16212C] dark:text-gray-300 dark:hover:border-[#1E8A8A]/60 dark:hover:bg-[#1E8A8A]/10 dark:hover:text-white";
-
-  // Danger button (Delete)
-  const dangerButton =
-    "group inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600 shadow-sm transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-md hover:shadow-red-100 active:scale-[0.97] dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:border-red-400/40 dark:hover:bg-red-500/20 dark:hover:shadow-red-900/30";
 
   const card =
     "rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7 dark:border-white/10 dark:bg-[#111B27]";
 
-  const innerBox =
-    "rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-[#16212C]";
-
   const label =
     "mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300";
 
-  const muted = "text-gray-500 dark:text-gray-400";
+  const secondaryButton =
+    "inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-[#1E8A8A] hover:bg-[#1E8A8A]/5 hover:text-[#1E8A8A] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-[#16212C] dark:text-gray-200";
 
-  const [section, setSection] = useState({
-    badgeText: "CLIENTS FEEDBACK",
-    highlightWord: "Stories",
-    headingLineOne: "Success Stories Fuel",
-    headingLineTwo: "our Innovation.",
-    description:
-      "Manage the stats and review cards for your testimonial section.",
-  });
+  const primaryButton =
+    "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#1E8A8A] to-[#176F6F] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50";
 
-  const [stats, setStats] = useState([
-    { id: 1, publicId: "", value: "93%", label: "Projects Completed" },
-    { id: 2, publicId: "", value: "20M", label: "Reach Worldwide" },
-    { id: 3, publicId: "", value: "8.5X", label: "Faster Growth" },
-    { id: 4, publicId: "", value: "100+", label: "Awards Archived" },
-  ]);
+  // --------------------------------------------------
+  // 1. GET: Load section, statistics, and reviews.
+  // --------------------------------------------------
 
-  const [reviews, setReviews] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
 
-  const [draft, setDraft] = useState({
-    id: Date.now(),
-    name: "",
-    role: "",
-    text: "",
-    image: "",
-    imageFile: null,
-    imagePreview: "",
-    publicId: "",
-  });
-
-  const [search, setSearch] = useState("");
-  const [openId, setOpenId] = useState(null);
-  const [visible, setVisible] = useState(20);
-
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [uploadingDraft, setUploadingDraft] = useState(false);
-
-  const loadData = async () => {
-    try {
+    async function loadData() {
       setLoading(true);
-      const res = await axios.get("/api/homepage/reviews-section");
 
-      if (res.data.success && res.data.data) {
-        const data = res.data.data;
+      try {
+        const response = await axios.get("/api/homepage/reviews-section");
 
-        if (data.section) {
-          setSection((previous) => ({ ...previous, ...data.section }));
+        if (!response.data.success || !response.data.data) {
+          throw new Error(response.data.message || "Failed to load reviews.");
         }
 
-        if (Array.isArray(data.stats) && data.stats.length > 0) {
+        if (cancelled) return;
+
+        const data = response.data.data;
+
+        setSection((previous) => ({
+          ...previous,
+          ...Object.fromEntries(
+            Object.entries(data.section || {}).map(([key, value]) => [
+              key,
+              getTranslation(value),
+            ]),
+          ),
+        }));
+
+        // An empty array is valid when there are no statistics.
+        if (Array.isArray(data.stats)) {
           setStats(
-            data.stats.map((item, index) => ({
-              ...item,
-              id: item.id || item._id || index + 1,
-              value: item.value || "",
-              label: item.label || "",
-              publicId: item.publicId || "",
+            data.stats.map((stat) => ({
+              value: getTranslation(stat.value),
+              label: getTranslation(stat.label),
             })),
           );
         }
 
         if (Array.isArray(data.reviews)) {
-          setReviews(
-            data.reviews.map((item, index) => ({
-              ...item,
-              id: item.id || item._id || Date.now() + index,
-              name: item.name || "",
-              role: item.role || "",
-              text: item.text || "",
-              image: item.image || "",
-              publicId: item.publicId || "",
-              imageFile: null,
-              imagePreview: "",
-            })),
+          setReviews(data.reviews.map(normalizeReview));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(
+            error.response?.data?.message ||
+              error.message ||
+              "Failed to load reviews.",
           );
         }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error("Failed to load reviews:", error);
-      toast.error("Failed to load reviews data.");
-    } finally {
-      setLoading(false);
     }
-  };
 
-  useEffect(() => {
     loadData();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const uploadImage = async (fileOrUrl) => {
-    try {
-      const formData = new FormData();
+  // --------------------------------------------------
+  // 2. Cloudinary image upload setup.
+  // --------------------------------------------------
 
-      if (fileOrUrl instanceof File) {
-        formData.append("file", fileOrUrl);
-      } else {
-        formData.append("imageUrl", fileOrUrl);
-      }
+  function setupCloudinary() {
+    if (!window.cloudinary || cloudinaryWidget.current) return;
 
-      const res = await axios.post(
-        "/api/homepage/reviews-section/upload",
-        formData,
-      );
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
 
-      if (res.data.success && res.data.url) {
-        return { image: res.data.url, publicId: res.data.publicId || "" };
-      }
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-      throw new Error(res.data.message || "Image upload failed.");
-    } catch (error) {
-      console.error("Image upload failed:", error);
-      throw error;
+    if (!cloudName || !uploadPreset) {
+      toast.error("Cloudinary environment variables are missing.");
+      return;
     }
-  };
 
-  const saveAll = async (reviewsToSave = reviews) => {
-    try {
-      setSaving(true);
-      const finalReviews = [];
-
-      for (const review of reviewsToSave) {
-        let image = review.image || "";
-        let publicId = review.publicId || "";
-
-        if (review.imageFile) {
-          const uploaded = await uploadImage(review.imageFile);
-          image = uploaded.image;
-          publicId = uploaded.publicId;
-        } else if (image && !publicId && image.startsWith("http")) {
-          const uploaded = await uploadImage(image);
-          image = uploaded.image;
-          publicId = uploaded.publicId;
+    cloudinaryWidget.current = window.cloudinary.createUploadWidget(
+      {
+        cloudName,
+        uploadPreset,
+        folder: "bexon/images",
+        sources: ["local", "camera", "url"],
+        multiple: false,
+        maxFileSize: 5 * 1024 * 1024,
+        clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+        resourceType: "image",
+        cropping: false,
+        showSkipCropButton: true,
+        theme: "minimal",
+      },
+      (error, result) => {
+        if (error) {
+          toast.error("Image upload failed.");
+          return;
         }
 
-        finalReviews.push({
-          id: review.id,
-          name: review.name,
-          role: review.role,
-          text: review.text,
-          image,
-          publicId,
-        });
-      }
+        if (result?.event !== "success") return;
 
-      const finalStats = stats.map((item) => ({
-        value: item.value,
-        label: item.label,
-        publicId: item.publicId || "",
-      }));
+        const image = result.info.secure_url;
+        const publicId = result.info.public_id;
+        const target = uploadTarget.current;
 
-      const res = await axios.post("/api/homepage/reviews-section", {
-        section,
-        stats: finalStats,
-        reviews: finalReviews,
-      });
+        if (target === "draft") {
+          setDraft((previous) => ({
+            ...previous,
+            image,
+            publicId,
+          }));
+        } else {
+          setReviews((previous) =>
+            previous.map((review) =>
+              review._id === target
+                ? {
+                    ...review,
+                    image,
+                    publicId,
+                  }
+                : review,
+            ),
+          );
+        }
 
-      if (res.data.success) {
-        setReviews((previous) =>
-          finalReviews.map((review, index) => ({
-            ...review,
-            id: previous[index]?.id || review.id || Date.now() + index,
-            imageFile: null,
-            imagePreview: "",
-          })),
-        );
+        toast.success("Image uploaded successfully.");
+      },
+    );
 
-        setDraft((previous) => ({
-          ...previous,
-          imageFile: null,
-          imagePreview: "",
-        }));
+    setCloudinaryReady(true);
+  }
 
-        toast.success("All changes saved successfully.");
-      } else {
-        toast.error(res.data.message || "Failed to save changes.");
-      }
-    } catch (error) {
-      console.error("Failed to save reviews:", error);
-      toast.error(error.response?.data?.message || "Failed to save changes.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addReview = async () => {
-    if (!draft.name.trim() || !draft.role.trim() || !draft.text.trim()) {
-      toast.error("Please enter the client's name, role, and review.");
+  function openCloudinary(target) {
+    if (!cloudinaryWidget.current) {
+      toast.error("Image uploader is not ready.");
       return;
     }
 
-    const newReview = { ...draft, id: Date.now() };
-    const updatedReviews = [newReview, ...reviews];
+    uploadTarget.current = target;
+    cloudinaryWidget.current.open();
+  }
 
-    setReviews(updatedReviews);
-    setOpenId(newReview.id);
+  // --------------------------------------------------
+  // 3. Update section content for the selected language.
+  // --------------------------------------------------
 
-    setDraft({
-      id: Date.now() + 1,
-      name: "",
-      role: "",
-      text: "",
-      image: "",
-      imageFile: null,
-      imagePreview: "",
-      publicId: "",
-    });
+  function updateSection(field, value) {
+    setSection((previous) => ({
+      ...previous,
+      [field]: {
+        ...getTranslation(previous[field]),
+        [language]: value,
+      },
+    }));
+  }
 
-    toast.success("Review added. Saving changes...");
-    await saveAll(updatedReviews);
-  };
+  // --------------------------------------------------
+  // 4. Update a statistic.
+  // --------------------------------------------------
 
-  const chooseDraftImage = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file.");
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size must be less than 5MB.");
-      event.target.value = "";
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setDraft((previous) => ({
-        ...previous,
-        imageFile: file,
-        imagePreview: reader.result,
-      }));
-    };
-    reader.readAsDataURL(file);
-    event.target.value = "";
-  };
-
-  const chooseReviewImage = (event, reviewId) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file.");
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size must be less than 5MB.");
-      event.target.value = "";
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setReviews((previous) =>
-        previous.map((item) =>
-          item.id === reviewId
-            ? { ...item, imageFile: file, imagePreview: reader.result }
-            : item,
-        ),
-      );
-    };
-    reader.readAsDataURL(file);
-    event.target.value = "";
-  };
-
-  const updateReview = (reviewId, field, value) => {
-    setReviews((previous) =>
-      previous.map((item) =>
-        item.id === reviewId ? { ...item, [field]: value } : item,
+  function updateStat(index, field, value) {
+    setStats((previous) =>
+      previous.map((stat, currentIndex) =>
+        currentIndex === index
+          ? {
+              ...stat,
+              [field]: {
+                ...getTranslation(stat[field]),
+                [language]: value,
+              },
+            }
+          : stat,
       ),
     );
-  };
+  }
 
-  const moveReview = (index, direction) => {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= reviews.length) return;
+  // --------------------------------------------------
+  // 5. Update the new review form.
+  // --------------------------------------------------
 
-    const updatedReviews = [...reviews];
-    const current = updatedReviews[index];
-    updatedReviews[index] = updatedReviews[nextIndex];
-    updatedReviews[nextIndex] = current;
-    setReviews(updatedReviews);
-  };
+  function updateDraft(field, value) {
+    setDraft((previous) => ({
+      ...previous,
+      [field]: {
+        ...getTranslation(previous[field]),
+        [language]: value,
+      },
+    }));
+  }
 
-  const deleteReview = async (reviewId) => {
-    try {
-      const review = reviews.find(
-        (item) => item._id === reviewId || item.id === reviewId,
-      );
+  // --------------------------------------------------
+  // 6. Update an existing review.
+  // --------------------------------------------------
 
-      if (!review) {
-        toast.error("Review not found");
-        return;
-      }
+  function updateReview(reviewId, field, value) {
+    setReviews((previous) =>
+      previous.map((review) =>
+        review._id === reviewId
+          ? {
+              ...review,
+              [field]: {
+                ...getTranslation(review[field]),
+                [language]: value,
+              },
+            }
+          : review,
+      ),
+    );
+  }
 
-      const response = await axios.delete("/api/homepage/reviews-section", {
-        data: {
-          reviewId: review._id || review.id,
-          publicId: review.publicId,
-        },
-      });
+  // --------------------------------------------------
+  // 7. Add a review to the local list.
+  // It is saved to MongoDB when Save Changes is clicked.
+  // --------------------------------------------------
 
-      if (!response.data?.success) {
+  function handleAddReview() {
+    for (const lang of languages) {
+      if (
+        !draft.name[lang.code].trim() ||
+        !draft.role[lang.code].trim() ||
+        !draft.text[lang.code].trim()
+      ) {
+        setLanguage(lang.code);
+
         toast.error(
-          response.data?.message ||
-            response.data?.error ||
-            "Failed to delete review",
+          `Complete the name, role, and review text in ${lang.label}.`,
         );
+
         return;
       }
+    }
 
-      const updatedReviews = reviews.filter(
-        (item) => item._id !== reviewId && item.id !== reviewId,
-      );
+    if (!draft.image) {
+      toast.error("Please upload a client image.");
+      return;
+    }
 
-      setReviews(updatedReviews);
+    setReviews((previous) => [draft, ...previous]);
+    setOpenReviewId(draft._id);
+    setDraft(emptyReview());
 
-      if (openId === reviewId) {
-        setOpenId(null);
+    toast.success("Review added. Save changes to store it in Backend Storage.");
+  }
+
+  // --------------------------------------------------
+  // 8. Validate all translations before saving.
+  // --------------------------------------------------
+
+  function validateTranslations() {
+    for (const [field, value] of Object.entries(section)) {
+      const translated = getTranslation(value);
+
+      for (const lang of languages) {
+        if (!translated[lang.code].trim()) {
+          setLanguage(lang.code);
+          toast.error(`Complete "${field}" in ${lang.label}.`);
+          return false;
+        }
+      }
+    }
+
+    for (let index = 0; index < stats.length; index++) {
+      for (const field of ["value", "label"]) {
+        const translated = getTranslation(stats[index][field]);
+
+        for (const lang of languages) {
+          if (!translated[lang.code].trim()) {
+            setLanguage(lang.code);
+
+            toast.error(
+              `Complete Statistic ${index + 1} ${field} in ${lang.label}.`,
+            );
+
+            return false;
+          }
+        }
+      }
+    }
+
+    for (let index = 0; index < reviews.length; index++) {
+      const review = reviews[index];
+
+      if (!review.image) {
+        setOpenReviewId(review._id);
+        toast.error(`Review ${index + 1} needs an image.`);
+        return false;
       }
 
-      toast.success(response.data.message || "Review deleted successfully");
+      for (const field of ["name", "role", "text"]) {
+        const translated = getTranslation(review[field]);
+
+        for (const lang of languages) {
+          if (!translated[lang.code].trim()) {
+            setLanguage(lang.code);
+            setOpenReviewId(review._id);
+
+            toast.error(
+              `Complete Review ${index + 1} ${field} in ${lang.label}.`,
+            );
+
+            return false;
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+
+  // --------------------------------------------------
+  // 9. Prepare data to send to the API.
+  // Do not send temporary frontend IDs to MongoDB.
+  // --------------------------------------------------
+
+  function buildPayload() {
+    return {
+      section,
+
+      stats: stats.map(({ value, label }) => ({
+        value,
+        label,
+      })),
+
+      reviews: reviews.map((review) => ({
+        ...(review._id && !String(review._id).startsWith("new-")
+          ? { _id: review._id }
+          : {}),
+
+        name: review.name,
+        role: review.role,
+        text: review.text,
+        image: review.image,
+        publicId: review.publicId || "",
+      })),
+    };
+  }
+
+  // --------------------------------------------------
+  // 10. GET again after saving.
+  // This retrieves the real MongoDB IDs.
+  // --------------------------------------------------
+
+  async function refreshData() {
+    const response = await axios.get("/api/homepage/reviews-section");
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(
+        response.data.message || "Failed to refresh saved reviews.",
+      );
+    }
+
+    const data = response.data.data;
+
+    setSection((previous) => ({
+      ...previous,
+      ...Object.fromEntries(
+        Object.entries(data.section || {}).map(([key, value]) => [
+          key,
+          getTranslation(value),
+        ]),
+      ),
+    }));
+
+    setStats(
+      (data.stats || []).map((stat) => ({
+        value: getTranslation(stat.value),
+        label: getTranslation(stat.label),
+      })),
+    );
+
+    setReviews((data.reviews || []).map(normalizeReview));
+    setOpenReviewId(null);
+  }
+
+  // --------------------------------------------------
+  // 11. POST: Save all section data to MongoDB.
+  // --------------------------------------------------
+
+  async function handleSave() {
+    if (saving) return;
+    if (!validateTranslations()) return;
+
+    setSaving(true);
+
+    try {
+      const response = await axios.post(
+        "/api/homepage/reviews-section",
+        buildPayload(),
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to save reviews.");
+      }
+
+      await refreshData();
+
+      toast.success("Reviews section saved successfully.");
     } catch (error) {
       toast.error(
         error.response?.data?.message ||
-          error.response?.data?.error ||
-          "You do not have permission to delete this review",
+          error.message ||
+          "Failed to save changes.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // --------------------------------------------------
+  // 12. DELETE: Remove an existing review.
+  // Unsaved reviews are removed locally.
+  // --------------------------------------------------
+
+  async function handleDeleteReview(review) {
+    if (saving) {
+      toast.error("Please wait until saving is complete.");
+      return;
+    }
+
+    if (String(review._id).startsWith("new-")) {
+      setReviews((previous) =>
+        previous.filter((item) => item._id !== review._id),
+      );
+
+      if (openReviewId === review._id) {
+        setOpenReviewId(null);
+      }
+
+      toast.success("Unsaved review removed.");
+      return;
+    }
+
+    try {
+      const response = await axios.delete("/api/homepage/reviews-section", {
+        data: {
+          reviewId: review._id,
+        },
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to delete review.");
+      }
+
+      setReviews((previous) =>
+        previous.filter((item) => item._id !== review._id),
+      );
+
+      if (openReviewId === review._id) {
+        setOpenReviewId(null);
+      }
+
+      toast.success("Review deleted successfully.");
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to delete review.",
       );
     }
-  };
+  }
 
-  const addStat = () => {
-    setStats((previous) => [
-      ...previous,
-      { id: Date.now(), publicId: "", value: "", label: "" },
-    ]);
-  };
-
-  const updateStat = (statId, field, value) => {
-    setStats((previous) =>
-      previous.map((item) =>
-        item.id === statId ? { ...item, [field]: value } : item,
-      ),
-    );
-  };
-
-  const moveStat = (index, direction) => {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= stats.length) return;
-
-    const updatedStats = [...stats];
-    const current = updatedStats[index];
-    updatedStats[index] = updatedStats[nextIndex];
-    updatedStats[nextIndex] = current;
-    setStats(updatedStats);
-  };
-
-  const filteredReviews = reviews.filter((item) => {
-    const searchText = search.toLowerCase();
-    return (
-      item.name.toLowerCase().includes(searchText) ||
-      item.role.toLowerCase().includes(searchText) ||
-      item.text.toLowerCase().includes(searchText)
-    );
-  });
+  // --------------------------------------------------
+  // 13. Loading screen.
+  // --------------------------------------------------
 
   if (loading) {
     return (
-      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
+      <div className="flex min-h-96 items-center justify-center bg-[var(--background)]">
         <Spinner />
-        <p className="text-sm font-medium text-[var(--muted)]">
-          Loading Counter Page...
-        </p>
       </div>
     );
   }
 
+  // --------------------------------------------------
+  // 14. Frontend UI.
+  // --------------------------------------------------
+
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      <div className="mx-auto max-w-7xl space-y-6">
-        {/* Header */}
-        <div className="top-3 z-30 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
+    <div className="min-h-screen space-y-6 bg-[var(--background)] text-[var(--foreground)]">
+      <Script
+        src="https://upload-widget.cloudinary.com/global/all.js"
+        strategy="afterInteractive"
+        onLoad={setupCloudinary}
+        onError={() => toast.error("Could not load Cloudinary uploader.")}
+      />
+
+      {/* Header */}
+      <section className={card}>
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
               <MessageSquareQuote size={24} />
             </div>
 
             <div>
               <h1 className="text-xl font-bold sm:text-2xl">Reviews Manager</h1>
-              <p className={`mt-1 text-sm ${muted}`}>
-                Manage testimonials and client feedback.
+
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Manage testimonials and translations.
               </p>
             </div>
           </div>
-        </div>
 
-        {/* Overview */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className={card}>
-            <p className={`text-sm ${muted}`}>Total Reviews</p>
-            <h2 className="mt-2 text-3xl font-bold">{reviews.length}</h2>
-            <p className={`mt-1 text-xs ${muted}`}>Client testimonials</p>
-          </div>
-
-          <div className={card}>
-            <p className={`text-sm ${muted}`}>Statistics</p>
-            <h2 className="mt-2 text-3xl font-bold">{stats.length}</h2>
-            <p className={`mt-1 text-xs ${muted}`}>Testimonial section stats</p>
-          </div>
-
-          <div className={card}>
-            <p className={`text-sm ${muted}`}>Filtered Reviews</p>
-            <h2 className="mt-2 text-3xl font-bold">
-              {filteredReviews.length}
-            </h2>
-            <p className={`mt-1 text-xs ${muted}`}>
-              Results matching your search
-            </p>
-          </div>
-        </div>
-
-        {/* Section Content */}
-        <section className={card}>
-          <div className="mb-6">
-            <h2 className="text-lg font-bold">Section Content</h2>
-            <p className={`mt-1 text-sm ${muted}`}>
-              Edit the heading and description displayed on your website.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div>
-              <label className={label}>Badge Text</label>
-              <input
-                className={input}
-                value={section.badgeText}
-                onChange={(event) =>
-                  setSection({ ...section, badgeText: event.target.value })
-                }
-                placeholder="CLIENTS FEEDBACK"
-              />
-            </div>
-
-            <div>
-              <label className={label}>Highlighted Word</label>
-              <input
-                className={input}
-                value={section.highlightWord}
-                onChange={(event) =>
-                  setSection({ ...section, highlightWord: event.target.value })
-                }
-                placeholder="Stories"
-              />
-            </div>
-
-            <div>
-              <label className={label}>Heading Line One</label>
-              <input
-                className={input}
-                value={section.headingLineOne}
-                onChange={(event) =>
-                  setSection({ ...section, headingLineOne: event.target.value })
-                }
-                placeholder="Success Stories Fuel"
-              />
-            </div>
-
-            <div>
-              <label className={label}>Heading Line Two</label>
-              <input
-                className={input}
-                value={section.headingLineTwo}
-                onChange={(event) =>
-                  setSection({ ...section, headingLineTwo: event.target.value })
-                }
-                placeholder="our Innovation."
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className={label}>Description</label>
-              <textarea
-                className={`${input} min-h-28 resize-y`}
-                value={section.description}
-                onChange={(event) =>
-                  setSection({ ...section, description: event.target.value })
-                }
-                placeholder="Enter section description..."
-                rows={4}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Statistics */}
-        <section className={card}>
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-bold">Statistics</h2>
-              <p className={`mt-1 text-sm ${muted}`}>
-                Manage the statistics shown in your testimonial section.
-              </p>
-            </div>
-
-            <button type="button" onClick={addStat} className={smallButton}>
-              <Plus
-                size={17}
-                className="transition-transform group-hover:rotate-90"
-              />
-              Add Statistic
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {stats.map((item, index) => (
-              <div key={item.id} className={innerBox}>
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold">
-                    Statistic {index + 1}
-                  </span>
-
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className={smallButton}
-                      onClick={() => moveStat(index, -1)}
-                      disabled={index === 0}
-                      aria-label="Move statistic up"
-                    >
-                      <ArrowUp
-                        size={16}
-                        className="transition-transform group-hover:-translate-y-0.5"
-                      />
-                    </button>
-
-                    <button
-                      type="button"
-                      className={smallButton}
-                      onClick={() => moveStat(index, 1)}
-                      disabled={index === stats.length - 1}
-                      aria-label="Move statistic down"
-                    >
-                      <ArrowDown
-                        size={16}
-                        className="transition-transform group-hover:translate-y-0.5"
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className={label}>Value</label>
-                    <input
-                      className={input}
-                      value={item.value}
-                      onChange={(event) =>
-                        updateStat(item.id, "value", event.target.value)
-                      }
-                      placeholder="93%"
-                    />
-                  </div>
-
-                  <div>
-                    <label className={label}>Label</label>
-                    <input
-                      className={input}
-                      value={item.label}
-                      onChange={(event) =>
-                        updateStat(item.id, "label", event.target.value)
-                      }
-                      placeholder="Projects Completed"
-                    />
-                  </div>
-                </div>
-              </div>
+          <div className="flex flex-wrap gap-2">
+            {languages.map((lang) => (
+              <button
+                key={lang.code}
+                type="button"
+                onClick={() => setLanguage(lang.code)}
+                className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                  language === lang.code
+                    ? "bg-[#1E8A8A] text-white shadow-sm"
+                    : "border border-gray-200 bg-white text-gray-600 hover:border-[#1E8A8A] dark:border-white/10 dark:bg-[#16212C] dark:text-gray-300"
+                }`}
+              >
+                {lang.label}
+              </button>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Add Review */}
-        <section className={card}>
-          <div className="mb-6">
-            <h2 className="text-lg font-bold">Add New Review</h2>
-            <p className={`mt-1 text-sm ${muted}`}>
-              Add a client testimonial and optionally upload a client image.
+      {/* Section content */}
+      <section className={card}>
+        <h2 className="mb-5 text-lg font-bold">Section Content</h2>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          {[
+            ["badgeText", "Badge Text"],
+            ["highlightWord", "Highlighted Word"],
+            ["headingLineOne", "Heading Line One"],
+            ["headingLineTwo", "Heading Line Two"],
+          ].map(([field, title]) => (
+            <div key={field}>
+              <label className={label}>{title}</label>
+
+              <input
+                className={input}
+                value={getTranslation(section[field])[language]}
+                onChange={(event) => updateSection(field, event.target.value)}
+              />
+            </div>
+          ))}
+
+          <div className="md:col-span-2">
+            <label className={label}>Description</label>
+
+            <textarea
+              className={input}
+              rows={4}
+              value={getTranslation(section.description)[language]}
+              onChange={(event) =>
+                updateSection("description", event.target.value)
+              }
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Statistics */}
+      <section className={card}>
+        <h2 className="mb-5 text-lg font-bold">Statistics</h2>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {stats.map((stat, index) => (
+            <div
+              key={index}
+              className="rounded-xl border border-gray-200 p-4 dark:border-white/10"
+            >
+              <h3 className="mb-4 text-sm font-semibold">
+                Statistic {index + 1}
+              </h3>
+
+              <label className={label}>Value</label>
+
+              <input
+                className={input}
+                value={getTranslation(stat.value)[language]}
+                onChange={(event) =>
+                  updateStat(index, "value", event.target.value)
+                }
+              />
+
+              <label className={`${label} mt-4`}>Label</label>
+
+              <input
+                className={input}
+                value={getTranslation(stat.label)[language]}
+                onChange={(event) =>
+                  updateStat(index, "label", event.target.value)
+                }
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Add review */}
+      <section className={card}>
+        <h2 className="mb-5 text-lg font-bold">Add Review</h2>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          <div>
+            <label className={label}>Client Name *</label>
+
+            <input
+              className={input}
+              value={draft.name[language]}
+              onChange={(event) => updateDraft("name", event.target.value)}
+              placeholder="Enter client name"
+            />
+          </div>
+
+          <div>
+            <label className={label}>Client Role *</label>
+
+            <input
+              className={input}
+              value={draft.role[language]}
+              onChange={(event) => updateDraft("role", event.target.value)}
+              placeholder="CEO, Founder, Manager..."
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className={label}>Review Text *</label>
+
+            <textarea
+              className={input}
+              rows={4}
+              value={draft.text[language]}
+              onChange={(event) => updateDraft("text", event.target.value)}
+              placeholder="Enter client feedback"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className={label}>Client Image *</label>
+
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={() => openCloudinary("draft")}
+                disabled={!cloudinaryReady}
+                className={primaryButton}
+              >
+                <Upload size={18} />
+                {cloudinaryReady
+                  ? "Choose Client Image"
+                  : "Loading Uploader..."}
+              </button>
+
+              {draft.image ? (
+                <img
+                  src={draft.image}
+                  alt="Client preview"
+                  className="h-20 w-20 rounded-xl border border-gray-200 object-cover dark:border-white/10"
+                />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-xl border border-dashed border-gray-300 text-gray-400 dark:border-white/20">
+                  <ImagePlus size={24} />
+                </div>
+              )}
+            </div>
+
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              JPG, PNG or WebP. Maximum 5MB.
             </p>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div>
-              <label className={label}>Client Name *</label>
-              <input
-                className={input}
-                value={draft.name}
-                onChange={(event) =>
-                  setDraft({ ...draft, name: event.target.value })
-                }
-                placeholder="Enter client name"
-              />
-            </div>
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={handleAddReview}
+            disabled={saving}
+            className={primaryButton}
+          >
+            <Plus size={18} />
+            Add Review
+          </button>
+        </div>
+      </section>
 
-            <div>
-              <label className={label}>Client Role *</label>
-              <input
-                className={input}
-                value={draft.role}
-                onChange={(event) =>
-                  setDraft({ ...draft, role: event.target.value })
-                }
-                placeholder="CEO, Founder, Manager..."
-              />
-            </div>
+      {/* Existing reviews */}
+      <section className={card}>
+        <h2 className="mb-5 text-lg font-bold">Manage Reviews</h2>
 
-            <div className="md:col-span-2">
-              <label className={label}>Review Text *</label>
-              <textarea
-                className={`${input} min-h-32 resize-y`}
-                value={draft.text}
-                onChange={(event) =>
-                  setDraft({ ...draft, text: event.target.value })
-                }
-                placeholder="Enter the client's feedback..."
-                rows={4}
-              />
-            </div>
+        {reviews.length === 0 ? (
+          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            No reviews yet. Add your first review above.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {reviews.map((review) => {
+              const isOpen = openReviewId === review._id;
 
-            <div className="md:col-span-2">
-              <label className={label}>Client Image URL</label>
-              <input
-                className={input}
-                value={draft.image}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    image: event.target.value,
-                    imageFile: null,
-                    imagePreview: "",
-                  })
-                }
-                placeholder="https://example.com/client.jpg"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className={label}>Upload Image From Your Computer</label>
-
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#16212C]">
-                  {draft.imagePreview || draft.image ? (
-                    <img
-                      src={draft.imagePreview || draft.image}
-                      alt="Review preview"
-                      className="h-full w-full object-cover"
-                      onError={(event) => {
-                        event.currentTarget.style.display = "none";
-                      }}
-                      onLoad={(event) => {
-                        event.currentTarget.style.display = "block";
-                      }}
-                    />
-                  ) : (
-                    <ImagePlus size={25} className={muted} />
-                  )}
-                </div>
-
-                <div>
-                  <label className={`${smallButton} cursor-pointer`}>
-                    <Upload
-                      size={17}
-                      className="transition-transform group-hover:-translate-y-0.5"
-                    />
-                    Choose Image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={chooseDraftImage}
-                    />
-                  </label>
-
-                  <p className={`mt-2 text-xs ${muted}`}>
-                    Images only. Maximum file size: 5MB.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <button
-              type="button"
-              onClick={addReview}
-              disabled={saving || uploadingDraft}
-              className={button}
-            >
-              {saving ? (
-                <LoaderCircle size={18} className="animate-spin" />
-              ) : (
-                <Plus
-                  size={18}
-                  className="transition-transform group-hover:rotate-90"
-                />
-              )}
-              {saving ? "Saving..." : "Add Review & Save"}
-            </button>
-          </div>
-        </section>
-
-        {/* Existing Reviews */}
-        <section className={card}>
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-bold">Manage Reviews</h2>
-              <p className={`mt-1 text-sm ${muted}`}>
-                Edit, reorder, or remove existing client reviews.
-              </p>
-            </div>
-
-            <div className="relative w-full sm:max-w-xs">
-              <Search
-                size={18}
-                className={`absolute top-1/2 left-3 -translate-y-1/2 ${muted}`}
-              />
-
-              <input
-                className={`${input} pl-10`}
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setVisible(20);
-                }}
-                placeholder="Search reviews..."
-              />
-            </div>
-          </div>
-
-          {filteredReviews.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-300 px-5 py-12 text-center dark:border-white/10">
-              <MessageSquareQuote
-                size={32}
-                className={`mx-auto mb-3 ${muted}`}
-              />
-              <p className="font-medium">No reviews found</p>
-              <p className={`mt-1 text-sm ${muted}`}>
-                Add a review or try a different search.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredReviews.slice(0, visible).map((item, index) => {
-                const isOpen = openId === item.id;
-                const imageSource = item.imagePreview || item.image;
-
-                return (
-                  <div
-                    key={item.id}
-                    className="overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md dark:border-white/10 dark:bg-[#16212C]"
-                  >
-                    <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#111B27]">
-                          {imageSource ? (
-                            <img
-                              src={imageSource}
-                              alt={item.name || "Client"}
-                              className="h-full w-full object-cover"
-                              onError={(event) => {
-                                event.currentTarget.style.display = "none";
-                              }}
-                              onLoad={(event) => {
-                                event.currentTarget.style.display = "block";
-                              }}
-                            />
-                          ) : (
-                            <ImagePlus size={19} className={muted} />
-                          )}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate font-semibold">
-                            {item.name || "Unnamed Client"}
-                          </h3>
-                          <p className={`mt-1 truncate text-sm ${muted}`}>
-                            {item.role || "No role provided"}
-                          </p>
-                        </div>
+              return (
+                <div
+                  key={review._id}
+                  className="overflow-hidden rounded-xl border border-gray-200 bg-white transition-shadow hover:shadow-md dark:border-white/10 dark:bg-[#16212C]"
+                >
+                  <div className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#111B27]">
+                        {review.image ? (
+                          <img
+                            src={review.image}
+                            alt={review.name?.[language] || "Client"}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <ImagePlus size={22} className="text-gray-400" />
+                        )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          className={smallButton}
-                          onClick={() => moveReview(index, -1)}
-                          disabled={index === 0}
-                          aria-label="Move review up"
-                        >
-                          <ArrowUp
-                            size={16}
-                            className="transition-transform group-hover:-translate-y-0.5"
-                          />
-                        </button>
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold">
+                          {review.name?.[language] || "Unnamed Client"}
+                        </h3>
 
-                        <button
-                          type="button"
-                          className={smallButton}
-                          onClick={() => moveReview(index, 1)}
-                          disabled={index === filteredReviews.length - 1}
-                          aria-label="Move review down"
-                        >
-                          <ArrowDown
-                            size={16}
-                            className="transition-transform group-hover:translate-y-0.5"
-                          />
-                        </button>
+                        <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
+                          {review.role?.[language] || "No role entered"}
+                        </p>
 
-                        <button
-                          type="button"
-                          className={smallButton}
-                          onClick={() => setOpenId(isOpen ? null : item.id)}
-                          aria-label={
-                            isOpen ? "Collapse review" : "Edit review"
-                          }
-                        >
-                          {isOpen ? (
-                            <ChevronUp size={17} />
-                          ) : (
-                            <ChevronDown size={17} />
-                          )}
-                          {isOpen ? "Close" : "Edit"}
-                        </button>
-
-                        <button
-                          type="button"
-                          className={dangerButton}
-                          onClick={() => deleteReview(item.id)}
-                        >
-                          <Trash2
-                            size={16}
-                            className="transition-transform group-hover:scale-110"
-                          />
-                          Delete
-                        </button>
+                        <p className="mt-1 text-xs text-gray-400">
+                          {String(review._id).startsWith("new-")
+                            ? "Unsaved review"
+                            : "Saved in Backend Storage"}
+                        </p>
                       </div>
                     </div>
 
-                    {!isOpen && (
-                      <div className="border-t border-gray-200 px-4 py-3 dark:border-white/10">
-                        <p className={`line-clamp-2 text-sm ${muted}`}>
-                          {item.text || "No review text provided."}
-                        </p>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenReviewId(isOpen ? null : review._id)
+                        }
+                        className={secondaryButton}
+                      >
+                        {isOpen ? "Close" : "View & Edit"}
 
-                    {isOpen && (
-                      <div className="space-y-5 border-t border-gray-200 p-4 dark:border-white/10">
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                          <div>
-                            <label className={label}>Client Name</label>
-                            <input
-                              className={input}
-                              value={item.name}
-                              onChange={(event) =>
-                                updateReview(
-                                  item.id,
-                                  "name",
-                                  event.target.value,
-                                )
-                              }
-                              placeholder="Client name"
-                            />
-                          </div>
+                        {isOpen ? (
+                          <ChevronUp size={17} />
+                        ) : (
+                          <ChevronDown size={17} />
+                        )}
+                      </button>
 
-                          <div>
-                            <label className={label}>Client Role</label>
-                            <input
-                              className={input}
-                              value={item.role}
-                              onChange={(event) =>
-                                updateReview(
-                                  item.id,
-                                  "role",
-                                  event.target.value,
-                                )
-                              }
-                              placeholder="Client role"
-                            />
-                          </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteReview(review)}
+                        disabled={saving}
+                        className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 p-3 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300"
+                        aria-label="Delete review"
+                      >
+                        <Trash2 size={17} />
+                      </button>
+                    </div>
+                  </div>
 
-                          <div className="md:col-span-2">
-                            <label className={label}>Review Text</label>
-                            <textarea
-                              className={`${input} min-h-32 resize-y`}
-                              value={item.text}
-                              onChange={(event) =>
-                                updateReview(
-                                  item.id,
-                                  "text",
-                                  event.target.value,
-                                )
-                              }
-                              placeholder="Client feedback..."
-                              rows={4}
-                            />
-                          </div>
+                  {isOpen && (
+                    <div className="space-y-5 border-t border-gray-200 p-4 dark:border-white/10">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className={label}>Client Name *</label>
 
-                          <div className="md:col-span-2">
-                            <label className={label}>Image URL</label>
-                            <input
-                              className={input}
-                              value={item.image}
-                              onChange={(event) =>
-                                setReviews((previous) =>
-                                  previous.map((review) =>
-                                    review.id === item.id
-                                      ? {
-                                          ...review,
-                                          image: event.target.value,
-                                          imageFile: null,
-                                          imagePreview: "",
-                                        }
-                                      : review,
-                                  ),
-                                )
-                              }
-                              placeholder="https://example.com/client.jpg"
-                            />
-                          </div>
-
-                          <div className="md:col-span-2">
-                            <label className={label}>Change Client Image</label>
-
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-[#111B27]">
-                                {item.imagePreview || item.image ? (
-                                  <img
-                                    src={item.imagePreview || item.image}
-                                    alt={item.name || "Client"}
-                                    className="h-full w-full object-cover"
-                                    onError={(event) => {
-                                      event.currentTarget.style.display =
-                                        "none";
-                                    }}
-                                    onLoad={(event) => {
-                                      event.currentTarget.style.display =
-                                        "block";
-                                    }}
-                                  />
-                                ) : (
-                                  <ImagePlus size={25} className={muted} />
-                                )}
-                              </div>
-
-                              <div>
-                                <label
-                                  className={`${smallButton} cursor-pointer`}
-                                >
-                                  <Upload
-                                    size={17}
-                                    className="transition-transform group-hover:-translate-y-0.5"
-                                  />
-                                  Choose Image
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={(event) =>
-                                      chooseReviewImage(event, item.id)
-                                    }
-                                  />
-                                </label>
-
-                                <p className={`mt-2 text-xs ${muted}`}>
-                                  Images only. Maximum file size: 5MB.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
+                          <input
+                            className={input}
+                            value={review.name?.[language] || ""}
+                            onChange={(event) =>
+                              updateReview(
+                                review._id,
+                                "name",
+                                event.target.value,
+                              )
+                            }
+                          />
                         </div>
 
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            className={button}
-                            onClick={() => saveAll()}
-                            disabled={saving}
-                          >
-                            {saving ? (
-                              <LoaderCircle
-                                size={17}
-                                className="animate-spin"
-                              />
-                            ) : (
-                              <Save
-                                size={17}
-                                className="transition-transform group-hover:scale-110"
+                        <div>
+                          <label className={label}>Client Role *</label>
+
+                          <input
+                            className={input}
+                            value={review.role?.[language] || ""}
+                            onChange={(event) =>
+                              updateReview(
+                                review._id,
+                                "role",
+                                event.target.value,
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className={label}>Review Text *</label>
+
+                          <textarea
+                            className={input}
+                            rows={4}
+                            value={review.text?.[language] || ""}
+                            onChange={(event) =>
+                              updateReview(
+                                review._id,
+                                "text",
+                                event.target.value,
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className={label}>Client Image</label>
+
+                          <div className="flex flex-wrap items-center gap-4">
+                            <button
+                              type="button"
+                              onClick={() => openCloudinary(review._id)}
+                              disabled={!cloudinaryReady || saving}
+                              className={secondaryButton}
+                            >
+                              <Upload size={17} />
+                              Change Image
+                            </button>
+
+                            {review.image && (
+                              <img
+                                src={review.image}
+                                alt="Client preview"
+                                className="h-20 w-20 rounded-xl border border-gray-200 object-cover dark:border-white/10"
                               />
                             )}
-                            {saving ? "Saving..." : "Save Changes"}
-                          </button>
+                          </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
 
-              {visible < filteredReviews.length && (
-                <div className="flex justify-center pt-3">
-                  <button
-                    type="button"
-                    className={smallButton}
-                    onClick={() => setVisible((previous) => previous + 20)}
-                  >
-                    <ChevronDown
-                      size={16}
-                      className="transition-transform group-hover:translate-y-0.5"
-                    />
-                    Load More Reviews
-                  </button>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleSave}
+                          disabled={saving}
+                          className={primaryButton}
+                        >
+                          {saving ? (
+                            <LoaderCircle size={18} className="animate-spin" />
+                          ) : (
+                            <Save size={18} />
+                          )}
+
+                          {saving ? "Saving..." : "Save Changes"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
-        </section>
-        <footer className="sticky bottom-4 z-10 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
-          <div>
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              Ready to save your changes?
-            </p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Save the section content, statistics, and reviews together.
-            </p>
+              );
+            })}
           </div>
+        )}
+      </section>
 
-          <button
-            type="button"
-            className={button}
-            onClick={() => saveAll()}
-            disabled={saving}
-          >
-            Save Changes
-            {saving ? (
-              <LoaderCircle size={18} className="animate-spin" />
-            ) : (
-              <Save
-                size={18}
-                className="transition-transform group-hover:scale-110"
-              />
-            )}
-          </button>
-        </footer>
-      </div>
+      {/* Save all changes */}
+      <footer className="sticky bottom-4 z-10 flex flex-col justify-between gap-4 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center dark:border-white/10 dark:bg-[#111B27]/95">
+        <div>
+          <p className="text-sm font-semibold">Ready to save your changes?</p>
+
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Save section content, statistics, and all review translations.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className={primaryButton}
+        >
+          {saving ? (
+            <LoaderCircle size={18} className="animate-spin" />
+          ) : (
+            <Save size={18} />
+          )}
+
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+      </footer>
+
+      {/* Reusable language selector */}
+      <AdminLanguageBall language={language} onLanguageChange={setLanguage} />
     </div>
   );
 }

@@ -1,8 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import {
   BarChart3,
   ChevronLeft,
@@ -19,6 +16,9 @@ import {
   Users,
   X,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 const navGroups = [
   {
