@@ -1,5 +1,7 @@
 "use client";
 
+import AdminLanguageBall from "@/app/admin/Components/Admin/AdminLanguageBall";
+import Spinner from "@/app/admin/Components/Admin/Spinner";
 import axios from "axios";
 import {
   BookOpen,
@@ -19,183 +21,283 @@ import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
-import Spinner from "../../Components/Admin/Spinner";
 
 const API = "/api/homepage/articles-section";
 
-const emptyArticle = {
-  day: "",
-  month: "OCT",
-  image: "",
-  publicId: "",
-  category: "",
-  author: "Admin",
-  title: "",
-  link: "",
-};
+const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "ps", label: "پښتو" },
+  { code: "fa", label: "دری" },
+];
 
-const emptyTitles = {
-  sectionTitle: "The Ultimate",
-  highlightedTitle: "Resource.",
-};
+const MONTHS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:border-[#1e8a8a] dark:border-[#263442] dark:bg-[#16212c] dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-[#35b5b5]";
+  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#1e8a8a] dark:border-[#263442] dark:bg-[#16212c] dark:text-gray-100";
+
+const sectionClass =
+  "rounded-2xl border border-gray-200 bg-white p-5 dark:border-[#263442] dark:bg-[#111a23]";
+
+const emptyTranslation = () => ({
+  day: "",
+  month: "",
+  category: "",
+  author: "",
+  title: "",
+});
+
+const emptyArticle = () => ({
+  image: "",
+  publicId: "",
+  link: "",
+  translations: {
+    en: emptyTranslation(),
+    ps: emptyTranslation(),
+    fa: emptyTranslation(),
+  },
+});
+
+const emptyTitles = () => ({
+  en: { sectionTitle: "The Ultimate", highlightedTitle: "Resource." },
+  ps: { sectionTitle: "", highlightedTitle: "" },
+  fa: { sectionTitle: "", highlightedTitle: "" },
+});
+
+// Prepare an article returned by the API.
+function normalizeArticle(item) {
+  return {
+    _id: item._id,
+    image: item.image || "",
+    publicId: item.publicId || "",
+    link: item.link || "",
+    translations: {
+      en: { ...emptyTranslation(), ...item.translations?.en },
+      ps: { ...emptyTranslation(), ...item.translations?.ps },
+      fa: { ...emptyTranslation(), ...item.translations?.fa },
+    },
+  };
+}
+
+function normalizeTitles(value = {}) {
+  const defaults = emptyTitles();
+
+  // Also supports the old flat heading format.
+  if (value.sectionTitle || value.highlightedTitle) {
+    defaults.en.sectionTitle = value.sectionTitle || defaults.en.sectionTitle;
+    defaults.en.highlightedTitle =
+      value.highlightedTitle || defaults.en.highlightedTitle;
+    return defaults;
+  }
+
+  return {
+    en: { ...defaults.en, ...value.en },
+    ps: { ...defaults.ps, ...value.ps },
+    fa: { ...defaults.fa, ...value.fa },
+  };
+}
+
+// Check that the link is a local path or a valid HTTP/HTTPS URL.
+function validateLink(value) {
+  const link = String(value || "").trim();
+
+  if (
+    !link ||
+    link.startsWith("//") ||
+    link.includes("\\") ||
+    /\s/.test(link)
+  ) {
+    return false;
+  }
+
+  if (link.startsWith("/")) return true;
+
+  try {
+    return ["http:", "https:"].includes(new URL(link).protocol);
+  } catch {
+    return false;
+  }
+}
 
 export default function BlogSectionAdmin() {
   const [article, setArticle] = useState(emptyArticle);
   const [titles, setTitles] = useState(emptyTitles);
   const [articles, setArticles] = useState([]);
+  const [language, setLanguage] = useState("en");
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [cloudinaryReady, setCloudinaryReady] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [cloudinaryReady, setCloudinaryReady] = useState(false);
 
-  const cloudinaryWidget = useRef(null);
-  const uploadArticleId = useRef(null);
+  const widgetRef = useRef(null);
+  const uploadTarget = useRef(null);
 
-  // Load articles and headings
-  const loadArticles = async () => {
-    try {
-      setLoading(true);
-
-      const response = await axios.get(API);
-
-      if (response.data.success) {
-        const section = response.data.data;
-
-        setArticles(
-          (section?.posts || []).map((item) => ({
-            ...item,
-            _id: item._id?.toString(),
-            day: item.day || "",
-            month: item.month || "OCT",
-            image: item.image || "",
-            publicId: item.publicId || "",
-            category: item.category || "",
-            author: item.author || "",
-            title: item.title || "",
-            link: item.link || "",
-          })),
-        );
-
-        if (section) {
-          setTitles((previous) => ({
-            ...previous,
-            sectionTitle: section.sectionTitle || "",
-            highlightedTitle: section.highlightedTitle || "",
-          }));
-        }
-      } else {
-        toast.error(response.data.message || "Failed to load articles.");
-      }
-    } catch (error) {
-      console.error("Load articles error:", error.response?.data || error);
-      toast.error("Failed to load articles.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Load all translations once. Switching languages does not reload the page.
   useEffect(() => {
+    async function loadArticles() {
+      try {
+        const response = await axios.get(API);
+
+        if (!response.data?.success) {
+          throw new Error(response.data?.message || "Could not load articles.");
+        }
+
+        const data = response.data.data || {};
+
+        setArticles((data.posts || []).map(normalizeArticle));
+        setTitles(normalizeTitles(data.Titles || {}));
+      } catch (error) {
+        toast.error(
+          error.response?.data?.message ||
+            error.message ||
+            "Failed to load articles.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
     loadArticles();
   }, []);
 
-  // New article inputs
-  function handleArticleChange(event) {
-    const { name, value } = event.target;
+  // Keep the ball and this component's language selection synchronized.
+  function changeLanguage(value) {
+    const code =
+      typeof value === "string"
+        ? value
+        : value?.language || value?.languageId || value?.code;
 
-    setArticle((currentArticle) => ({
-      ...currentArticle,
-      [name]: value,
-    }));
-  }
+    if (!LANGUAGES.some((item) => item.code === code)) return;
 
-  // Section heading inputs
-  function handleTitleChange(event) {
-    const { name, value } = event.target;
+    setLanguage(code);
 
-    setTitles((currentTitles) => ({
-      ...currentTitles,
-      [name]: value,
-    }));
-  }
+    try {
+      localStorage.setItem("admin-content-language", code);
+    } catch {}
 
-  // Existing article inputs
-  function handleExistingArticleChange(articleId, fieldName, value) {
-    setArticles((currentArticles) =>
-      currentArticles.map((item) =>
-        item._id === articleId ? { ...item, [fieldName]: value } : item,
-      ),
+    window.dispatchEvent(
+      new CustomEvent("admin-language-change", {
+        detail: { languageId: code },
+      }),
     );
   }
 
-  // Open or close article
-  function toggleArticle(articleId) {
-    setExpandedId((currentId) => (currentId === articleId ? null : articleId));
+  // Update the new article's shared fields or selected translation.
+  function handleArticleChange(event) {
+    const { name, value } = event.target;
+
+    if (["link", "image", "publicId"].includes(name)) {
+      setArticle((current) => ({ ...current, [name]: value }));
+      return;
+    }
+
+    setArticle((current) => ({
+      ...current,
+      translations: {
+        ...current.translations,
+        [language]: {
+          ...current.translations[language],
+          [name]: value,
+        },
+      },
+    }));
   }
 
-  // Cloudinary image upload
+  // Update section headings for the selected language.
+  function handleTitleChange(event) {
+    const { name, value } = event.target;
+
+    setTitles((current) => ({
+      ...current,
+      [language]: { ...current[language], [name]: value },
+    }));
+  }
+
+  // Update an existing article.
+  function handleExistingChange(id, name, value) {
+    setArticles((current) =>
+      current.map((item) => {
+        if (item._id !== id) return item;
+
+        if (["link", "image", "publicId"].includes(name)) {
+          return { ...item, [name]: value };
+        }
+
+        return {
+          ...item,
+          translations: {
+            ...item.translations,
+            [language]: {
+              ...item.translations[language],
+              [name]: value,
+            },
+          },
+        };
+      }),
+    );
+  }
+
+  // Upload or replace an article image using Cloudinary.
   function uploadImage(articleId = null) {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
     if (!cloudinaryReady || !window.cloudinary) {
       toast.error("Image uploader is not ready.");
       return;
     }
-
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     if (!cloudName || !uploadPreset) {
       toast.error("Check your Cloudinary environment variables.");
       return;
     }
 
-    uploadArticleId.current = articleId;
+    uploadTarget.current = articleId;
 
-    if (!cloudinaryWidget.current) {
-      cloudinaryWidget.current = window.cloudinary.createUploadWidget(
+    if (!widgetRef.current) {
+      widgetRef.current = window.cloudinary.createUploadWidget(
         {
           cloudName,
           uploadPreset,
-          sources: ["local", "url", "camera"],
+          folder: "bexon/images",
           multiple: false,
           maxFileSize: 5 * 1024 * 1024,
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "gif"],
-          resourceType: "image",
-          folder: "bexon/images",
         },
-        function (error, result) {
+        (error, result) => {
           if (error) {
             toast.error("Image upload failed.");
             return;
           }
 
-          if (result.event !== "success") return;
+          if (result?.event !== "success") return;
 
-          const uploadedImage = result.info.secure_url;
-          const uploadedPublicId = result.info.public_id || "";
-          const targetId = uploadArticleId.current;
+          const image = result.info.secure_url;
+          const publicId = result.info.public_id || "";
+          const id = uploadTarget.current;
 
-          if (targetId) {
-            setArticles((currentArticles) =>
-              currentArticles.map((item) =>
-                item._id === targetId
-                  ? {
-                      ...item,
-                      image: uploadedImage,
-                      publicId: uploadedPublicId,
-                    }
-                  : item,
+          if (id) {
+            setArticles((current) =>
+              current.map((item) =>
+                item._id === id ? { ...item, image, publicId } : item,
               ),
             );
           } else {
-            setArticle((currentArticle) => ({
-              ...currentArticle,
-              image: uploadedImage,
-              publicId: uploadedPublicId,
-            }));
+            setArticle((current) => ({ ...current, image, publicId }));
           }
 
           toast.success("Image uploaded successfully.");
@@ -203,278 +305,215 @@ export default function BlogSectionAdmin() {
       );
     }
 
-    cloudinaryWidget.current.open();
+    widgetRef.current.open();
   }
 
-  // Validate new article using toast.error()
-  async function handleAddArticle() {
-    if (!article.image) {
-      toast.error("Please upload an image first.");
-      return;
-    }
+  // Validate both headings in all three languages.
+  function validateTitles() {
+    for (const item of LANGUAGES) {
+      const heading = titles[item.code];
 
-    if (!article.day.trim()) {
-      toast.error("Please enter the article day.");
-      return;
-    }
-
-    if (
-      Number(article.day) < 1 ||
-      Number(article.day) > 31 ||
-      !Number.isInteger(Number(article.day))
-    ) {
-      toast.error("Day must be between 1 and 31.");
-      return;
-    }
-
-    if (!article.month.trim()) {
-      toast.error("Please select a month.");
-      return;
-    }
-
-    if (!article.category.trim()) {
-      toast.error("Please enter the article category.");
-      return;
-    }
-
-    if (!article.author.trim()) {
-      toast.error("Please enter the article author.");
-      return;
-    }
-
-    if (!article.title.trim()) {
-      toast.error("Please enter an article title.");
-      return;
-    }
-
-    if (!article.link.trim()) {
-      toast.error("Please enter the article link.");
-      return;
-    }
-
-    const link = article.link.trim();
-
-    if (link.startsWith("//") || link.includes("\\") || /\s/.test(link)) {
-      toast.error("Please enter a valid article link.");
-      return;
-    }
-
-    if (link.startsWith("/")) {
-      // Valid local route
-    } else {
-      try {
-        const url = new URL(link);
-
-        if (!["http:", "https:"].includes(url.protocol)) {
-          toast.error("Article link must use HTTP or HTTPS.");
-          return;
-        }
-      } catch {
-        toast.error("Please enter a valid article link.");
-        return;
+      if (!heading.sectionTitle.trim()) {
+        return {
+          language: item.code,
+          message: `Enter the Main Title in ${item.label}.`,
+        };
       }
+
+      if (!heading.highlightedTitle.trim()) {
+        return {
+          language: item.code,
+          message: `Enter the Highlighted Title in ${item.label}.`,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  // Validate all fields in all three translations.
+  function validateArticle(item) {
+    if (!item.image) {
+      return { language, message: "Please upload an article image." };
+    }
+
+    for (const lang of LANGUAGES) {
+      const fields = item.translations[lang.code];
+
+      if (
+        !fields.day.trim() ||
+        !Number.isInteger(Number(fields.day)) ||
+        Number(fields.day) < 1 ||
+        Number(fields.day) > 31
+      ) {
+        return {
+          language: lang.code,
+          message: `Enter a valid day from 1 to 31 in ${lang.label}.`,
+        };
+      }
+
+      for (const field of ["month", "category", "author", "title"]) {
+        if (!String(fields[field] || "").trim()) {
+          return {
+            language: lang.code,
+            message: `Please enter the article ${field} in ${lang.label}.`,
+          };
+        }
+      }
+    }
+
+    if (!validateLink(item.link)) {
+      return { language, message: "Please enter a valid article link." };
+    }
+
+    return null;
+  }
+
+  // Build the data shape expected by the multilingual API.
+  function buildPayload(item) {
+    const translations = {};
+
+    for (const lang of LANGUAGES) {
+      translations[lang.code] = {};
+
+      for (const field of ["day", "month", "category", "author", "title"]) {
+        translations[lang.code][field] = String(
+          item.translations[lang.code][field] || "",
+        ).trim();
+      }
+    }
+
+    return {
+      image: item.image,
+      publicId: item.publicId || "",
+      link: item.link.trim(),
+      translations,
+    };
+  }
+
+  function showValidationError(error) {
+    setLanguage(error.language);
+    toast.error(error.message);
+  }
+
+  // Save all section headings.
+  async function handleSaveTitles() {
+    const error = validateTitles();
+
+    if (error) {
+      showValidationError(error);
+      return;
     }
 
     setSaving(true);
 
     try {
-      const response = await axios.post(API, {
-        article: {
-          ...article,
-          day: article.day.trim(),
-          category: article.category.trim(),
-          author: article.author.trim(),
-          title: article.title.trim(),
-          link: link,
-        },
-        Titles: titles,
-      });
+      const response = await axios.put(API, { Titles: titles });
 
-      if (!response.data.success) {
-        toast.error(response.data.message || "Failed to add article.");
-        return;
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || "Failed to save headings.");
       }
 
-      toast.success(response.data.message || "Article added.");
-
-      setArticle({ ...emptyArticle });
-
-      await loadArticles();
+      toast.success("Section headings saved.");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to add article.");
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to save headings.",
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  // Update existing article
-  async function handleUpdateArticle(item) {
-    if (!item._id) {
-      toast.error("Article ID is missing.");
-      return;
-    }
+  // Add a new article.
+  async function handleAddArticle() {
+    const articleError = validateArticle(article);
+    if (articleError) return showValidationError(articleError);
 
-    if (!item.image) {
-      toast.error("Please upload an article image.");
-      return;
-    }
+    const titleError = validateTitles();
+    if (titleError) return showValidationError(titleError);
 
-    if (!String(item.day).trim()) {
-      toast.error("Please enter the article day.");
-      return;
-    }
+    setSaving(true);
 
-    if (
-      Number(item.day) < 1 ||
-      Number(item.day) > 31 ||
-      !Number.isInteger(Number(item.day))
-    ) {
-      toast.error("Day must be between 1 and 31.");
-      return;
-    }
+    try {
+      const response = await axios.post(API, {
+        article: buildPayload(article),
+        Titles: titles,
+      });
 
-    if (!String(item.month || "").trim()) {
-      toast.error("Please select a month.");
-      return;
-    }
-
-    if (!item.category?.trim()) {
-      toast.error("Please enter the article category.");
-      return;
-    }
-
-    if (!item.author?.trim()) {
-      toast.error("Please enter the article author.");
-      return;
-    }
-
-    if (!item.title?.trim()) {
-      toast.error("Please enter an article title.");
-      return;
-    }
-
-    if (!item.link?.trim()) {
-      toast.error("Please enter the article link.");
-      return;
-    }
-
-    const link = item.link.trim();
-
-    if (link.startsWith("//") || link.includes("\\") || /\s/.test(link)) {
-      toast.error("Please enter a valid article link.");
-      return;
-    }
-
-    if (!link.startsWith("/")) {
-      try {
-        const url = new URL(link);
-
-        if (!["http:", "https:"].includes(url.protocol)) {
-          toast.error("Article link must use HTTP or HTTPS.");
-          return;
-        }
-      } catch {
-        toast.error("Please enter a valid article link.");
-        return;
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || "Failed to add article.");
       }
+
+      toast.success("Article added successfully.");
+      setArticle(emptyArticle());
+
+      const data = await axios.get(API);
+      if (data.data?.success) {
+        setArticles((data.data.data.posts || []).map(normalizeArticle));
+        setTitles(normalizeTitles(data.data.data.Titles || {}));
+      }
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to add article.",
+      );
+    } finally {
+      setSaving(false);
     }
+  }
+
+  // Update an existing article.
+  async function handleUpdateArticle(item) {
+    const error = validateArticle(item);
+    if (error) return showValidationError(error);
 
     setEditingId(item._id);
 
     try {
       const response = await axios.put(API, {
         _id: item._id,
-        article: {
-          day: item.day,
-          month: item.month,
-          image: item.image,
-          publicId: item.publicId,
-          category: item.category.trim(),
-          author: item.author.trim(),
-          title: item.title.trim(),
-          link,
-        },
+        article: buildPayload(item),
       });
 
-      if (!response.data.success) {
-        toast.error(response.data.message || "Failed to update article.");
-        return;
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || "Failed to update article.");
       }
 
-      toast.success(response.data.message || "Article updated.");
-
-      await loadArticles();
+      toast.success("Article updated successfully.");
     } catch (error) {
       toast.error(
-        error.response?.data?.message || "Update failed. Check your PUT API.",
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to update article.",
       );
     } finally {
       setEditingId(null);
     }
   }
 
-  // Save section headings
-  async function handleSaveTitles() {
-    if (!titles.sectionTitle.trim()) {
-      toast.error("Please enter the main section title.");
-      return;
-    }
-
-    if (!titles.highlightedTitle.trim()) {
-      toast.error("Please enter the highlighted title.");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const response = await axios.put(API, {
-        Titles: {
-          sectionTitle: titles.sectionTitle.trim(),
-          highlightedTitle: titles.highlightedTitle.trim(),
-        },
-      });
-
-      if (!response.data.success) {
-        toast.error(response.data.message || "Failed to save headings.");
-        return;
-      }
-
-      toast.success(response.data.message || "Headings saved.");
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message ||
-          "Heading save failed. Check your PUT API.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // Delete article
+  // Delete an article after confirmation.
   async function handleDeleteArticle(item) {
     if (deletingId) return;
 
     const result = await Swal.fire({
       title: "Delete this article?",
-      text: `"${item.title || "Untitled article"}" will be permanently deleted.`,
+      text: "This article will be permanently deleted.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Yes, delete it",
       cancelButtonText: "Keep article",
       reverseButtons: true,
-      focusCancel: true,
       buttonsStyling: false,
-      allowOutsideClick: false,
       customClass: {
         popup: "rounded-2xl p-6",
-        title: "text-xl font-semibold",
-        htmlContainer: "text-sm",
-        actions: "gap-3",
         confirmButton:
-          "rounded-lg bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700",
+          "rounded-lg bg-red-600 px-5 py-3 text-sm font-semibold text-white",
         cancelButton:
-          "rounded-lg border border-gray-300 px-5 py-3 text-sm font-semibold hover:bg-gray-100",
+          "rounded-lg border border-gray-300 px-5 py-3 text-sm font-semibold",
+        actions: "gap-3",
       },
     });
 
@@ -484,58 +523,38 @@ export default function BlogSectionAdmin() {
 
     try {
       const response = await axios.delete(API, {
-        data: {
-          _id: item._id,
-          publicId: item.publicId,
-        },
+        data: { _id: item._id, publicId: item.publicId },
       });
 
-      if (!response.data.success) {
-        toast.error(response.data.message || "Failed to delete article.");
-        return;
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || "Failed to delete article.");
       }
 
-      setArticles((currentArticles) =>
-        currentArticles.filter((articleItem) => articleItem._id !== item._id),
+      setArticles((current) =>
+        current.filter((entry) => entry._id !== item._id),
       );
-
-      if (expandedId === item._id) {
-        setExpandedId(null);
-      }
-
-      toast.success(response.data.message || "Article deleted.");
+      setExpandedId(null);
+      toast.success("Article deleted successfully.");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to delete article.");
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to delete article.",
+      );
     } finally {
       setDeletingId(null);
     }
   }
 
-  const months = [
-    "JAN",
-    "FEB",
-    "MAR",
-    "APR",
-    "MAY",
-    "JUN",
-    "JUL",
-    "AUG",
-    "SEP",
-    "OCT",
-    "NOV",
-    "DEC",
-  ];
-
   if (loading) {
     return (
-      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
+      <div className="flex min-h-96 items-center justify-center bg-[var(--background)]">
         <Spinner />
-        <p className="text-(--muted)] text-sm font-medium">
-          Loading Articles Page...
-        </p>
       </div>
     );
   }
+
+  const currentTranslation = article.translations[language];
 
   return (
     <div className="min-h-screen space-y-5 bg-[#f7f9fc] text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
@@ -546,131 +565,159 @@ export default function BlogSectionAdmin() {
         onError={() => toast.error("Could not load Cloudinary.")}
       />
 
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Header and language selector */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-[#e7f5f5] p-3 text-[#1e8a8a] dark:bg-[#162c32] dark:text-[#35b5b5]">
             <BookOpen size={23} />
           </div>
-
           <div>
             <h1 className="text-xl font-bold sm:text-2xl">Blog Section</h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Manage your blog content.
+              Manage your multilingual blog content.
             </p>
           </div>
         </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-[#263442] dark:bg-[#111a23]">
+            {LANGUAGES.map((item) => (
+              <button
+                key={item.code}
+                type="button"
+                onClick={() => changeLanguage(item.code)}
+                className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                  language === item.code
+                    ? "bg-[#1e8a8a] text-white"
+                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#16212c]"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          <AdminLanguageBall
+            language={language}
+            onLanguageChange={changeLanguage}
+          />
+        </div>
       </div>
 
-      {/* Section Heading */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-[#263442] dark:bg-[#111a23]">
-        <h2 className="mb-4 font-bold">Section Heading</h2>
+      {/* Section headings */}
+      <section className={sectionClass}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-bold">Section Heading</h2>
+            <p className="mt-1 text-xs text-gray-500">
+              Editing: {LANGUAGES.find((item) => item.code === language)?.label}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveTitles}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            <Save size={16} />
+            Save Headings
+          </button>
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <Type size={15} />
-              Main Title
-            </label>
-
-            <input
-              name="sectionTitle"
-              value={titles.sectionTitle}
-              onChange={handleTitleChange}
-              placeholder="The Ultimate"
-              maxLength={80}
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <Type size={15} />
-              Highlighted Title
-            </label>
-
-            <input
-              name="highlightedTitle"
-              value={titles.highlightedTitle}
-              onChange={handleTitleChange}
-              placeholder="Resource."
-              maxLength={80}
-              className={inputClass}
-            />
-          </div>
+          {[
+            ["sectionTitle", "Main Title", "The Ultimate"],
+            ["highlightedTitle", "Highlighted Title", "Resource."],
+          ].map(([name, label, placeholder]) => (
+            <div key={name}>
+              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                <Type size={15} />
+                {label}
+              </label>
+              <input
+                name={name}
+                value={titles[language][name]}
+                onChange={handleTitleChange}
+                placeholder={placeholder}
+                maxLength={80}
+                className={inputClass}
+              />
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Add New Article */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-[#263442] dark:bg-[#111a23]">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-bold">Add New Article</h2>
+      {/* Add article */}
+      <section className={sectionClass}>
+        <h2 className="mb-4 flex items-center justify-between font-bold">
+          Add New Article
           <Plus size={19} className="text-[#1e8a8a]" />
-        </div>
-
-        <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-          <ImagePlus size={15} />
-          Article Image
-        </label>
+        </h2>
 
         <button
           type="button"
           onClick={() => uploadImage()}
           disabled={!cloudinaryReady}
-          className="flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] disabled:opacity-60 dark:border-[#35b5b5] dark:text-[#35b5b5]"
+          className="flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] disabled:opacity-60"
         >
           <ImagePlus size={16} />
           {cloudinaryReady ? "Upload Image" : "Loading uploader..."}
         </button>
 
-        <div className="mt-3">
-          <p className="mb-2 text-xs text-gray-500">Image Preview</p>
-
-          {article.image ? (
-            <img
-              src={article.image}
-              alt="New article"
-              className="h-36 w-full rounded-xl border object-cover sm:w-64"
-            />
-          ) : (
-            <div className="flex h-36 w-full items-center justify-center rounded-xl border border-dashed border-gray-300 text-sm text-gray-400 sm:w-64">
-              <ImagePlus size={24} />
-            </div>
-          )}
-        </div>
+        {article.image && (
+          <img
+            src={article.image}
+            alt="New article"
+            className="mt-3 h-36 w-full rounded-xl border object-cover sm:w-64"
+          />
+        )}
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <CalendarDays size={15} />
-              Day
-            </label>
-
-            <input
-              name="day"
-              type="number"
-              min="1"
-              max="31"
-              value={article.day}
-              onChange={handleArticleChange}
-              placeholder="24"
-              className={inputClass}
-            />
-          </div>
+          {[
+            ["day", "Day", "24"],
+            ["category", "Category", "BUSINESS"],
+            ["author", "Author", "Admin"],
+            ["title", "Article Title", "Enter article title"],
+          ].map(([name, label, placeholder]) => (
+            <div key={name} className={name === "title" ? "sm:col-span-2" : ""}>
+              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                {name === "day" ? (
+                  <CalendarDays size={15} />
+                ) : name === "category" ? (
+                  <Tag size={15} />
+                ) : name === "author" ? (
+                  <UserRound size={15} />
+                ) : (
+                  <Type size={15} />
+                )}
+                {label}
+              </label>
+              <input
+                name={name}
+                type={name === "day" ? "number" : "text"}
+                min={name === "day" ? 1 : undefined}
+                max={name === "day" ? 31 : undefined}
+                value={currentTranslation[name]}
+                onChange={handleArticleChange}
+                placeholder={placeholder}
+                className={inputClass}
+              />
+            </div>
+          ))}
 
           <div>
             <label className="mb-2 flex items-center gap-2 text-sm font-medium">
               <CalendarDays size={15} />
               Month
             </label>
-
             <select
               name="month"
-              value={article.month}
+              value={currentTranslation.month}
               onChange={handleArticleChange}
               className={inputClass}
             >
-              {months.map((month) => (
+              <option value="">Select month</option>
+              {MONTHS.map((month) => (
                 <option key={month} value={month}>
                   {month}
                 </option>
@@ -678,69 +725,24 @@ export default function BlogSectionAdmin() {
             </select>
           </div>
 
-          <div>
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <Tag size={15} />
-              Category
-            </label>
-
-            <input
-              name="category"
-              value={article.category}
-              onChange={handleArticleChange}
-              placeholder="BUSINESS"
-              maxLength={40}
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <UserRound size={15} />
-              Author
-            </label>
-
-            <input
-              name="author"
-              value={article.author}
-              onChange={handleArticleChange}
-              placeholder="Admin"
-              maxLength={60}
-              className={inputClass}
-            />
-          </div>
-
-          <div className="sm:col-span-2">
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <Type size={15} />
-              Article Title
-            </label>
-
-            <input
-              name="title"
-              value={article.title}
-              onChange={handleArticleChange}
-              placeholder="Enter article title"
-              maxLength={120}
-              className={inputClass}
-            />
-          </div>
-
           <div className="sm:col-span-2">
             <label className="mb-2 flex items-center gap-2 text-sm font-medium">
               <LinkIcon size={15} />
-              Article Link
+              Article Link (shared across languages)
             </label>
-
             <input
               name="link"
               value={article.link}
               onChange={handleArticleChange}
-              placeholder="/blog/my-article"
+              placeholder="/resources/my-article"
               className={inputClass}
             />
           </div>
         </div>
+
+        <p className="mt-3 text-xs text-gray-500">
+          Complete English, Pashto, and Dari using the language selector above.
+        </p>
 
         <button
           type="button"
@@ -753,253 +755,178 @@ export default function BlogSectionAdmin() {
         </button>
       </section>
 
-      {/* All Articles */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-[#263442] dark:bg-[#111a23]">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-bold">All Articles</h2>
-            <p className="mt-1 text-xs text-gray-500">
-              Click an article to edit its details.
-            </p>
-          </div>
+      {/* Existing articles */}
+      <section className={sectionClass}>
+        <h2 className="mb-4 font-bold">
+          Existing Articles ({articles.length})
+        </h2>
 
-          <span className="rounded-lg bg-[#e7f5f5] px-3 py-1.5 text-xs font-semibold text-[#1e8a8a] dark:bg-[#162c32] dark:text-[#35b5b5]">
-            {articles.length} Articles
-          </span>
-        </div>
+        {articles.length === 0 ? (
+          <p className="py-8 text-center text-sm text-gray-500">
+            No articles found.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {articles.map((item) => {
+              const fields = item.translations[language];
+              const expanded = expandedId === item._id;
 
-        <div className="space-y-3">
-          {loading ? (
-            <p className="py-8 text-center text-sm text-gray-500">
-              Loading articles...
-            </p>
-          ) : articles.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">
-              No articles found.
-            </p>
-          ) : (
-            articles.map((item) => (
-              <div
-                key={item._id}
-                className="overflow-hidden rounded-xl border border-gray-200 dark:border-[#263442]"
-              >
-                {/* Article Row */}
-                <div className="flex items-center gap-3 p-3">
-                  <div className="flex h-14 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-100 dark:bg-[#16212c]">
-                    {item.image ? (
+              return (
+                <div
+                  key={item._id}
+                  className="overflow-hidden rounded-xl border border-gray-200 dark:border-[#263442]"
+                >
+                  <div className="flex items-center gap-3 p-3">
+                    {item.image && (
                       <img
                         src={item.image}
-                        alt={item.title}
-                        className="h-full w-full object-cover"
+                        alt={fields.title || "Article"}
+                        className="h-14 w-16 rounded-lg object-cover"
                       />
-                    ) : (
-                      <ImagePlus size={20} />
                     )}
-                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => toggleArticle(item._id)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <p className="text-xs font-semibold text-[#1e8a8a] dark:text-[#35b5b5]">
-                      {item.category || "UNCATEGORIZED"}
-                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(expanded ? null : item._id)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="truncate text-sm font-semibold">
+                        {fields.title || "Untitled article"}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {fields.category || "No category"} · {fields.author}
+                      </p>
+                    </button>
 
-                    <p className="mt-1 truncate text-sm font-semibold">
-                      {item.title || "Untitled article"}
-                    </p>
-
-                    <p className="mt-1 text-xs text-gray-500">
-                      {item.day} {item.month} · {item.author}
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleArticle(item._id)}
-                    aria-label="Toggle article editor"
-                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-[#16212c]"
-                  >
-                    {expandedId === item._id ? (
-                      <ChevronUp size={19} />
-                    ) : (
-                      <ChevronDown size={19} />
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteArticle(item)}
-                    disabled={deletingId === item._id}
-                    aria-label="Delete article"
-                    className="rounded-lg p-2 text-red-500 disabled:opacity-50"
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                </div>
-
-                {/* Editable Article Fields */}
-                {expandedId === item._id && (
-                  <div className="grid gap-4 border-t border-gray-200 p-4 sm:grid-cols-2 dark:border-[#263442]">
-                    <div className="sm:col-span-2">
-                      <label className="mb-2 block text-sm font-medium">
-                        Article Image
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={() => uploadImage(item._id)}
-                        disabled={!cloudinaryReady}
-                        className="flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] disabled:opacity-60 dark:border-[#35b5b5] dark:text-[#35b5b5]"
-                      >
-                        <ImagePlus size={16} />
-                        Replace Image
-                      </button>
-
-                      {item.image && (
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          className="mt-3 h-36 w-full rounded-xl border object-cover sm:w-64"
-                        />
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(expanded ? null : item._id)}
+                      aria-label="Toggle article editor"
+                    >
+                      {expanded ? (
+                        <ChevronUp size={18} />
+                      ) : (
+                        <ChevronDown size={18} />
                       )}
-                    </div>
+                    </button>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Day
-                      </label>
-
-                      <input
-                        type="number"
-                        min="1"
-                        max="31"
-                        value={item.day}
-                        onChange={(event) =>
-                          handleExistingArticleChange(
-                            item._id,
-                            "day",
-                            event.target.value,
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Month
-                      </label>
-
-                      <select
-                        value={item.month}
-                        onChange={(event) =>
-                          handleExistingArticleChange(
-                            item._id,
-                            "month",
-                            event.target.value,
-                          )
-                        }
-                        className={inputClass}
-                      >
-                        {months.map((month) => (
-                          <option key={month} value={month}>
-                            {month}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Category
-                      </label>
-
-                      <input
-                        value={item.category}
-                        onChange={(event) =>
-                          handleExistingArticleChange(
-                            item._id,
-                            "category",
-                            event.target.value,
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Author
-                      </label>
-
-                      <input
-                        value={item.author}
-                        onChange={(event) =>
-                          handleExistingArticleChange(
-                            item._id,
-                            "author",
-                            event.target.value,
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label className="mb-2 block text-sm font-medium">
-                        Article Title
-                      </label>
-
-                      <input
-                        value={item.title}
-                        onChange={(event) =>
-                          handleExistingArticleChange(
-                            item._id,
-                            "title",
-                            event.target.value,
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <label className="mb-2 block text-sm font-medium">
-                        Article Link
-                      </label>
-
-                      <input
-                        value={item.link}
-                        onChange={(event) =>
-                          handleExistingArticleChange(
-                            item._id,
-                            "link",
-                            event.target.value,
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateArticle(item)}
-                        disabled={editingId === item._id}
-                        className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                      >
-                        <Save size={17} />
-                        {editingId === item._id ? "Saving..." : "Save Article"}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteArticle(item)}
+                      disabled={deletingId === item._id}
+                      aria-label="Delete article"
+                      className="p-2 text-red-500 disabled:opacity-50"
+                    >
+                      <Trash2 size={17} />
+                    </button>
                   </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
+
+                  {expanded && (
+                    <div className="grid gap-4 border-t border-gray-200 p-4 sm:grid-cols-2 dark:border-[#263442]">
+                      <div className="sm:col-span-2">
+                        <button
+                          type="button"
+                          onClick={() => uploadImage(item._id)}
+                          disabled={!cloudinaryReady}
+                          className="flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] disabled:opacity-60"
+                        >
+                          <ImagePlus size={16} />
+                          Replace Image
+                        </button>
+                      </div>
+
+                      {["day", "month", "category", "author", "title"].map(
+                        (field) => (
+                          <div
+                            key={field}
+                            className={field === "title" ? "sm:col-span-2" : ""}
+                          >
+                            <label className="mb-2 block text-sm font-medium">
+                              {field === "day"
+                                ? "Day"
+                                : field === "month"
+                                  ? "Month"
+                                  : field === "category"
+                                    ? "Category"
+                                    : field === "author"
+                                      ? "Author"
+                                      : "Article Title"}
+                            </label>
+
+                            {field === "month" ? (
+                              <select
+                                value={fields.month}
+                                onChange={(event) =>
+                                  handleExistingChange(
+                                    item._id,
+                                    field,
+                                    event.target.value,
+                                  )
+                                }
+                                className={inputClass}
+                              >
+                                <option value="">Select month</option>
+                                {MONTHS.map((month) => (
+                                  <option key={month} value={month}>
+                                    {month}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type={field === "day" ? "number" : "text"}
+                                value={fields[field]}
+                                onChange={(event) =>
+                                  handleExistingChange(
+                                    item._id,
+                                    field,
+                                    event.target.value,
+                                  )
+                                }
+                                className={inputClass}
+                              />
+                            )}
+                          </div>
+                        ),
+                      )}
+
+                      <div className="sm:col-span-2">
+                        <label className="mb-2 block text-sm font-medium">
+                          Article Link
+                        </label>
+                        <input
+                          value={item.link}
+                          onChange={(event) =>
+                            handleExistingChange(
+                              item._id,
+                              "link",
+                              event.target.value,
+                            )
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div className="flex justify-end sm:col-span-2">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateArticle(item)}
+                          disabled={editingId === item._id}
+                          className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                        >
+                          <Save size={17} />
+                          {editingId === item._id
+                            ? "Saving..."
+                            : "Save Article"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     </div>
   );

@@ -1,92 +1,47 @@
 import mongoose from "mongoose";
 
-const ArticleSchema = new mongoose.Schema(
+const TranslationSchema = new mongoose.Schema(
   {
-    // id: {
-    //   type: Number,
-    //   required: true,
-    // },
-
-    day: {
-      type: String,
-      required: true,
-    },
-
-    month: {
-      type: String,
-      required: true,
-      uppercase: true,
-    },
-
-    image: {
-      type: String,
-      required: true,
-    },
-
-    publicId: {
-      type: String,
-      default: "",
-    },
-
-    category: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    author: {
-      type: String,
-      required: true,
-      trim: true,
-      default: "Admin",
-    },
-
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    link: {
-      type: String,
-      required: true,
-      trim: true,
-      default: "/",
-    },
+    day: { type: String, default: "" },
+    month: { type: String, default: "OCT" },
+    category: { type: String, default: "", trim: true },
+    author: { type: String, default: "Admin", trim: true },
+    title: { type: String, default: "", trim: true },
   },
-  {
-    _id: true,
-  },
+  { _id: false },
 );
+
+const ArticleSchema = new mongoose.Schema({
+  image: { type: String, required: true },
+  publicId: { type: String, default: "" },
+  link: { type: String, required: true, trim: true },
+  translations: {
+    en: { type: TranslationSchema, default: () => ({}) },
+    ps: { type: TranslationSchema, default: () => ({}) },
+    fa: { type: TranslationSchema, default: () => ({}) },
+  },
+});
 
 const BlogSectionSchema = new mongoose.Schema(
   {
-    sectionTitle: {
-      type: String,
-      required: true,
-      default: "The Ultimate",
-      trim: true,
+    Titles: {
+      en: {
+        sectionTitle: { type: String, default: "The Ultimate" },
+        highlightedTitle: { type: String, default: "Resource." },
+      },
+      ps: {
+        sectionTitle: { type: String, default: "" },
+        highlightedTitle: { type: String, default: "" },
+      },
+      fa: {
+        sectionTitle: { type: String, default: "" },
+        highlightedTitle: { type: String, default: "" },
+      },
     },
-
-    highlightedTitle: {
-      type: String,
-      required: true,
-      default: "Resource.",
-      trim: true,
-    },
-
-    posts: {
-      type: [ArticleSchema],
-      default: [],
-    },
+    posts: { type: [ArticleSchema], default: [] },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
 
-const BlogSection =
-  mongoose.models.BlogSection ||
+export default mongoose.models.BlogSection ||
   mongoose.model("BlogSection", BlogSectionSchema);
-
-export default BlogSection;

@@ -270,8 +270,13 @@ export default function AboutUsAdmin() {
       }
     }
 
-    if (!formData.buttonLink.trim()) {
+    if (!formData.buttonLink?.trim()) {
       toast.error("Button Link is required.");
+      return false;
+    }
+
+    if (!formData.buttonLink.trim().startsWith("/")) {
+      toast.error("Button Link must start with '/'.");
       return false;
     }
 
