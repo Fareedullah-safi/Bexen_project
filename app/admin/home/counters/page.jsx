@@ -111,6 +111,9 @@ export default function ReviewsAdminPanel() {
   const cloudinaryWidget = useRef(null);
   const uploadTarget = useRef("draft");
 
+  // RTL for Pashto/Dari; LTR for English.
+  const inputDirection = language === "en" ? "ltr" : "rtl";
+
   // Bexon styling.
   const input =
     "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#0C1E21] outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-2 focus:ring-[#1E8A8A]/10 dark:border-white/10 dark:bg-[#16212C] dark:text-white dark:placeholder:text-gray-500";
@@ -667,6 +670,7 @@ export default function ReviewsAdminPanel() {
               <label className={label}>{title}</label>
 
               <input
+                dir={inputDirection}
                 className={input}
                 value={getTranslation(section[field])[language]}
                 onChange={(event) => updateSection(field, event.target.value)}
@@ -678,6 +682,7 @@ export default function ReviewsAdminPanel() {
             <label className={label}>Description</label>
 
             <textarea
+              dir={inputDirection}
               className={input}
               rows={4}
               value={getTranslation(section.description)[language]}
@@ -706,6 +711,7 @@ export default function ReviewsAdminPanel() {
               <label className={label}>Value</label>
 
               <input
+                dir={inputDirection}
                 className={input}
                 value={getTranslation(stat.value)[language]}
                 onChange={(event) =>
@@ -716,6 +722,7 @@ export default function ReviewsAdminPanel() {
               <label className={`${label} mt-4`}>Label</label>
 
               <input
+                dir={inputDirection}
                 className={input}
                 value={getTranslation(stat.label)[language]}
                 onChange={(event) =>
@@ -736,6 +743,7 @@ export default function ReviewsAdminPanel() {
             <label className={label}>Client Name *</label>
 
             <input
+              dir={inputDirection}
               className={input}
               value={draft.name[language]}
               onChange={(event) => updateDraft("name", event.target.value)}
@@ -747,6 +755,7 @@ export default function ReviewsAdminPanel() {
             <label className={label}>Client Role *</label>
 
             <input
+              dir={inputDirection}
               className={input}
               value={draft.role[language]}
               onChange={(event) => updateDraft("role", event.target.value)}
@@ -758,6 +767,7 @@ export default function ReviewsAdminPanel() {
             <label className={label}>Review Text *</label>
 
             <textarea
+              dir={inputDirection}
               className={input}
               rows={4}
               value={draft.text[language]}
@@ -899,6 +909,7 @@ export default function ReviewsAdminPanel() {
                           <label className={label}>Client Name *</label>
 
                           <input
+                            dir={inputDirection}
                             className={input}
                             value={review.name?.[language] || ""}
                             onChange={(event) =>
@@ -915,6 +926,7 @@ export default function ReviewsAdminPanel() {
                           <label className={label}>Client Role *</label>
 
                           <input
+                            dir={inputDirection}
                             className={input}
                             value={review.role?.[language] || ""}
                             onChange={(event) =>
@@ -931,6 +943,7 @@ export default function ReviewsAdminPanel() {
                           <label className={label}>Review Text *</label>
 
                           <textarea
+                            dir={inputDirection}
                             className={input}
                             rows={4}
                             value={review.text?.[language] || ""}

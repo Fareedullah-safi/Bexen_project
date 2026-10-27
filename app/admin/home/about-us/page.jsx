@@ -5,7 +5,6 @@ import {
   AlertCircle,
   CheckCircle2,
   ImagePlus,
-  Link as LinkIcon,
   LoaderCircle,
   PlayCircle,
   RotateCcw,
@@ -32,6 +31,8 @@ const fields = [
   "clientName",
   "clientRole",
 ];
+
+const imageFields = ["mainImage", "thumbnailImage"];
 
 const initialData = {
   experienceNumber: { en: "13+", fa: "", ps: "" },
@@ -60,24 +61,30 @@ const initialData = {
 export default function AboutUsAdmin() {
   const [formData, setFormData] = useState(initialData);
   const [language, setLanguage] = useState("en");
+
   const [imageIds, setImageIds] = useState({
     mainImage: "",
     thumbnailImage: "",
   });
+
   const [previews, setPreviews] = useState({
     mainImage: "",
     thumbnailImage: "",
   });
+
   const [imageErrors, setImageErrors] = useState({
     mainImage: false,
     thumbnailImage: false,
   });
+
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDark, setIsDark] = useState(true);
+  const [isCloudinaryReady, setIsCloudinaryReady] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState("");
 
-  const fileInputRefs = useRef({});
-  const previewUrls = useRef(new Set());
+  const cloudinaryWidgetRef = useRef(null);
+  const activeUploadRef = useRef("");
 
   // Load the current theme.
   useEffect(() => {
@@ -95,6 +102,52 @@ export default function AboutUsAdmin() {
     });
 
     return () => observer.disconnect();
+  }, []);
+
+  // Load the Cloudinary Upload Widget.
+  useEffect(() => {
+    let script = document.querySelector(
+      'script[data-cloudinary-upload-widget="true"]',
+    );
+
+    let createdScript = false;
+
+    const handleLoad = () => {
+      if (window.cloudinary?.createUploadWidget) {
+        setIsCloudinaryReady(true);
+      } else {
+        toast.error("Cloudinary Upload Widget failed to initialize.");
+      }
+    };
+
+    const handleError = () => {
+      toast.error("Could not load the Cloudinary Upload Widget.");
+    };
+
+    if (window.cloudinary?.createUploadWidget) {
+      setIsCloudinaryReady(true);
+      return;
+    }
+
+    if (!script) {
+      script = document.createElement("script");
+      script.src = "https://upload-widget.cloudinary.com/global/all.js";
+      script.async = true;
+      script.dataset.cloudinaryUploadWidget = "true";
+      createdScript = true;
+    }
+
+    script.addEventListener("load", handleLoad);
+    script.addEventListener("error", handleError);
+
+    if (createdScript) {
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      script?.removeEventListener("load", handleLoad);
+      script?.removeEventListener("error", handleError);
+    };
   }, []);
 
   // Load About Us data from MongoDB.
@@ -159,15 +212,6 @@ export default function AboutUsAdmin() {
     loadData();
   }, []);
 
-  // Clean up temporary image previews.
-  useEffect(() => {
-    return () => {
-      previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
-
-      previewUrls.current.clear();
-    };
-  }, []);
-
   // Update a text field in the selected language only.
   function handleChange(event) {
     const { name, value } = event.target;
@@ -189,98 +233,185 @@ export default function AboutUsAdmin() {
     }
   }
 
-  // Select an image from the computer.
-  function handleImageChange(event, field) {
-    const file = event.target.files?.[0];
+  // Return translated fields missing in a particular language.
+  function getMissingFieldsForLanguage(languageCode) {
+    return fields.filter((field) => {
+      const value = formData[field]?.[languageCode];
 
-    if (!file) return;
+      return typeof value !== "string" || !value.trim();
+    });
+  }
 
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      toast.error("Only JPG, PNG, and WEBP images are allowed.");
-      event.target.value = "";
+  // Check whether all translated fields are complete for a language.
+  function isLanguageComplete(languageCode) {
+    return getMissingFieldsForLanguage(languageCode).length === 0;
+  }
+
+  // Format field names for readable validation messages.
+  function getFieldLabel(field) {
+    return field
+      .replace(/([A-Z])/g, " $1")
+      .replace(/^./, (character) => character.toUpperCase());
+  }
+
+  // Open Cloudinary Widget and upload directly to Cloudinary.
+  function openCloudinaryWidget(field) {
+    if (isSaving || uploadingImage) return;
+
+    if (!isCloudinaryReady || !window.cloudinary?.createUploadWidget) {
+      toast.error("Cloudinary is still loading. Please try again.");
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be 5 MB or smaller.");
-      event.target.value = "";
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+    if (!cloudName || !uploadPreset) {
+      toast.error(
+        "Cloudinary configuration is missing. Check your environment variables.",
+      );
       return;
     }
 
-    if (previews[field] && previewUrls.current.has(previews[field])) {
-      URL.revokeObjectURL(previews[field]);
-      previewUrls.current.delete(previews[field]);
+    try {
+      // Close any previously opened widget instance.
+      if (cloudinaryWidgetRef.current) {
+        cloudinaryWidgetRef.current.close();
+        cloudinaryWidgetRef.current = null;
+      }
+
+      activeUploadRef.current = field;
+      setUploadingImage(field);
+
+      const widget = window.cloudinary.createUploadWidget(
+        {
+          cloudName,
+          uploadPreset,
+          sources: ["local"],
+          multiple: false,
+          maxFileSize: 5 * 1024 * 1024,
+          clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+          folder: "bexon/images",
+          cropping: false,
+          showAdvancedOptions: false,
+          showCompletedButton: true,
+          resourceType: "image",
+        },
+        (error, result) => {
+          if (error) {
+            console.error("Cloudinary Widget Error:", error);
+            toast.error(error.message || "Cloudinary image upload failed.");
+            setUploadingImage("");
+            activeUploadRef.current = "";
+            cloudinaryWidgetRef.current = null;
+            return;
+          }
+
+          if (!result) return;
+
+          if (result.event === "success") {
+            const uploaded = result.info;
+            const targetField = activeUploadRef.current || field;
+
+            if (!uploaded?.secure_url || !uploaded?.public_id) {
+              toast.error("Cloudinary did not return a valid image.");
+              return;
+            }
+
+            // Store the Cloudinary URL and public ID immediately.
+            setFormData((prev) => ({
+              ...prev,
+              [targetField]: uploaded.secure_url,
+            }));
+
+            setImageIds((prev) => ({
+              ...prev,
+              [targetField]: uploaded.public_id,
+            }));
+
+            setPreviews((prev) => ({
+              ...prev,
+              [targetField]: uploaded.secure_url,
+            }));
+
+            setImageErrors((prev) => ({
+              ...prev,
+              [targetField]: false,
+            }));
+
+            toast.success(
+              targetField === "mainImage"
+                ? "Main image uploaded to Cloudinary."
+                : "Video thumbnail uploaded to Cloudinary.",
+            );
+          }
+
+          if (result.event === "close" || result.event === "abort") {
+            setUploadingImage("");
+            activeUploadRef.current = "";
+            cloudinaryWidgetRef.current = null;
+          }
+        },
+      );
+
+      cloudinaryWidgetRef.current = widget;
+      widget.open();
+    } catch (error) {
+      console.error("Cloudinary Widget Initialization Error:", error);
+      toast.error("Could not open the Cloudinary Upload Widget.");
+      setUploadingImage("");
+      activeUploadRef.current = "";
+      cloudinaryWidgetRef.current = null;
     }
-
-    const preview = URL.createObjectURL(file);
-    previewUrls.current.add(preview);
-
-    setFormData((prev) => ({ ...prev, [field]: file }));
-    setPreviews((prev) => ({ ...prev, [field]: preview }));
-    setImageIds((prev) => ({ ...prev, [field]: "" }));
-    setImageErrors((prev) => ({ ...prev, [field]: false }));
-
-    event.target.value = "";
   }
 
-  // Use an image URL instead of selecting a file.
-  function handleImageUrl(field, value) {
-    if (previews[field] && previewUrls.current.has(previews[field])) {
-      URL.revokeObjectURL(previews[field]);
-      previewUrls.current.delete(previews[field]);
-    }
-
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    setPreviews((prev) => ({
-      ...prev,
-      [field]: value.trim(),
-    }));
-    setImageIds((prev) => ({ ...prev, [field]: "" }));
-    setImageErrors((prev) => ({ ...prev, [field]: false }));
-  }
-
-  // Remove the selected image.
+  // Remove the selected image from the form.
+  // This clears the form reference; it does not delete the asset from Cloudinary.
   function removeImage(field) {
-    if (previews[field] && previewUrls.current.has(previews[field])) {
-      URL.revokeObjectURL(previews[field]);
-      previewUrls.current.delete(previews[field]);
-    }
-
     setFormData((prev) => ({ ...prev, [field]: "" }));
     setPreviews((prev) => ({ ...prev, [field]: "" }));
     setImageIds((prev) => ({ ...prev, [field]: "" }));
     setImageErrors((prev) => ({ ...prev, [field]: false }));
-
-    if (fileInputRefs.current[field]) {
-      fileInputRefs.current[field].value = "";
-    }
   }
 
-  // Check the form before saving.
+  // Validate all languages and all shared fields before saving.
   function validateForm() {
-    for (const field of fields) {
-      if (!formData[field]?.[language]?.trim()) {
-        toast.error(
-          `${field.replace(/([A-Z])/g, " $1")} is required in ${
-            languages.find((item) => item.code === language)?.label
-          }.`,
-        );
+    // Validate every translated field in every language.
+    for (const item of languages) {
+      const missingFields = getMissingFieldsForLanguage(item.code);
 
+      if (missingFields.length > 0) {
+        const firstMissingField = getFieldLabel(missingFields[0]);
+
+        toast.error(`${firstMissingField} is required in ${item.label}.`, {
+          description: `${missingFields.length} translated field(s) still need content in ${item.label}.`,
+        });
+
+        setLanguage(item.code);
         return false;
       }
     }
 
-    if (!formData.buttonLink?.trim()) {
+    // Validate the shared button link.
+    if (
+      typeof formData.buttonLink !== "string" ||
+      !formData.buttonLink.trim()
+    ) {
       toast.error("Button Link is required.");
       return false;
     }
 
-    if (!formData.buttonLink.trim().startsWith("/")) {
-      toast.error("Button Link must start with '/'.");
+    const buttonLink = formData.buttonLink.trim();
+
+    if (!buttonLink.startsWith("/") || buttonLink.startsWith("//")) {
+      toast.error(
+        "Button Link must be a valid internal path starting with '/'.",
+      );
       return false;
     }
 
-    if (!formData.videoLink.trim()) {
+    // Validate the YouTube link.
+    if (typeof formData.videoLink !== "string" || !formData.videoLink.trim()) {
       toast.error("YouTube Video Link is required.");
       return false;
     }
@@ -288,29 +419,59 @@ export default function AboutUsAdmin() {
     try {
       const url = new URL(formData.videoLink.trim());
 
+      const validHosts = [
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "youtu.be",
+      ];
+
       if (
-        ![
-          "youtube.com",
-          "www.youtube.com",
-          "m.youtube.com",
-          "youtu.be",
-        ].includes(url.hostname)
+        !["http:", "https:"].includes(url.protocol) ||
+        !validHosts.includes(url.hostname)
       ) {
-        throw new Error();
+        throw new Error("Invalid YouTube URL");
       }
     } catch {
       toast.error("Enter a valid YouTube URL.");
       return false;
     }
 
-    for (const field of ["mainImage", "thumbnailImage"]) {
-      if (!formData[field]) {
+    // Validate both Cloudinary image references.
+    for (const field of imageFields) {
+      const value = formData[field];
+      const publicId = imageIds[field];
+
+      if (!value || typeof value !== "string" || !value.trim()) {
         toast.error(
           field === "mainImage"
-            ? "Main Image is required."
-            : "Video Thumbnail is required.",
+            ? "Main Image is required. Upload it using Cloudinary."
+            : "Video Thumbnail is required. Upload it using Cloudinary.",
         );
 
+        return false;
+      }
+
+      try {
+        const imageUrl = new URL(value.trim());
+
+        if (
+          imageUrl.protocol !== "https:" ||
+          imageUrl.hostname !== "res.cloudinary.com"
+        ) {
+          throw new Error("Image must be hosted on Cloudinary.");
+        }
+      } catch {
+        toast.error(
+          `${getFieldLabel(field)} must be a valid Cloudinary image URL.`,
+        );
+        return false;
+      }
+
+      if (!publicId || typeof publicId !== "string") {
+        toast.error(
+          `${getFieldLabel(field)} is missing its Cloudinary public ID. Please upload the image again.`,
+        );
         return false;
       }
     }
@@ -318,96 +479,28 @@ export default function AboutUsAdmin() {
     return true;
   }
 
-  // Save translations and upload any new images.
+  // Save translations and Cloudinary image references.
   async function handleSave(event) {
     event.preventDefault();
 
-    if (isSaving || !validateForm()) return;
+    if (isSaving || uploadingImage || !validateForm()) return;
 
     setIsSaving(true);
 
     try {
-      const images = {
-        mainImage: {
-          url:
-            typeof formData.mainImage === "string"
-              ? formData.mainImage.trim()
-              : "",
-          publicId: imageIds.mainImage,
-        },
-        thumbnailImage: {
-          url:
-            typeof formData.thumbnailImage === "string"
-              ? formData.thumbnailImage.trim()
-              : "",
-          publicId: imageIds.thumbnailImage,
-        },
-      };
-
-      // Upload new files or external image URLs to Cloudinary.
-      const uploadData = new FormData();
-      let hasImagesToUpload = false;
-
-      for (const field of ["mainImage", "thumbnailImage"]) {
-        const value = formData[field];
-
-        if (typeof File !== "undefined" && value instanceof File) {
-          uploadData.append(field, value);
-          hasImagesToUpload = true;
-        } else if (
-          typeof value === "string" &&
-          value.trim() &&
-          !imageIds[field]
-        ) {
-          uploadData.append(`${field}Url`, value.trim());
-          hasImagesToUpload = true;
-        }
-      }
-
-      if (hasImagesToUpload) {
-        const uploadResponse = await fetch(
-          "/api/homepage/about-us/upload-images",
-          {
-            method: "POST",
-            body: uploadData,
-          },
-        );
-
-        const uploadResult = await uploadResponse.json();
-
-        if (!uploadResponse.ok || !uploadResult.success) {
-          throw new Error(uploadResult.message || "Image upload failed.");
-        }
-
-        for (const field of ["mainImage", "thumbnailImage"]) {
-          const value = formData[field];
-
-          const needsUpload =
-            (typeof File !== "undefined" && value instanceof File) ||
-            (typeof value === "string" && value.trim() && !imageIds[field]);
-
-          if (!needsUpload) continue;
-
-          const uploaded = uploadResult.images?.[field];
-
-          if (!uploaded?.url || !uploaded?.publicId) {
-            throw new Error(`Cloudinary upload failed for ${field}.`);
-          }
-
-          images[field] = {
-            url: uploaded.url,
-            publicId: uploaded.publicId,
-          };
-        }
-      }
-
-      // Send every language so the other translations are preserved.
+      // No image upload API is needed: the widget already uploaded images.
       const payload = {
         ...Object.fromEntries(fields.map((field) => [field, formData[field]])),
         buttonLink: formData.buttonLink.trim(),
         videoLink: formData.videoLink.trim(),
-        mainImage: images.mainImage,
-        thumbnailImage: images.thumbnailImage,
+        mainImage: {
+          url: formData.mainImage.trim(),
+          publicId: imageIds.mainImage,
+        },
+        thumbnailImage: {
+          url: formData.thumbnailImage.trim(),
+          publicId: imageIds.thumbnailImage,
+        },
       };
 
       const response = await fetch("/api/homepage/about-us", {
@@ -424,22 +517,23 @@ export default function AboutUsAdmin() {
 
       const saved = result.data;
 
+      // Preserve the response format used by the existing API.
       setFormData((prev) => ({
         ...prev,
         ...saved,
-        mainImage: saved.mainImage?.url || images.mainImage.url,
-        thumbnailImage: saved.thumbnailImage?.url || images.thumbnailImage.url,
+        mainImage: saved.mainImage?.url || payload.mainImage.url,
+        thumbnailImage: saved.thumbnailImage?.url || payload.thumbnailImage.url,
       }));
 
       setImageIds({
-        mainImage: saved.mainImage?.publicId || images.mainImage.publicId,
+        mainImage: saved.mainImage?.publicId || payload.mainImage.publicId,
         thumbnailImage:
-          saved.thumbnailImage?.publicId || images.thumbnailImage.publicId,
+          saved.thumbnailImage?.publicId || payload.thumbnailImage.publicId,
       });
 
       setPreviews({
-        mainImage: saved.mainImage?.url || images.mainImage.url,
-        thumbnailImage: saved.thumbnailImage?.url || images.thumbnailImage.url,
+        mainImage: saved.mainImage?.url || payload.mainImage.url,
+        thumbnailImage: saved.thumbnailImage?.url || payload.thumbnailImage.url,
       });
 
       toast.success("About Us saved successfully.");
@@ -472,6 +566,8 @@ export default function AboutUsAdmin() {
   const mutedTextClass = isDark ? "text-gray-400" : "text-gray-500";
 
   function renderInput(label, name, placeholder, type = "text") {
+    const isTranslatedField = fields.includes(name);
+
     return (
       <div key={name}>
         <label htmlFor={name} className={labelClass}>
@@ -483,21 +579,22 @@ export default function AboutUsAdmin() {
           name={name}
           type={type}
           value={
-            fields.includes(name)
+            isTranslatedField
               ? formData[name]?.[language] || ""
               : formData[name] || ""
           }
           onChange={handleChange}
           placeholder={placeholder}
           className={inputClass}
-          required
-          dir={language === "en" ? "ltr" : "auto"}
+          dir={isTranslatedField ? (language === "en" ? "ltr" : "rtl") : "ltr"}
         />
       </div>
     );
   }
 
   function renderImageField(label, field) {
+    const isUploading = uploadingImage === field;
+
     return (
       <div key={field} className="min-w-0">
         <label className={labelClass}>{label}</label>
@@ -540,7 +637,8 @@ export default function AboutUsAdmin() {
             <button
               type="button"
               onClick={() => removeImage(field)}
-              className="absolute top-5 right-5 rounded-lg bg-red-500 p-2 text-white hover:bg-red-600"
+              disabled={isSaving || Boolean(uploadingImage)}
+              className="absolute top-5 right-5 rounded-lg bg-red-500 p-2 text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
               aria-label={`Remove ${label}`}
             >
               <Trash2 size={17} />
@@ -552,52 +650,48 @@ export default function AboutUsAdmin() {
             </p>
           </div>
         ) : (
-          <label
-            className={`flex h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 text-center hover:border-[#1E8A8A] ${
+          <div
+            className={`flex h-52 flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 text-center ${
               isDark
                 ? "border-[#263442] bg-[#16212c]"
                 : "border-[#d0d5dd] bg-[#f8fafc]"
             }`}
           >
             <span className="mb-3 rounded-xl bg-[#1E8A8A]/15 p-4 text-[#35B5B5]">
-              <ImagePlus size={27} />
+              {isUploading ? (
+                <LoaderCircle size={27} className="animate-spin" />
+              ) : (
+                <ImagePlus size={27} />
+              )}
             </span>
 
-            <span className="text-sm font-medium">Upload {label}</span>
+            <span className="text-sm font-medium">
+              {isUploading ? "Uploading..." : `Upload ${label}`}
+            </span>
 
             <span className={`mt-2 text-xs ${mutedTextClass}`}>
               JPG, PNG or WEBP · Maximum 5 MB
             </span>
 
-            <input
-              ref={(node) => {
-                fileInputRefs.current[field] = node;
-              }}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(event) => handleImageChange(event, field)}
-            />
-          </label>
+            <button
+              type="button"
+              onClick={() => openCloudinaryWidget(field)}
+              disabled={
+                !isCloudinaryReady || isSaving || Boolean(uploadingImage)
+              }
+              className="mt-3 rounded-lg bg-[#1E8A8A] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#249b98] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isUploading
+                ? "Uploading..."
+                : isCloudinaryReady
+                  ? "Choose Image"
+                  : "Loading Cloudinary..."}
+            </button>
+          </div>
         )}
 
-        <div className="relative mt-3">
-          <LinkIcon
-            size={16}
-            className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-500"
-          />
-
-          <input
-            type="url"
-            value={typeof formData[field] === "string" ? formData[field] : ""}
-            onChange={(event) => handleImageUrl(field, event.target.value)}
-            placeholder="Or paste an image URL"
-            className={`${inputClass} pl-10`}
-          />
-        </div>
-
         <p className={`mt-2 text-xs ${mutedTextClass}`}>
-          New images and external URLs are uploaded to Cloudinary when saved.
+          Images are uploaded directly to Cloudinary.
         </p>
       </div>
     );
@@ -639,14 +733,23 @@ export default function AboutUsAdmin() {
             >
               {languages.map((item) => {
                 const isActive = language === item.code;
+                const isComplete = isLanguageComplete(item.code);
+                const missingCount = getMissingFieldsForLanguage(
+                  item.code,
+                ).length;
 
                 return (
                   <button
                     key={item.code}
                     type="button"
                     onClick={() => setLanguage(item.code)}
-                    disabled={isSaving}
+                    disabled={isSaving || Boolean(uploadingImage)}
                     aria-pressed={isActive}
+                    aria-label={`${item.label}: ${
+                      isComplete
+                        ? "all translated fields complete"
+                        : `${missingCount} translated fields missing`
+                    }`}
                     className={`relative flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#1E8A8A] focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
                       isActive
                         ? "bg-[#1E8A8A] text-white shadow-md shadow-[#1E8A8A]/20"
@@ -660,6 +763,17 @@ export default function AboutUsAdmin() {
                       : item.code === "fa"
                         ? "دری"
                         : "پښتو"}
+
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        isComplete ? "bg-emerald-400" : "bg-red-400"
+                      }`}
+                      title={
+                        isComplete
+                          ? `${item.label} is complete`
+                          : `${missingCount} translated fields missing`
+                      }
+                    />
 
                     {isActive && (
                       <span className="h-1.5 w-1.5 rounded-full bg-white" />
@@ -675,7 +789,7 @@ export default function AboutUsAdmin() {
           </div>
         </header>
 
-        <form onSubmit={handleSave} className="space-y-6">
+        <form onSubmit={handleSave} noValidate className="space-y-6">
           <section
             className={`overflow-hidden rounded-2xl border shadow-xl ${cardClass}`}
           >
@@ -723,8 +837,7 @@ export default function AboutUsAdmin() {
                   value={formData.description?.[language] || ""}
                   onChange={handleChange}
                   placeholder="Write your About Us description..."
-                  required
-                  dir={language === "en" ? "ltr" : "auto"}
+                  dir={language === "en" ? "ltr" : "rtl"}
                   className={`${inputClass} resize-y leading-6`}
                 />
 
@@ -769,8 +882,8 @@ export default function AboutUsAdmin() {
                     value={formData.videoLink}
                     onChange={handleChange}
                     placeholder="https://www.youtube.com/watch?v=..."
-                    required
                     className={`${inputClass} pl-10`}
+                    dir="ltr"
                   />
                 </div>
               </div>
@@ -810,7 +923,7 @@ export default function AboutUsAdmin() {
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                disabled={isSaving}
+                disabled={isSaving || Boolean(uploadingImage)}
                 className={`flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium ${
                   isDark
                     ? "border-[#263442] text-gray-300"
@@ -823,13 +936,18 @@ export default function AboutUsAdmin() {
 
               <button
                 type="submit"
-                disabled={isSaving}
+                disabled={isSaving || Boolean(uploadingImage)}
                 className="flex items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#249b98] disabled:opacity-60"
               >
                 {isSaving ? (
                   <>
                     <LoaderCircle size={17} className="animate-spin" />
                     Saving Changes...
+                  </>
+                ) : uploadingImage ? (
+                  <>
+                    <LoaderCircle size={17} className="animate-spin" />
+                    Uploading Image...
                   </>
                 ) : (
                   <>

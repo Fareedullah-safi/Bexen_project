@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
-
 "use client";
 
+import AdminLanguageBall from "@/app/admin/Components/Admin/AdminLanguageBall";
 import Spinner from "@/app/admin/Components/Admin/Spinner";
 import { ImagePlus, Plus, Save, Trash2 } from "lucide-react";
 import Script from "next/script";
@@ -267,10 +267,8 @@ const normalizeSavedCards = (cards = []) =>
 
 export default function Features() {
   const [language, setLanguage] = useState("en");
-
   const [translations, setTranslations] = useState(createEmptyTranslations);
   const [cards, setCards] = useState([]);
-
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [languageReady, setLanguageReady] = useState(false);
@@ -500,6 +498,64 @@ export default function Features() {
   const handleSubmit = async () => {
     if (loading) return;
 
+    const languageNames = {
+      en: "English",
+      ps: "Pashto",
+      fa: "Dari",
+    };
+
+    const requiredSectionFields = [
+      { key: "tagline", label: "Section tagline" },
+      { key: "title", label: "Section heading" },
+    ];
+
+    // Validate every card icon.
+    for (let index = 0; index < cards.length; index += 1) {
+      const icon = cards[index]?.icon;
+
+      if (!icon?.url?.trim() || !icon?.publicId?.trim()) {
+        toast.error(`Please upload an icon for Card ${index + 1}.`);
+        return;
+      }
+    }
+
+    // Validate all required text fields in all languages.
+    for (const lang of ["en", "ps", "fa"]) {
+      for (const field of requiredSectionFields) {
+        if (!translations[lang]?.[field.key]?.trim()) {
+          toast.error(
+            `Please fill in ${field.label} in the ${languageNames[lang]} tab.`,
+          );
+
+          setLanguage(lang);
+          return;
+        }
+      }
+
+      for (let index = 0; index < cards.length; index += 1) {
+        const cardTranslation = cards[index]?.translations?.[lang];
+
+        if (!cardTranslation?.title?.trim()) {
+          toast.error(
+            `Please fill in Card ${index + 1} title in the ${languageNames[lang]} tab.`,
+          );
+
+          setLanguage(lang);
+          return;
+        }
+
+        if (!cardTranslation?.description?.trim()) {
+          toast.error(
+            `Please fill in Card ${index + 1} description in the ${languageNames[lang]} tab.`,
+          );
+
+          setLanguage(lang);
+          return;
+        }
+      }
+    }
+
+    // Only save after every required field passes validation.
     setLoading(true);
 
     try {
@@ -587,6 +643,8 @@ export default function Features() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">
+      <AdminLanguageBall />
+
       <Script
         src="https://upload-widget.cloudinary.com/latest/global/all.js"
         strategy="afterInteractive"
@@ -647,6 +705,7 @@ export default function Features() {
             </label>
 
             <input
+              dir={language === "en" ? "ltr" : "rtl"}
               type="text"
               value={currentTranslation.tagline}
               onChange={(e) => setField("tagline", e.target.value)}
@@ -660,6 +719,7 @@ export default function Features() {
             </label>
 
             <input
+              dir={language === "en" ? "ltr" : "rtl"}
               type="text"
               value={currentTranslation.title}
               onChange={(e) => setField("title", e.target.value)}
@@ -717,6 +777,7 @@ export default function Features() {
                     </label>
 
                     <input
+                      dir={language === "en" ? "ltr" : "rtl"}
                       type="text"
                       value={cardTranslation.title}
                       onChange={(e) =>
@@ -733,6 +794,7 @@ export default function Features() {
                     </label>
 
                     <textarea
+                      dir={language === "en" ? "ltr" : "rtl"}
                       rows={5}
                       value={cardTranslation.description}
                       onChange={(e) =>
@@ -749,7 +811,7 @@ export default function Features() {
 
           {cards.length === 0 && (
             <p className="col-span-full py-8 text-center text-sm text-[var(--muted)]">
-              No cards yet. Click &quot;Add Card&quot; to create one.
+              No cards yet. Click "Add Card" to create one.
             </p>
           )}
         </div>

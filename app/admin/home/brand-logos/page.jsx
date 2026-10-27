@@ -22,10 +22,9 @@ export default function BrandLogos() {
   const fileRefs = useRef({});
   const previewUrls = useRef(new Set());
 
+  // Only one logo can be added through this form.
   const [logos, setLogos] = useState([
     { id: 1, preview: "", file: null, url: "" },
-    { id: 2, preview: "", file: null, url: "" },
-    { id: 3, preview: "", file: null, url: "" },
   ]);
 
   const [titleDrafts, setTitleDrafts] = useState(EMPTY_TITLES);
@@ -52,6 +51,7 @@ export default function BrandLogos() {
     };
   }, []);
 
+  // Validate and select the single logo image.
   const handleLogo = (id, e) => {
     const file = e.target.files?.[0];
 
@@ -89,11 +89,20 @@ export default function BrandLogos() {
 
         revokePreview(logo.preview);
 
-        return { ...logo, file, url: "", preview };
+        return {
+          ...logo,
+          file,
+          url: "",
+          preview,
+        };
       }),
     );
 
-    setImageErrors((prev) => ({ ...prev, [id]: false }));
+    setImageErrors((prev) => ({
+      ...prev,
+      [id]: false,
+    }));
+
     e.target.value = "";
   };
 
@@ -111,7 +120,10 @@ export default function BrandLogos() {
       ),
     );
 
-    setImageErrors((prev) => ({ ...prev, [id]: false }));
+    setImageErrors((prev) => ({
+      ...prev,
+      [id]: false,
+    }));
   };
 
   const handleRemove = (id) => {
@@ -125,7 +137,10 @@ export default function BrandLogos() {
       ),
     );
 
-    setImageErrors((prev) => ({ ...prev, [id]: false }));
+    setImageErrors((prev) => ({
+      ...prev,
+      [id]: false,
+    }));
 
     if (fileRefs.current[id]) {
       fileRefs.current[id].value = "";
@@ -148,6 +163,7 @@ export default function BrandLogos() {
       setSavedData(Array.isArray(data.data) ? data.data : []);
     } catch (error) {
       console.error("Fetch brand logos error:", error);
+
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -173,7 +189,6 @@ export default function BrandLogos() {
             throw new Error(data?.message || `Failed to load ${code} title`);
           }
 
-          // GET returns { success, lang, title }, not a translations object.
           return [code, typeof data.title === "string" ? data.title : ""];
         }),
       );
@@ -184,6 +199,7 @@ export default function BrandLogos() {
       });
     } catch (error) {
       console.error("Fetch language titles error:", error);
+
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -194,12 +210,29 @@ export default function BrandLogos() {
     }
   };
 
+  // Save exactly one image.
   const handleSubmit = async () => {
     if (isSaving) return;
 
-    if (!logos[0].file && !logos[0].url.trim()) {
-      toast.error("Please add Logo 1");
+    const logo = logos[0];
+
+    if (!logo?.file && !logo?.url?.trim()) {
+      toast.error("Please upload one brand logo or enter an image URL");
       return;
+    }
+
+    if (logo.url.trim()) {
+      try {
+        const parsedUrl = new URL(logo.url.trim());
+
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+          toast.error("Please enter a valid HTTP or HTTPS image URL");
+          return;
+        }
+      } catch {
+        toast.error("Please enter a valid image URL");
+        return;
+      }
     }
 
     try {
@@ -207,15 +240,14 @@ export default function BrandLogos() {
 
       const formData = new FormData();
 
-      logos.forEach((logo) => {
-        formData.append("ids", String(logo.id));
+      // The API receives only one logo ID and one image.
+      formData.append("ids", "1");
 
-        if (logo.file) {
-          formData.append(`file_${logo.id}`, logo.file);
-        }
+      if (logo.file) {
+        formData.append("file_1", logo.file);
+      }
 
-        formData.append(`url_${logo.id}`, logo.url || "");
-      });
+      formData.append("url_1", logo.url || "");
 
       const { data: uploadResult } = await axios.post(
         "/api/homepage/brand-logos/upload",
@@ -228,7 +260,9 @@ export default function BrandLogos() {
 
       const { data: saveResult } = await axios.post(
         "/api/homepage/brand-logos",
-        { logos: uploadResult.logos },
+        {
+          logos: uploadResult.logos,
+        },
       );
 
       if (!saveResult?.success) {
@@ -241,23 +275,18 @@ export default function BrandLogos() {
         if (input) input.value = "";
       });
 
-      logos.forEach((logo) => revokePreview(logo.preview));
+      logos.forEach((item) => revokePreview(item.preview));
 
-      setLogos((prev) =>
-        prev.map((logo) => ({
-          ...logo,
-          file: null,
-          url: "",
-          preview: "",
-        })),
-      );
+      setLogos([{ id: 1, preview: "", file: null, url: "" }]);
 
       setImageErrors({});
-      toast.success("Brand logos saved successfully");
+
+      toast.success("Brand logo saved successfully");
 
       await allBoxData();
     } catch (error) {
       console.error("Brand logos save error:", error);
+
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -268,6 +297,7 @@ export default function BrandLogos() {
     }
   };
 
+  // All three language titles are required.
   const handleTitleSubmit = async () => {
     if (isChangingTitle || isFetchingTitle) return;
 
@@ -277,8 +307,15 @@ export default function BrandLogos() {
       fa: titleDrafts.fa ?? "",
     };
 
-    if (Object.values(translations).some((title) => !title.trim())) {
-      toast.error("Please enter titles for all three languages");
+    const missingLanguage = LANGUAGES.find(
+      ({ code }) => !translations[code].trim(),
+    );
+
+    if (missingLanguage) {
+      setTitleLanguage(missingLanguage.code);
+
+      toast.error(`Please enter the section title in ${missingLanguage.label}`);
+
       return;
     }
 
@@ -293,8 +330,6 @@ export default function BrandLogos() {
         throw new Error(data?.message || "Failed to update language titles");
       }
 
-      // Your API stores translations as { en: { title }, ps: { title }, fa: { title } }.
-      // Handle a missing or differently shaped response without crashing.
       const savedTranslations = data?.translations;
 
       if (savedTranslations) {
@@ -303,23 +338,25 @@ export default function BrandLogos() {
             typeof savedTranslations.en === "string"
               ? savedTranslations.en
               : (savedTranslations.en?.title ?? translations.en),
+
           ps:
             typeof savedTranslations.ps === "string"
               ? savedTranslations.ps
               : (savedTranslations.ps?.title ?? translations.ps),
+
           fa:
             typeof savedTranslations.fa === "string"
               ? savedTranslations.fa
               : (savedTranslations.fa?.title ?? translations.fa),
         });
       } else {
-        // The API may confirm success without returning the saved document.
         setTitleDrafts(translations);
       }
 
       toast.success("All language titles updated successfully");
     } catch (error) {
       console.error("Update language titles error:", error);
+
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -345,9 +382,11 @@ export default function BrandLogos() {
       }
 
       toast.success("Logo deleted successfully");
+
       await allBoxData();
     } catch (error) {
       console.error("Delete logo error:", error);
+
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -368,7 +407,6 @@ export default function BrandLogos() {
     0,
   );
 
-  // Show the existing Spinner until initial data has loaded.
   if (isFetchingTitle || isFetching) {
     return (
       <div className="flex min-h-[300px] w-full items-center justify-center bg-[var(--background)] text-[var(--foreground)]">
@@ -386,21 +424,24 @@ export default function BrandLogos() {
 
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Brand Logos</h1>
+
           <p className="mt-1 text-base text-[var(--muted)]">
-            Manage the brand logos displayed on your homepage.
+            Manage the brand logo displayed on your homepage.
           </p>
         </div>
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
+        {/* Section title editor */}
         <div className="border-b border-[var(--border)] p-7 sm:p-8">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <label className="block text-base font-semibold">
                 Section Title
               </label>
+
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Select a language to edit its title.
+                Select a language and enter its required title.
               </p>
             </div>
 
@@ -410,6 +451,8 @@ export default function BrandLogos() {
             >
               {LANGUAGES.map((language) => {
                 const isActive = titleLanguage === language.code;
+
+                const isRTL = titleLanguage === "ps" || titleLanguage === "fa";
 
                 return (
                   <button
@@ -436,7 +479,9 @@ export default function BrandLogos() {
           </div>
 
           <input
+            dir={titleLanguage === "en" ? "ltr" : "rtl"}
             type="text"
+            required
             value={titleDrafts[titleLanguage] ?? ""}
             onChange={(e) =>
               setTitleDrafts((prev) => ({
@@ -444,7 +489,10 @@ export default function BrandLogos() {
                 [titleLanguage]: e.target.value,
               }))
             }
-            placeholder={`Enter ${LANGUAGES.find((language) => language.code === titleLanguage)?.label} title`}
+            placeholder={`Enter ${
+              LANGUAGES.find((language) => language.code === titleLanguage)
+                ?.label
+            } title`}
             disabled={isChangingTitle}
             className="w-full rounded-2xl border border-[var(--border)] bg-[var(--background)] px-5 py-4 text-base text-[var(--foreground)] transition outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-60"
           />
@@ -461,22 +509,24 @@ export default function BrandLogos() {
                 Updating All...
               </>
             ) : (
-              "Update All Languages"
+              "Update Title All Languages"
             )}
           </button>
         </div>
 
+        {/* Single-logo editor */}
         <div className="p-7 sm:p-8">
           <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-bold">Brand Logos</h2>
+              <h2 className="text-lg font-bold">Brand Logo</h2>
+
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Add your company logos.
+                Add one company logo. Only one image is allowed in this form.
               </p>
             </div>
 
             <span className="w-fit rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent)]">
-              Logo 1 required
+              One logo allowed
             </span>
           </div>
 
@@ -502,7 +552,7 @@ export default function BrandLogos() {
                   {logo.preview && !imageErrors[logo.id] ? (
                     <img
                       src={logo.preview}
-                      alt={`Logo ${logo.id}`}
+                      alt="Brand logo preview"
                       className="h-full w-full object-contain"
                       onError={() =>
                         setImageErrors((prev) => ({
@@ -528,8 +578,9 @@ export default function BrandLogos() {
                           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
                             <ImagePlus size={29} />
                           </div>
+
                           <span className="mt-3 text-sm font-medium">
-                            Logo {logo.id}
+                            Brand Logo
                           </span>
                         </>
                       )}
@@ -539,11 +590,10 @@ export default function BrandLogos() {
 
                 <div className="min-w-0 flex-1 pr-0 lg:pr-12">
                   <div className="mb-4">
-                    <p className="text-lg font-bold">Logo {logo.id}</p>
+                    <p className="text-lg font-bold">Brand Logo</p>
+
                     <p className="mt-1 text-sm text-[var(--muted)]">
-                      {logo.id === 1
-                        ? "Required brand logo"
-                        : "Optional brand logo"}
+                      Required brand logo · Maximum 5 MB
                     </p>
                   </div>
 
@@ -608,7 +658,7 @@ export default function BrandLogos() {
               ) : (
                 <>
                   <Upload size={18} />
-                  Save Brand Logos
+                  Save Brand Logo
                 </>
               )}
             </button>
@@ -616,11 +666,13 @@ export default function BrandLogos() {
         </div>
       </div>
 
+      {/* Previously saved logos remain visible and deletable. */}
       {savedData.length > 0 && (
         <div className="mt-8 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
           <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-bold">Saved Brand Logos</h2>
+
               <p className="mt-1 text-sm text-[var(--muted)]">
                 Logos currently saved in your database.
               </p>
@@ -667,7 +719,7 @@ export default function BrandLogos() {
                       {logo.url ? (
                         <img
                           src={logo.url}
-                          alt={`Logo ${logo.id}`}
+                          alt="Saved brand logo"
                           className="h-full w-full object-contain"
                           onError={(e) => {
                             e.currentTarget.style.display = "none";

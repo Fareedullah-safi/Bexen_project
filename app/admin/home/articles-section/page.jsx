@@ -146,6 +146,9 @@ export default function BlogSectionAdmin() {
   const widgetRef = useRef(null);
   const uploadTarget = useRef(null);
 
+  // RTL for Pashto/Dari; LTR for English.
+  const inputDirection = language === "en" ? "ltr" : "rtl";
+
   // Load all translations once. Switching languages does not reload the page.
   useEffect(() => {
     async function loadArticles() {
@@ -635,6 +638,7 @@ export default function BlogSectionAdmin() {
                 {label}
               </label>
               <input
+                dir={inputDirection}
                 name={name}
                 value={titles[language][name]}
                 onChange={handleTitleChange}
@@ -693,6 +697,7 @@ export default function BlogSectionAdmin() {
                 {label}
               </label>
               <input
+                dir={inputDirection}
                 name={name}
                 type={name === "day" ? "number" : "text"}
                 min={name === "day" ? 1 : undefined}
@@ -711,6 +716,7 @@ export default function BlogSectionAdmin() {
               Month
             </label>
             <select
+              dir={inputDirection}
               name="month"
               value={currentTranslation.month}
               onChange={handleArticleChange}
@@ -731,6 +737,7 @@ export default function BlogSectionAdmin() {
               Article Link (shared across languages)
             </label>
             <input
+              dir="ltr"
               name="link"
               value={article.link}
               onChange={handleArticleChange}
@@ -855,6 +862,7 @@ export default function BlogSectionAdmin() {
 
                             {field === "month" ? (
                               <select
+                                dir={inputDirection}
                                 value={fields.month}
                                 onChange={(event) =>
                                   handleExistingChange(
@@ -874,6 +882,7 @@ export default function BlogSectionAdmin() {
                               </select>
                             ) : (
                               <input
+                                dir={inputDirection}
                                 type={field === "day" ? "number" : "text"}
                                 value={fields[field]}
                                 onChange={(event) =>
@@ -895,6 +904,7 @@ export default function BlogSectionAdmin() {
                           Article Link
                         </label>
                         <input
+                          dir="ltr"
                           value={item.link}
                           onChange={(event) =>
                             handleExistingChange(

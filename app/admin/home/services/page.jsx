@@ -1,5 +1,6 @@
 "use client";
 
+import AdminLanguageBall from "@/app/admin/Components/Admin/AdminLanguageBall";
 import Spinner from "@/app/admin/Components/Admin/Spinner";
 import {
   ArrowDown,
@@ -34,7 +35,11 @@ const createTranslation = (en = "") => ({
 
 const normalizeTranslation = (value, fallback = "") => {
   if (typeof value === "string") {
-    return { en: value || fallback, fa: "", ps: "" };
+    return {
+      en: value || fallback,
+      fa: "",
+      ps: "",
+    };
   }
 
   return {
@@ -52,16 +57,6 @@ const createEmptySolution = () => ({
   publicId: "",
 });
 
-function normalizeSolution(item, index) {
-  return {
-    id: item._id || item.id || `item-${index}-${Date.now()}`,
-    title: normalizeTranslation(item.title),
-    description: normalizeTranslation(item.description),
-    image: item.image || "",
-    publicId: item.publicId || "",
-  };
-}
-
 /* ==================== Image Picker ==================== */
 
 function ImagePicker({ value, publicId, onChange, disabled, cloudinaryReady }) {
@@ -73,7 +68,9 @@ function ImagePicker({ value, publicId, onChange, disabled, cloudinaryReady }) {
 
   function openCloudinaryWidget() {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
-      toast.error("Configure your Cloudinary environment variables");
+      toast.error(
+        "Configure NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.",
+      );
       return;
     }
 
@@ -87,21 +84,14 @@ function ImagePicker({ value, publicId, onChange, disabled, cloudinaryReady }) {
         cloudName: CLOUD_NAME,
         uploadPreset: UPLOAD_PRESET,
         folder: "homepage/services",
-
         multiple: false,
         maxFiles: 1,
         resourceType: "image",
-
         clientAllowedFormats: ["png", "jpg", "jpeg", "webp"],
         maxFileSize: 5 * 1024 * 1024,
-
-        // Available upload sources
         sources: ["local", "camera", "url"],
-
         showUploadMoreButton: false,
         cropping: false,
-
-        // Teal Bexon theme
         theme: "minimal",
         styles: {
           palette: {
@@ -118,13 +108,6 @@ function ImagePicker({ value, publicId, onChange, disabled, cloudinaryReady }) {
             inProgress: "#1E8A8A",
             complete: "#12B76A",
             sourceBg: "#F7F9FC",
-          },
-          fonts: {
-            default: null,
-            "'Inter', sans-serif": {
-              url: null,
-              active: true,
-            },
           },
         },
       },
@@ -143,7 +126,7 @@ function ImagePicker({ value, publicId, onChange, disabled, cloudinaryReady }) {
           !uploaded?.public_id ||
           !uploaded.secure_url.startsWith("https://")
         ) {
-          toast.error("Cloudinary did not return valid secure image details");
+          toast.error("Cloudinary did not return valid secure image details.");
           return;
         }
 
@@ -235,13 +218,10 @@ export default function SolutionsAdmin() {
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
 
   const [badge, setBadge] = useState(() => createTranslation("OUR SOLUTIONS"));
-
   const [headingOne, setHeadingOne] = useState(() =>
     createTranslation("Solutions to Transform"),
   );
-
   const [headingTwo, setHeadingTwo] = useState(() => createTranslation("Your"));
-
   const [highlight, setHighlight] = useState(() =>
     createTranslation("Business."),
   );
@@ -254,9 +234,14 @@ export default function SolutionsAdmin() {
   const selectedLanguage =
     LANGUAGES.find((item) => item.code === language) || LANGUAGES[0];
 
+  const inputDirection = language === "en" ? "ltr" : "rtl";
+  const busy = isSaving || !!deletingId;
+
   /* ==================== Load Data ==================== */
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadData() {
       try {
         const res = await fetch("/api/homepage/services");
@@ -268,6 +253,8 @@ export default function SolutionsAdmin() {
           );
         }
 
+        if (cancelled) return;
+
         if (!result.data) {
           setSolutions([createEmptySolution()]);
           return;
@@ -276,13 +263,10 @@ export default function SolutionsAdmin() {
         const data = result.data;
 
         setBadge(normalizeTranslation(data.badge, "OUR SOLUTIONS"));
-
         setHeadingOne(
           normalizeTranslation(data.headingOne, "Solutions to Transform"),
         );
-
         setHeadingTwo(normalizeTranslation(data.headingTwo, "Your"));
-
         setHighlight(normalizeTranslation(data.highlight, "Business."));
 
         setSolutions(
@@ -291,13 +275,21 @@ export default function SolutionsAdmin() {
             : [createEmptySolution()],
         );
       } catch (error) {
-        toast.error(error.message || "Failed to load saved data");
+        if (!cancelled) {
+          toast.error(error.message || "Failed to load saved data");
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     }
 
     loadData();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   /* ==================== Translation Helpers ==================== */
@@ -344,23 +336,96 @@ export default function SolutionsAdmin() {
   }
 
   function moveSolution(index, direction) {
-    if (isSaving || deletingId) return;
+    if (busy) return;
 
     const target = direction === "up" ? index - 1 : index + 1;
 
     if (target < 0 || target >= solutions.length) return;
 
-    const updated = [...solutions];
+    setSolutions((previous) => {
+      const updated = [...previous];
+      [updated[index], updated[target]] = [updated[target], updated[index]];
+      return updated;
+    });
+  }
 
-    [updated[index], updated[target]] = [updated[target], updated[index]];
+  /* ==================== Validation ==================== */
 
-    setSolutions(updated);
+  function validateAllLanguages() {
+    const translatedFields = [
+      { name: "Badge Text", value: badge },
+      { name: "Heading Line 1", value: headingOne },
+      { name: "Heading Line 2", value: headingTwo },
+      { name: "Highlight Word", value: highlight },
+    ];
+
+    if (!solutions.length) {
+      toast.error("Add at least one solution card.");
+      return false;
+    }
+
+    for (const lang of LANGUAGES) {
+      for (const field of translatedFields) {
+        if (!field.value?.[lang.code]?.trim()) {
+          setLanguage(lang.code);
+          toast.error(
+            `${field.name} is required in ${lang.label}. Complete all language tabs before saving.`,
+          );
+          return false;
+        }
+      }
+
+      for (let index = 0; index < solutions.length; index++) {
+        const item = solutions[index];
+
+        if (!item.title?.[lang.code]?.trim()) {
+          setLanguage(lang.code);
+          toast.error(
+            `Solution ${index + 1}: Title is required in ${lang.label}.`,
+          );
+          return false;
+        }
+
+        if (!item.description?.[lang.code]?.trim()) {
+          setLanguage(lang.code);
+          toast.error(
+            `Solution ${index + 1}: Description is required in ${lang.label}.`,
+          );
+          return false;
+        }
+      }
+    }
+
+    for (let index = 0; index < solutions.length; index++) {
+      const item = solutions[index];
+
+      if (!item.image?.trim()) {
+        toast.error(`Solution ${index + 1}: Image is required.`);
+        return false;
+      }
+
+      if (!item.publicId?.trim()) {
+        toast.error(
+          `Solution ${index + 1}: Please upload its image using Cloudinary.`,
+        );
+        return false;
+      }
+
+      if (!item.image.startsWith("https://")) {
+        toast.error(
+          `Solution ${index + 1}: The image must be a valid HTTPS image URL.`,
+        );
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /* ==================== Delete Solution ==================== */
 
   async function handleDeleteCard(cardId) {
-    if (isSaving || deletingId) return;
+    if (busy) return;
 
     if (solutions.length === 1) {
       toast.error("You must have at least one card");
@@ -369,7 +434,6 @@ export default function SolutionsAdmin() {
 
     if (String(cardId).startsWith("new-")) {
       setSolutions((previous) => previous.filter((item) => item.id !== cardId));
-
       toast.success("Card removed");
       return;
     }
@@ -408,35 +472,8 @@ export default function SolutionsAdmin() {
   async function handleSave(event) {
     event.preventDefault();
 
-    if (isSaving || deletingId) return;
-
-    if (!headingOne[language]?.trim()) {
-      toast.error(`Heading Line 1 is required in ${selectedLanguage.label}`);
-      return;
-    }
-
-    for (let index = 0; index < solutions.length; index++) {
-      const item = solutions[index];
-
-      if (!item.title[language]?.trim()) {
-        toast.error(
-          `Card ${index + 1}: Title is required in ${selectedLanguage.label}`,
-        );
-        return;
-      }
-
-      if (!item.description[language]?.trim()) {
-        toast.error(
-          `Card ${index + 1}: Description is required in ${selectedLanguage.label}`,
-        );
-        return;
-      }
-
-      if (!item.image) {
-        toast.error(`Card ${index + 1}: Image is required`);
-        return;
-      }
-    }
+    if (busy) return;
+    if (!validateAllLanguages()) return;
 
     try {
       setIsSaving(true);
@@ -521,296 +558,286 @@ export default function SolutionsAdmin() {
         }}
       />
 
-      <div className="w-full">
-        {/* Page Header + Language Selector */}
-        <div className="mb-10 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
-              <Box size={27} />
-            </div>
-
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">
-                Solutions Slider
-              </h1>
-
-              <p className="mt-1 text-base text-[var(--muted)]">
-                Manage section five — solutions cards and heading.
-              </p>
-            </div>
+      {/* Heading, three language buttons, and language ball */}
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+            <Box size={27} />
           </div>
 
-          {/* Language Selector */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:justify-end">
-            <span className="text-sm font-semibold text-[var(--muted)]">
-              Content language
-            </span>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Solutions Slider
+            </h1>
 
-            <div
-              className="inline-flex w-full flex-wrap items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-1.5 shadow-sm sm:w-auto"
-              role="group"
-              aria-label="Content language"
-            >
-              {LANGUAGES.map((item) => {
-                const active = language === item.code;
-
-                return (
-                  <button
-                    key={item.code}
-                    type="button"
-                    onClick={() => setLanguage(item.code)}
-                    disabled={isSaving || !!deletingId}
-                    aria-pressed={active}
-                    className={`relative flex min-h-10 flex-1 items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none ${
-                      active
-                        ? "bg-[var(--accent)] text-white shadow-[var(--accent)]/20 shadow-md"
-                        : "text-[var(--muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
-                    }`}
-                  >
-                    {item.label}
-
-                    {active && (
-                      <span className="ml-2 h-1.5 w-1.5 rounded-full bg-white" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            <p className="mt-1 text-base text-[var(--muted)]">
+              Manage section five — solutions cards and heading.
+            </p>
           </div>
         </div>
 
-        <p className="-mt-5 mb-6 text-xs text-[var(--muted)]">
-          Editing:{" "}
-          <span className="font-semibold text-[var(--foreground)]">
-            {selectedLanguage.label}
-          </span>{" "}
-          · Other translations remain unchanged.
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex w-fit max-w-full flex-wrap items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1">
+            {LANGUAGES.map((item) => (
+              <button
+                key={item.code}
+                type="button"
+                disabled={busy}
+                onClick={() => setLanguage(item.code)}
+                aria-pressed={language === item.code}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  language === item.code
+                    ? "bg-[#1E8A8A] text-white"
+                    : "text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
 
-        <form onSubmit={handleSave} className="space-y-6">
-          {/* Section Header */}
-          <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
-            <div className="mb-6 flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
-                01
-              </span>
+          <AdminLanguageBall
+            language={language}
+            onLanguageChange={setLanguage}
+          />
+        </div>
+      </div>
 
-              <h2 className="text-lg font-bold">Section Header</h2>
-            </div>
+      <p className="-mt-5 mb-6 text-xs text-[var(--muted)]">
+        Editing:{" "}
+        <span className="font-semibold text-[var(--foreground)]">
+          {selectedLanguage.label}
+        </span>{" "}
+        · Other translations remain unchanged. All three languages are required
+        before saving.
+      </p>
 
-            <div className="grid gap-5 md:grid-cols-2">
-              {[
-                {
-                  label: "Badge Text",
-                  value: badge,
-                  setter: setBadge,
-                  placeholder: "OUR SOLUTIONS",
-                },
-                {
-                  label: "Highlight Word",
-                  value: highlight,
-                  setter: setHighlight,
-                  placeholder: "Business.",
-                },
-                {
-                  label: "Heading Line 1",
-                  value: headingOne,
-                  setter: setHeadingOne,
-                  placeholder: "Solutions to Transform",
-                },
-                {
-                  label: "Heading Line 2",
-                  value: headingTwo,
-                  setter: setHeadingTwo,
-                  placeholder: "Your",
-                },
-              ].map((field) => (
-                <div key={field.label}>
-                  <label className={labelClass}>{field.label}</label>
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* Section Header */}
+        <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
+          <div className="mb-6 flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
+              01
+            </span>
+            <h2 className="text-lg font-bold">Section Header</h2>
+          </div>
 
-                  <input
-                    value={field.value[language] || ""}
-                    onChange={(event) =>
-                      updateTranslation(field.setter, event.target.value)
-                    }
-                    disabled={isSaving || !!deletingId}
-                    placeholder={field.placeholder}
-                    dir={language === "en" ? "ltr" : "auto"}
-                    className={inputClass}
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Solutions Cards */}
-          <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
-                  02
-                </span>
-
-                <h2 className="text-lg font-bold">Solutions Cards</h2>
+          <div className="grid gap-5 md:grid-cols-2">
+            {[
+              {
+                label: "Badge Text",
+                value: badge,
+                setter: setBadge,
+                placeholder: "OUR SOLUTIONS",
+              },
+              {
+                label: "Highlight Word",
+                value: highlight,
+                setter: setHighlight,
+                placeholder: "Business.",
+              },
+              {
+                label: "Heading Line 1",
+                value: headingOne,
+                setter: setHeadingOne,
+                placeholder: "Solutions to Transform",
+              },
+              {
+                label: "Heading Line 2",
+                value: headingTwo,
+                setter: setHeadingTwo,
+                placeholder: "Your",
+              },
+            ].map((field) => (
+              <div key={field.label}>
+                <label className={labelClass}>{field.label}</label>
+                <input
+                  value={field.value[language] || ""}
+                  onChange={(event) =>
+                    updateTranslation(field.setter, event.target.value)
+                  }
+                  disabled={busy}
+                  placeholder={field.placeholder}
+                  dir={inputDirection}
+                  className={inputClass}
+                  required
+                />
               </div>
+            ))}
+          </div>
+        </section>
 
-              <span className="w-fit rounded-full bg-[#1E8A8A]/10 px-4 py-2 text-sm font-semibold text-[#1E8A8A]">
-                {solutions.length} cards
+        {/* Solutions Cards */}
+        <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
+                02
               </span>
+              <h2 className="text-lg font-bold">Solutions Cards</h2>
             </div>
 
-            <div className="space-y-5">
-              {solutions.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="rounded-3xl border border-[var(--border)] bg-[var(--background)] p-5 sm:p-6"
-                >
-                  <div className="mb-5 flex items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A] text-sm font-bold text-white">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
+            <span className="w-fit rounded-full bg-[#1E8A8A]/10 px-4 py-2 text-sm font-semibold text-[#1E8A8A]">
+              {solutions.length} cards
+            </span>
+          </div>
 
-                      <p className="truncate text-sm font-semibold">
-                        {item.title[language] ||
-                          `${selectedLanguage.label} — Solution ${index + 1}`}
-                      </p>
-                    </div>
+          <div className="space-y-5">
+            {solutions.map((item, index) => (
+              <div
+                key={item.id}
+                className="rounded-3xl border border-[var(--border)] bg-[var(--background)] p-5 sm:p-6"
+              >
+                <div className="mb-5 flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1E8A8A] text-sm font-bold text-white">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
 
-                    <div className="flex shrink-0 items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => moveSolution(index, "up")}
-                        disabled={index === 0 || isSaving || !!deletingId}
-                        title="Move up"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30"
-                      >
-                        <ArrowUp size={16} />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => moveSolution(index, "down")}
-                        disabled={
-                          index === solutions.length - 1 ||
-                          isSaving ||
-                          !!deletingId
-                        }
-                        title="Move down"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30"
-                      >
-                        <ArrowDown size={16} />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCard(item.id)}
-                        disabled={isSaving || !!deletingId}
-                        title="Delete card"
-                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface)] text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white disabled:opacity-40"
-                      >
-                        {deletingId === item.id ? (
-                          <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                          <Trash2 size={16} />
-                        )}
-                      </button>
-                    </div>
+                    <p className="truncate text-sm font-semibold">
+                      {item.title[language] ||
+                        `${selectedLanguage.label} — Solution ${index + 1}`}
+                    </p>
                   </div>
 
-                  <div className="grid gap-5 lg:grid-cols-2">
-                    <div className="space-y-4">
-                      <div>
-                        <label className={labelClass}>Card Title</label>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => moveSolution(index, "up")}
+                      disabled={index === 0 || busy}
+                      title="Move up"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30"
+                    >
+                      <ArrowUp size={16} />
+                    </button>
 
-                        <input
-                          value={item.title[language] || ""}
-                          onChange={(event) =>
-                            updateSolutionTranslation(
-                              item.id,
-                              "title",
-                              event.target.value,
-                            )
-                          }
-                          disabled={isSaving || deletingId === item.id}
-                          placeholder="e.g. Business Strategy Development"
-                          dir={language === "en" ? "ltr" : "auto"}
-                          className={inputClass}
-                        />
-                      </div>
+                    <button
+                      type="button"
+                      onClick={() => moveSolution(index, "down")}
+                      disabled={index === solutions.length - 1 || busy}
+                      title="Move down"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-30"
+                    >
+                      <ArrowDown size={16} />
+                    </button>
 
-                      <div>
-                        <label className={labelClass}>Description</label>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCard(item.id)}
+                      disabled={busy}
+                      title="Delete card"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface)] text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white disabled:opacity-40"
+                    >
+                      {deletingId === item.id ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
+                    </button>
+                  </div>
+                </div>
 
-                        <textarea
-                          value={item.description[language] || ""}
-                          onChange={(event) =>
-                            updateSolutionTranslation(
-                              item.id,
-                              "description",
-                              event.target.value,
-                            )
-                          }
-                          disabled={isSaving || deletingId === item.id}
-                          rows={5}
-                          placeholder="Enter short card description..."
-                          dir={language === "en" ? "ltr" : "auto"}
-                          className={`${inputClass} resize-y`}
-                        />
-                      </div>
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <div className="space-y-4">
+                    <div>
+                      <label className={labelClass}>Card Title</label>
+                      <input
+                        value={item.title[language] || ""}
+                        onChange={(event) =>
+                          updateSolutionTranslation(
+                            item.id,
+                            "title",
+                            event.target.value,
+                          )
+                        }
+                        disabled={busy}
+                        placeholder="e.g. Business Strategy Development"
+                        dir={inputDirection}
+                        className={inputClass}
+                        required
+                      />
                     </div>
 
                     <div>
-                      <label className={labelClass}>Card Image</label>
-
-                      <ImagePicker
-                        value={item.image}
-                        publicId={item.publicId}
-                        disabled={isSaving || deletingId === item.id}
-                        cloudinaryReady={cloudinaryReady}
-                        onChange={(uploaded) => updateImage(item.id, uploaded)}
+                      <label className={labelClass}>Description</label>
+                      <textarea
+                        value={item.description[language] || ""}
+                        onChange={(event) =>
+                          updateSolutionTranslation(
+                            item.id,
+                            "description",
+                            event.target.value,
+                          )
+                        }
+                        disabled={busy}
+                        rows={5}
+                        placeholder="Enter short card description..."
+                        dir={inputDirection}
+                        className={`${inputClass} resize-y`}
+                        required
                       />
                     </div>
                   </div>
+
+                  <div>
+                    <label className={labelClass}>Card Image</label>
+                    <ImagePicker
+                      value={item.image}
+                      publicId={item.publicId}
+                      disabled={busy}
+                      cloudinaryReady={cloudinaryReady}
+                      onChange={(uploaded) => updateImage(item.id, uploaded)}
+                    />
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+          </div>
 
-            <button
-              type="button"
-              onClick={addSolution}
-              disabled={isSaving || !!deletingId}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] py-4 text-sm font-semibold text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-40"
-            >
-              <Plus size={18} />
-              Add New Solution
-            </button>
-          </section>
+          <button
+            type="button"
+            onClick={addSolution}
+            disabled={busy}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] py-4 text-sm font-semibold text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-40"
+          >
+            <Plus size={18} />
+            Add New Solution
+          </button>
+        </section>
 
-          {/* Save Footer */}
-          <footer className="sticky bottom-4 z-10 mt-4 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
-            <div>
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                Ready to save your changes?
-              </p>
+        {/* Save Footer */}
+        <footer className="sticky bottom-4 z-10 mt-4 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
+          <div>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              Ready to save your changes?
+            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Save translations and image references to MongoDB.
+            </p>
+          </div>
 
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Save translations and image references to MongoDB.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSaving || !!deletingId}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167575] focus-visible:ring-4 focus-visible:ring-[#1E8A8A]/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSaving ? <Spinner /> : <Save size={18} />}
-
-              {isSaving ? "Saving Solutions..." : "Save Solutions"}
-            </button>
-          </footer>
-        </form>
-      </div>
+          <button
+            type="submit"
+            disabled={busy}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#167575] focus-visible:ring-4 focus-visible:ring-[#1E8A8A]/20 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSaving ? <Spinner /> : <Save size={18} />}
+            {isSaving ? "Saving Solutions..." : "Save Solutions"}
+          </button>
+        </footer>
+      </form>
     </div>
   );
+}
+
+/* ==================== Solution Normalizer ==================== */
+
+function normalizeSolution(item, index) {
+  return {
+    id: String(item._id || item.id || `item-${index}-${Date.now()}`),
+    title: normalizeTranslation(item.title),
+    description: normalizeTranslation(item.description),
+    image: item.image || "",
+    publicId: item.publicId || "",
+  };
 }
