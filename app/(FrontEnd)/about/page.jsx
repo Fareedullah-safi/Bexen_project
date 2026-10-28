@@ -1,20 +1,17 @@
-import SectionFour from "./AboutPages/SectionFour";
 import SectionThree from "../Home/SectionThree";
 import About from "./AboutPages/About";
-import SectionOne from "./AboutPages/SectionOne";
-import SectionTwo from "./AboutPages/SectionTwo";
-import SectionFive from "./AboutPages/SectionFive";
 import SectionSix from "./AboutPages/SectionSix";
+import SectionTwo from "./AboutPages/SectionTwo";
 
 export default function AboutPage() {
   return (
-    <main className="pt-12 overflow-x-hidden">
+    <main className="overflow-x-hidden pt-12">
       <About />
-      <SectionOne />
+      {/* <SectionOne /> */}
       <SectionTwo />
       <SectionThree />
-      <SectionFour />
-      <SectionFive />
+      {/* <SectionFour /> */}
+      {/* <SectionFive /> */}
       <SectionSix />
     </main>
   );

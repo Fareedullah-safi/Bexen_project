@@ -64,8 +64,8 @@ const navigation = [
         icon: Info,
         children: [
           { name: "Banner", href: "/admin/about/banner" },
-          { name: "Our Story", href: "/admin/about/our-story" },
-          { name: "Recognitions", href: "/admin/about/recognitions" },
+          { name: "Mission Vision", href: "/admin/about/mission-vision" },
+          { name: "FAQS", href: "/admin/about/faqs" },
         ],
       },
       {
