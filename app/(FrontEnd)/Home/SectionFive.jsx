@@ -26,7 +26,7 @@ export default function SectionFive() {
     return "";
   };
 
-  // Load services and reload them whenever the language changes.
+  // Load services and reload them whenever the language changes
   useEffect(() => {
     let active = true;
     let requestId = 0;
