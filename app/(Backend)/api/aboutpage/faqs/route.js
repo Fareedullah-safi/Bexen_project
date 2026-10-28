@@ -2,7 +2,7 @@ import dbConnect from "@/Lib/mongoDB"; // Change this if your DB connection file
 import FAQSection from "@/Models/About-Page-Models/faqs/FAQS";
 import { NextResponse } from "next/server";
 
-// GET: Fetch the FAQ Data
+// GET: Fetch the FAQ data
 export async function GET() {
   try {
     await dbConnect();
