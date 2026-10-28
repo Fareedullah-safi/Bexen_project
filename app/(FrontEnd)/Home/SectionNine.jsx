@@ -1,14 +1,44 @@
 "use client";
 
-import Image from "next/image";
-import { Minus, PhoneCallIcon, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
 import axios from "axios";
+import { Minus, PhoneCallIcon, Plus } from "lucide-react";
+import Image from "next/image";
+import { useEffect, useState } from "react";
+
+const getText = (value, language = "en") => {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value[language] || value.en || value.fa || value.ps || "";
+  }
+
+  return "";
+};
 
 export default function SectionNine() {
   const [open, setOpen] = useState(null);
   const [faqData, setFaqData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [language, setLanguage] = useState("en");
+
+  useEffect(() => {
+    const updateLanguage = (event) => {
+      const lang =
+        event?.detail?.language ||
+        localStorage.getItem("site-language") ||
+        "en";
+
+      setLanguage(lang);
+    };
+
+    updateLanguage();
+    window.addEventListener("site-language-change", updateLanguage);
+
+    return () =>
+      window.removeEventListener("site-language-change", updateLanguage);
+  }, []);
 
   useEffect(() => {
     async function getFaqData() {
@@ -45,6 +75,12 @@ export default function SectionNine() {
 
   const faqs = Array.isArray(faqData.faqs) ? faqData.faqs : [];
 
+  const headingLineOne = getText(faqData.headingLineOne, language);
+  const headingLineTwo = getText(faqData.headingLineTwo, language);
+  const callHeadingLineOne = getText(faqData.callHeadingLineOne, language);
+  const callHeadingLineTwo = getText(faqData.callHeadingLineTwo, language);
+  const phoneNumber = getText(faqData.phoneNumber, language);
+
   return (
     <section className="min-h-screen w-full bg-[#ECF0F0] px-6 py-16 lg:px-12">
       <div className="flex w-full flex-col gap-8 lg:flex-row">
@@ -57,7 +93,7 @@ export default function SectionNine() {
             {faqData.imageURL && (
               <Image
                 src={faqData.imageURL}
-                alt={faqData.headingLineOne || "Company"}
+                alt={headingLineOne || "Company"}
                 fill
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover transition-transform duration-700 hover:scale-105"
@@ -66,37 +102,34 @@ export default function SectionNine() {
 
             <div className="absolute inset-0 bg-linear-to-t from-[#0C1E21]/60 via-transparent to-transparent" />
 
-            {(faqData.headingLineOne || faqData.headingLineTwo) && (
+            {(headingLineOne || headingLineTwo) && (
               <h2
                 className="wow animate__animated animate__fadeInUp absolute top-8 left-8 z-10 text-4xl leading-tight font-medium text-white md:text-5xl"
                 data-wow-delay="0.3s"
               >
-                {faqData.headingLineOne}
-                {faqData.headingLineOne && faqData.headingLineTwo && <br />}
-                {faqData.headingLineTwo}
+                {headingLineOne}
+                {headingLineOne && headingLineTwo && <br />}
+                {headingLineTwo}
               </h2>
             )}
           </div>
 
           {/* Get Started Box */}
-          {(faqData.callHeadingLineOne ||
-            faqData.callHeadingLineTwo ||
-            faqData.phoneNumber) && (
+          {(callHeadingLineOne || callHeadingLineTwo || phoneNumber) && (
             <div
               className="wow animate__animated animate__fadeInUp absolute right-0 bottom-0 z-20 rounded-tl-[35px] bg-[#ECF0F0] pt-4 pb-0 pl-4"
               data-wow-delay="0.5s"
             >
               <div className="w-60 rounded-2xl bg-[#1E8A8A] px-6 py-6 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
-                {(faqData.callHeadingLineOne || faqData.callHeadingLineTwo) && (
+                {(callHeadingLineOne || callHeadingLineTwo) && (
                   <p className="text-2xl font-bold text-white">
-                    {faqData.callHeadingLineOne}
-                    {faqData.callHeadingLineOne &&
-                      faqData.callHeadingLineTwo && <br />}
-                    {faqData.callHeadingLineTwo}
+                    {callHeadingLineOne}
+                    {callHeadingLineOne && callHeadingLineTwo && <br />}
+                    {callHeadingLineTwo}
                   </p>
                 )}
 
-                {faqData.phoneNumber && (
+                {phoneNumber && (
                   <div className="mt-5 flex flex-col gap-3">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0C1E21] text-white transition-transform duration-300 hover:rotate-12">
                       <PhoneCallIcon size={20} />
@@ -105,11 +138,11 @@ export default function SectionNine() {
                     <a
                       href={
                         faqData.phoneHref ||
-                        `tel:${faqData.phoneNumber.replace(/[^\d+]/g, "")}`
+                        `tel:${phoneNumber.replace(/[^\d+]/g, "")}`
                       }
                       className="group/phone relative w-fit text-xl font-semibold text-white"
                     >
-                      {faqData.phoneNumber}
+                      {phoneNumber}
                       <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-cyan-500 transition-all duration-300 group-hover/phone:w-full" />
                     </a>
                   </div>
@@ -126,7 +159,7 @@ export default function SectionNine() {
 
             return (
               <div
-                key={faq._id || faq.id || index}
+                key={faq._id || faq.id || `faq-${index}`}
                 className="wow animate__animated animate__fadeInRight mb-3 overflow-hidden rounded-xl bg-white shadow-sm"
                 data-wow-delay={`${index * 0.1}s`}
               >
@@ -137,7 +170,7 @@ export default function SectionNine() {
                   className="flex w-full cursor-pointer items-center justify-between gap-5 px-6 py-6 text-left"
                 >
                   <span className="text-lg font-semibold text-[#102326] md:text-xl">
-                    {faq.question}
+                    {getText(faq.question, language)}
                   </span>
 
                   <span
@@ -167,7 +200,7 @@ export default function SectionNine() {
                     </div>
 
                     <p className="py-5 text-base leading-7 text-zinc-600 md:text-lg">
-                      {faq.answer}
+                      {getText(faq.answer, language)}
                     </p>
                   </div>
                 </div>

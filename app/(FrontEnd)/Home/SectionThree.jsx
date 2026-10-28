@@ -1,8 +1,8 @@
 "use client";
 
+import Loader from "@/app/Components/Loader";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import Loader from "@/app/Components/Loader";
 
 export default function BrandLogos() {
   const [dbLogos, setDbLogos] = useState([]);
@@ -11,16 +11,24 @@ export default function BrandLogos() {
   const [groupWidth, setGroupWidth] = useState(0);
 
   useEffect(() => {
-    const dataLogos = async () => {
+    let active = true;
+
+    const dataLogos = async (language) => {
       try {
-        const res = await fetch("/api/homepage/brand-logos", {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `/api/homepage/brand-logos?lang=${encodeURIComponent(language)}`,
+          {
+            cache: "no-store",
+          },
+        );
+
         const data = await res.json();
 
         if (!res.ok || !data.success) {
           throw new Error("Failed to load brand logos");
         }
+
+        if (!active) return;
 
         setDbLogos(
           data.data.flatMap((item) =>
@@ -31,18 +39,41 @@ export default function BrandLogos() {
         );
       } catch (error) {
         console.error("Failed to load brand logos:", error);
-        setDbLogos([]);
+
+        if (active) {
+          setDbLogos([]);
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
-    dataLogos();
+    const savedLanguage = localStorage.getItem("site-language") || "en";
+
+    dataLogos(savedLanguage);
+
+    const handleLanguageChange = (event) => {
+      const language =
+        event.detail?.language || localStorage.getItem("site-language") || "en";
+
+      dataLogos(language);
+    };
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+
+    return () => {
+      active = false;
+
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
   }, []);
 
   useEffect(() => {
     if (dbLogos.length > 0 && trackRef.current) {
       const firstGroup = trackRef.current.firstElementChild;
+
       if (firstGroup) {
         setGroupWidth(firstGroup.offsetWidth);
       }
@@ -111,6 +142,7 @@ export default function BrandLogos() {
             <div className="flex shrink-0 gap-3 pr-3 sm:gap-4 sm:pr-4 md:gap-5 md:pr-5 lg:gap-6 lg:pr-6">
               {logoSet}
             </div>
+
             <div
               className="flex shrink-0 gap-3 pr-3 sm:gap-4 sm:pr-4 md:gap-5 md:pr-5 lg:gap-6 lg:pr-6"
               aria-hidden="true"

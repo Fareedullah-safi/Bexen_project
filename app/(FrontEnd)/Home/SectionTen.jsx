@@ -2,13 +2,129 @@
 
 import axios from "axios";
 import { ArrowRight, Box, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
+const translations = {
+  en: {
+    badge: "GET IN TOUCH",
+    heading: "Drop Us a",
+    headingHighlight: "Line.",
+    fullName: "Full Name",
+    email: "Email Address",
+    phone: "Phone number",
+    chooseService: "Choose a service",
+    chooseOption: "Choose an option",
+    message: "Type message",
+    sending: "Sending...",
+    sendMessage: "Send Message",
+    globalPresence: "GLOBAL PRESENCE",
+    headOffice: "Head office:",
+    regionalOffice: "Regional office:",
+    enterName: "Please enter your full name.",
+    enterEmail: "Please enter your email address.",
+    enterPhone: "Please enter your phone number.",
+    selectService: "Please choose a service.",
+    enterMessage: "Please enter your message.",
+    success: "Your message was sent successfully.",
+    failure: "Failed to send your message. Please try again.",
+    services: [
+      "Business Strategy",
+      "Customer Experience",
+      "Sustainability and ESG",
+      "Training and Development",
+      "IT Support & Maintenance",
+      "Marketing Strategy",
+    ],
+  },
+  fa: {
+    badge: "با ما در تماس شوید",
+    heading: "پیام خود را",
+    headingHighlight: "بفرستید.",
+    fullName: "نام کامل",
+    email: "آدرس ایمیل",
+    phone: "شماره تلفن",
+    chooseService: "یک خدمت انتخاب کنید",
+    chooseOption: "یک گزینه انتخاب کنید",
+    message: "پیام خود را بنویسید",
+    sending: "در حال ارسال...",
+    sendMessage: "ارسال پیام",
+    globalPresence: "حضور جهانی",
+    headOffice: "دفتر مرکزی:",
+    regionalOffice: "دفتر منطقه‌ای:",
+    enterName: "لطفاً نام کامل خود را وارد کنید.",
+    enterEmail: "لطفاً آدرس ایمیل خود را وارد کنید.",
+    enterPhone: "لطفاً شماره تلفن خود را وارد کنید.",
+    selectService: "لطفاً یک خدمت انتخاب کنید.",
+    enterMessage: "لطفاً پیام خود را وارد کنید.",
+    success: "پیام شما با موفقیت ارسال شد.",
+    failure: "ارسال پیام ناموفق بود. لطفاً دوباره تلاش کنید.",
+    services: [
+      "استراتژی کسب‌وکار",
+      "تجربه مشتری",
+      "پایداری و ESG",
+      "آموزش و توسعه",
+      "پشتیبانی و نگهداری فناوری اطلاعات",
+      "استراتژی بازاریابی",
+    ],
+  },
+  ps: {
+    badge: "اړیکه ونیسئ",
+    heading: "خپل پیغام",
+    headingHighlight: "راولېږئ.",
+    fullName: "بشپړ نوم",
+    email: "د برېښنالیک پته",
+    phone: "د ټیلیفون شمېره",
+    chooseService: "خدمت وټاکئ",
+    chooseOption: "یو انتخاب وکړئ",
+    message: "خپل پیغام ولیکئ",
+    sending: "لېږل کېږي...",
+    sendMessage: "پیغام ولېږئ",
+    globalPresence: "نړیوال حضور",
+    headOffice: "مرکزي دفتر:",
+    regionalOffice: "سیمه‌ییز دفتر:",
+    enterName: "مهرباني وکړئ خپل بشپړ نوم ولیکئ.",
+    enterEmail: "مهرباني وکړئ د برېښنالیک پته ولیکئ.",
+    enterPhone: "مهرباني وکړئ د ټیلیفون شمېره ولیکئ.",
+    selectService: "مهرباني وکړئ یو خدمت وټاکئ.",
+    enterMessage: "مهرباني وکړئ خپل پیغام ولیکئ.",
+    success: "ستاسو پیغام په بریالیتوب واستول شو.",
+    failure: "د پیغام لېږل ناکام شول. بیا هڅه وکړئ.",
+    services: [
+      "د سوداګرۍ ستراتیژي",
+      "د پېرودونکو تجربه",
+      "پایښت او ESG",
+      "روزنه او پراختیا",
+      "د معلوماتي ټکنالوژۍ ملاتړ او ساتنه",
+      "د بازارموندنې ستراتیژي",
+    ],
+  },
+};
 
 export default function SectionTen() {
   const [serviceOpen, setServiceOpen] = useState(false);
   const [service, setService] = useState("Choose an option");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [language, setLanguage] = useState("en");
+
+  useEffect(() => {
+    const updateLanguage = (event) => {
+      const lang =
+        event?.detail?.language ||
+        localStorage.getItem("site-language") ||
+        "en";
+
+      setLanguage(translations[lang] ? lang : "en");
+    };
+
+    updateLanguage();
+    window.addEventListener("site-language-change", updateLanguage);
+
+    return () =>
+      window.removeEventListener("site-language-change", updateLanguage);
+  }, []);
+
+  const t = translations[language];
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -30,7 +146,7 @@ export default function SectionTen() {
   const regions = [
     {
       id: 1,
-      title: "Head office:",
+      title: t.headOffice,
       address: "993 Renner Burg, West Rond, MT 94251-030, USA.",
       phone: "P: +1 (009) 544-7818",
       email: "M: support@bexon.com",
@@ -39,7 +155,7 @@ export default function SectionTen() {
     },
     {
       id: 2,
-      title: "Regional office:",
+      title: t.regionalOffice,
       address: "Hessisch Lichtenau 37235, Kassel, Germany.",
       phone: "P: +1 (009) 880-1810",
       email: "M: support@bexon.com",
@@ -48,7 +164,7 @@ export default function SectionTen() {
     },
     {
       id: 3,
-      title: "Regional office:",
+      title: t.regionalOffice,
       address: "32 Altamira, State of Pará, Brazil.",
       phone: "P: +1 (009) 544-7818",
       email: "M: support@bexon.com",
@@ -63,28 +179,28 @@ export default function SectionTen() {
     if (isSubmitting) return;
 
     if (!formData.fullName.trim()) {
-      alert("Please enter your full name.");
+      toast.error(t.enterName);
       return;
     }
 
     if (!formData.email.trim()) {
-      alert("Please enter your email address.");
+      toast.error(t.enterEmail);
       return;
     }
 
     if (!formData.phone.trim()) {
-      alert("Please enter your phone number.");
+      toast.error(t.enterPhone);
       return;
     }
 
     if (!formData.service) {
-      alert("Please choose a service.");
+      toast.error(t.selectService);
       setServiceOpen(true);
       return;
     }
 
     if (!formData.message.trim()) {
-      alert("Please enter your message.");
+      toast.error(t.enterMessage);
       return;
     }
 
@@ -94,9 +210,7 @@ export default function SectionTen() {
       const res = await axios.post("/api/homepage/contact", formData);
 
       if (res.data.success) {
-        toast.success(
-          res.data.message || "Your message was sent successfully.",
-        );
+        toast.success(res.data.message || t.success);
 
         setFormData({
           fullName: "",
@@ -111,18 +225,17 @@ export default function SectionTen() {
       }
     } catch (error) {
       console.error("Contact submission failed:", error);
-
-      alert(
-        error.response?.data?.message ||
-          "Failed to send your message. Please try again.",
-      );
+      toast.error(error.response?.data?.message || t.failure);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <section className="w-full bg-[#e7eded] px-4 py-6 sm:py-10 md:py-12 lg:py-16">
+    <section
+      dir={language === "en" ? "ltr" : "rtl"}
+      className="w-full bg-[#e7eded] px-4 py-6 sm:py-10 md:py-12 lg:py-16"
+    >
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#081f22] [background-image:url('https://themejunction.net/html/bexon/demo/assets/images/bg/map.svg')] [background-size:170%_auto] [background-position:center_8%] bg-no-repeat sm:rounded-[28px] sm:[background-size:130%_auto] sm:[background-position:center_5%] md:[background-size:110%_auto] md:[background-position:center_8%] lg:rounded-[30px] lg:[background-size:64%_auto] lg:[background-position:left_center]">
         <div className="absolute inset-0 bg-[#081f22]/90" />
 
@@ -134,13 +247,11 @@ export default function SectionTen() {
 
         <div className="pointer-events-none absolute inset-0 opacity-[0.16]">
           <div className="absolute -top-72 -left-60 h-[800px] w-[650px] -rotate-[28deg] bg-[repeating-linear-gradient(100deg,transparent_0,transparent_25px,rgba(125,211,211,0.12)_26px,transparent_27px)]" />
-
           <div className="absolute -right-60 -bottom-72 h-[800px] w-[650px] rotate-[28deg] bg-[repeating-linear-gradient(100deg,transparent_0,transparent_25px,rgba(125,211,211,0.08)_26px,transparent_27px)]" />
         </div>
 
         <div className="relative z-10 flex flex-col lg:grid lg:grid-cols-[1fr_1fr]">
           {/* MAP */}
-
           <div className="relative min-h-97.5 sm:min-h-117.5 md:min-h-135 lg:min-h-200">
             {regions.map((region, index) => (
               <div
@@ -150,7 +261,6 @@ export default function SectionTen() {
                 className={`wow animate__animated animate__fadeIn group absolute ${region.position} z-30`}
               >
                 <span className="absolute -inset-2.5 rounded-full bg-[#1E8A8A]/20 blur-md sm:-inset-3 md:-inset-4" />
-
                 <span className="absolute -inset-2 animate-ping rounded-full bg-[#1E8A8A]/25 sm:-inset-2.5 md:-inset-3" />
 
                 <button
@@ -165,19 +275,15 @@ export default function SectionTen() {
                   <p className="text-xs leading-5 font-medium text-white sm:text-sm sm:leading-6 lg:text-lg lg:leading-7">
                     {region.title}
                   </p>
-
                   <p className="mt-1.5 text-xs leading-5 font-medium text-white sm:mt-2 sm:text-sm sm:leading-6 lg:text-lg lg:leading-7">
                     {region.address}
                   </p>
-
                   <p className="mt-1.5 text-xs leading-5 font-medium text-white sm:mt-2 sm:text-sm sm:leading-6 lg:text-lg lg:leading-7">
                     {region.phone}
                   </p>
-
                   <p className="text-xs leading-5 font-medium text-white sm:text-sm sm:leading-6 lg:text-lg lg:leading-7">
                     {region.email}
                   </p>
-
                   <div className="absolute -bottom-2 left-1/2 h-0 w-0 -translate-x-1/2 border-t-[9px] border-r-[9px] border-l-[9px] border-t-[#249596] border-r-transparent border-l-transparent sm:-bottom-2.5 sm:border-t-[11px] sm:border-r-[11px] sm:border-l-[11px] lg:-bottom-3 lg:border-t-[14px] lg:border-r-[14px] lg:border-l-[14px]" />
                 </div>
               </div>
@@ -188,40 +294,36 @@ export default function SectionTen() {
               className="wow animate__animated animate__fadeIn absolute bottom-6 left-5 hidden items-center gap-2 text-[10px] font-medium tracking-[0.18em] text-white/35 sm:flex md:bottom-8 md:left-8 md:text-xs lg:bottom-8 lg:left-10"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-[#1E8A8A] sm:h-2 sm:w-2" />
-              GLOBAL PRESENCE
+              {t.globalPresence}
             </div>
           </div>
 
           {/* CONTACT FORM */}
-
           <div className="relative z-40 flex w-full items-center justify-center px-3 pb-5 sm:px-6 sm:pb-8 md:px-8 md:pb-10 lg:px-10 lg:py-10 xl:px-12">
             <div className="w-full max-w-[650px] rounded-[22px] border border-white/10 bg-black/[0.04] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.3)] backdrop-blur-2xl sm:rounded-[26px] sm:p-7 md:p-9 lg:p-10 xl:p-11">
               {/* BADGE */}
-
               <span
                 data-wow-duration="0.8s"
                 className="wow animate__animated animate__fadeInDown inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] font-bold tracking-wide text-white sm:px-4 sm:py-2 sm:text-xs md:text-sm"
               >
                 <Box size={16} className="text-[#1E8A8A] sm:size-[17px]" />
-                GET IN TOUCH
+                {t.badge}
               </span>
 
               {/* HEADING */}
-
               <h1
                 data-wow-duration="0.9s"
                 data-wow-delay="0.1s"
                 className="wow animate__animated animate__fadeInUp mt-5 max-w-xl text-3xl leading-tight font-medium tracking-tight text-white sm:mt-6 sm:text-4xl md:text-5xl lg:text-[56px]"
               >
-                Drop Us a <span className="text-[#1E8A8A]">Line.</span>
+                {t.heading}{" "}
+                <span className="text-[#1E8A8A]">{t.headingHighlight}</span>
               </h1>
 
               {/* FORM */}
-
               <form onSubmit={handleSubmit} className="mt-7 sm:mt-9 md:mt-10">
                 <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2 sm:gap-x-7 sm:gap-y-7 md:gap-y-8">
                   {/* NAME */}
-
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.15s"
@@ -231,9 +333,8 @@ export default function SectionTen() {
                       htmlFor="fullName"
                       className="block text-xs text-white/60 transition-colors duration-300 group-focus-within:text-[#58eee0] sm:text-sm md:text-base"
                     >
-                      Full Name *
+                      {t.fullName} *
                     </label>
-
                     <input
                       id="fullName"
                       name="fullName"
@@ -242,17 +343,13 @@ export default function SectionTen() {
                       required
                       value={formData.fullName}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          fullName: e.target.value,
-                        })
+                        setFormData({ ...formData, fullName: e.target.value })
                       }
                       className="mt-2 w-full border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
 
                   {/* EMAIL */}
-
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.2s"
@@ -262,9 +359,8 @@ export default function SectionTen() {
                       htmlFor="email"
                       className="block text-xs text-white/60 transition-colors duration-300 group-focus-within:text-[#58eee0] sm:text-sm md:text-base"
                     >
-                      Email Address *
+                      {t.email} *
                     </label>
-
                     <input
                       id="email"
                       name="email"
@@ -273,17 +369,13 @@ export default function SectionTen() {
                       required
                       value={formData.email}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          email: e.target.value,
-                        })
+                        setFormData({ ...formData, email: e.target.value })
                       }
                       className="mt-2 w-full border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
 
                   {/* PHONE */}
-
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.25s"
@@ -293,9 +385,8 @@ export default function SectionTen() {
                       htmlFor="phone"
                       className="block text-xs text-white/60 transition-colors duration-300 group-focus-within:text-[#58eee0] sm:text-sm md:text-base"
                     >
-                      Phone number *
+                      {t.phone} *
                     </label>
-
                     <input
                       id="phone"
                       name="phone"
@@ -304,23 +395,19 @@ export default function SectionTen() {
                       required
                       value={formData.phone}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          phone: e.target.value,
-                        })
+                        setFormData({ ...formData, phone: e.target.value })
                       }
                       className="mt-2 w-full border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
                   </div>
 
                   {/* SERVICE */}
-
                   <div className="group relative">
                     <label
                       id="service-label"
                       className="block text-xs text-white/60 transition-colors duration-300 group-focus-within:text-[#58eee0] sm:text-sm md:text-base"
                     >
-                      Choose a service *
+                      {t.chooseService} *
                     </label>
 
                     <button
@@ -338,9 +425,10 @@ export default function SectionTen() {
                             : "text-white"
                         }
                       >
-                        {service}
+                        {service === "Choose an option"
+                          ? t.chooseOption
+                          : t.services[services.indexOf(service)] || service}
                       </span>
-
                       <ChevronDown
                         size={18}
                         className={`shrink-0 transition-transform duration-300 ${
@@ -352,7 +440,6 @@ export default function SectionTen() {
                     </button>
 
                     {/* DROPDOWN */}
-
                     <div
                       role="listbox"
                       aria-labelledby="service-label"
@@ -368,15 +455,12 @@ export default function SectionTen() {
                         aria-selected={!formData.service}
                         onClick={() => {
                           setService("Choose an option");
-                          setFormData((prev) => ({
-                            ...prev,
-                            service: "",
-                          }));
+                          setFormData((prev) => ({ ...prev, service: "" }));
                           setServiceOpen(false);
                         }}
                         className="w-full bg-[#dce8e9] px-4 py-3 text-left text-sm font-semibold text-[#102326] transition hover:bg-[#cfdfe0] sm:px-6 sm:py-4 sm:text-base"
                       >
-                        Choose an option
+                        {t.chooseOption}
                       </button>
 
                       {services.map((item, index) => (
@@ -387,10 +471,7 @@ export default function SectionTen() {
                           aria-selected={formData.service === item}
                           onClick={() => {
                             setService(item);
-                            setFormData((prev) => ({
-                              ...prev,
-                              service: item,
-                            }));
+                            setFormData((prev) => ({ ...prev, service: item }));
                             setServiceOpen(false);
                           }}
                           style={{
@@ -404,14 +485,13 @@ export default function SectionTen() {
                               : "-translate-x-3 opacity-0"
                           }`}
                         >
-                          {item}
+                          {t.services[index]}
                         </button>
                       ))}
                     </div>
                   </div>
 
                   {/* MESSAGE */}
-
                   <div
                     data-wow-duration="0.8s"
                     data-wow-delay="0.35s"
@@ -421,9 +501,8 @@ export default function SectionTen() {
                       htmlFor="message"
                       className="block text-xs text-white/60 transition-colors duration-300 group-focus-within:text-[#58eee0] sm:text-sm md:text-base"
                     >
-                      Type message *
+                      {t.message} *
                     </label>
-
                     <textarea
                       id="message"
                       name="message"
@@ -431,10 +510,7 @@ export default function SectionTen() {
                       required
                       value={formData.message}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          message: e.target.value,
-                        })
+                        setFormData({ ...formData, message: e.target.value })
                       }
                       className="mt-2 w-full resize-none border-b border-white/10 bg-transparent pb-2.5 text-sm text-white transition-all duration-300 outline-none focus:border-[#1E8A8A] sm:mt-3 sm:pb-3 md:pb-4"
                     />
@@ -442,7 +518,6 @@ export default function SectionTen() {
                 </div>
 
                 {/* BUTTON */}
-
                 <button
                   data-wow-duration="0.8s"
                   data-wow-delay="0.45s"
@@ -452,10 +527,9 @@ export default function SectionTen() {
                 >
                   <span className="overflow-hidden leading-none">
                     <span className="block">
-                      {isSubmitting ? "Sending..." : "Send Message"}
+                      {isSubmitting ? t.sending : t.sendMessage}
                     </span>
                   </span>
-
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0C1E21] sm:h-11 sm:w-11">
                     <ArrowRight
                       size={17}

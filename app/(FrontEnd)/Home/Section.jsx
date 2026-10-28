@@ -1,9 +1,9 @@
 "use client";
 
+import Loader from "@/app/Components/Loader";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import Loader from "@/app/Components/Loader";
 
 export default function Section() {
   const [images, setImages] = useState([]);
@@ -13,31 +13,56 @@ export default function Section() {
   const [showControls, setShowControls] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const getSlides = async () => {
       try {
-        const res = await fetch("/api/homepage/slides");
-        const data = await res.json();
+        const res = await fetch("/api/homepage/slides", {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        const data = await res.json().catch(() => null);
 
         if (!res.ok) {
-          throw new Error(data.message || "Failed to load slides");
+          throw new Error(
+            data?.message || `Failed to load slides (${res.status})`,
+          );
         }
 
-        const imageData =
-          data.slides?.map((slide) => slide.image).filter(Boolean) || [];
+        if (!data || !Array.isArray(data.slides)) {
+          throw new Error(data?.message || "Invalid slides API response.");
+        }
+
+        const imageData = data.slides
+          .map((slide) => slide?.image)
+          .filter((src) => typeof src === "string" && src.trim().length > 0);
 
         setImages(imageData);
-
-        if (imageData.length > 0) {
-          setImage(imageData[0]);
-        }
+        setImage(imageData[0] || null);
+        setImageKey(0);
       } catch (error) {
-        console.error("Failed to load slides:", error);
+        if (error.name !== "AbortError") {
+          console.error("Failed to load slides:", error);
+          setImages([]);
+          setImage(null);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     getSlides();
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -45,15 +70,14 @@ export default function Section() {
 
     const interval = setInterval(() => {
       setImage((current) => {
-        if (!current) return images[0];
+        const currentIndex = images.indexOf(current);
+        const nextIndex =
+          currentIndex < 0 ? 0 : (currentIndex + 1) % images.length;
 
-        const index = images.indexOf(current);
-        const nextImage = images[(index + 1) % images.length];
-
-        setImageKey((key) => key + 1);
-
-        return nextImage;
+        return images[nextIndex];
       });
+
+      setImageKey((key) => key + 1);
     }, 5000);
 
     return () => clearInterval(interval);
@@ -81,8 +105,7 @@ export default function Section() {
     if (images.length <= 1) return;
 
     const currentIndex = images.indexOf(image);
-    const previousIndex =
-      (currentIndex - 1 + images.length) % images.length;
+    const previousIndex = (currentIndex - 1 + images.length) % images.length;
 
     handleImageChange(images[previousIndex]);
   };

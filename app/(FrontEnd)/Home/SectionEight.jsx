@@ -17,12 +17,32 @@ export default function SectionEight() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
+  const getLocalizedText = (value, language = "en") => {
+    if (typeof value === "string") return value;
+
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value[language] || value.en || value.fa || value.ps || "";
+    }
+
+    return "";
+  };
+
   useEffect(() => {
-    const loadTestimonials = async () => {
+    let active = true;
+    let requestId = 0;
+
+    const loadTestimonials = async (language) => {
+      const currentRequestId = ++requestId;
+
+      setIsLoading(true);
+
       try {
-        const response = await fetch("/api/homepage/reviews-section", {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/homepage/reviews-section?lang=${encodeURIComponent(language)}`,
+          {
+            cache: "no-store",
+          },
+        );
 
         if (!response.ok) {
           throw new Error("Failed to load testimonials");
@@ -30,38 +50,109 @@ export default function SectionEight() {
 
         const result = await response.json();
 
+        if (!active || currentRequestId !== requestId) {
+          return;
+        }
+
         if (result.success && result.data) {
           if (result.data.section) {
+            const sectionData = result.data.section;
+
             setSection({
-              badgeText: result.data.section.badgeText || "",
-              highlightWord: result.data.section.highlightWord || "",
-              headingLineOne: result.data.section.headingLineOne || "",
-              headingLineTwo: result.data.section.headingLineTwo || "",
-              description: result.data.section.description || "",
+              badgeText: getLocalizedText(sectionData.badgeText, language),
+              highlightWord: getLocalizedText(
+                sectionData.highlightWord,
+                language,
+              ),
+              headingLineOne: getLocalizedText(
+                sectionData.headingLineOne,
+                language,
+              ),
+              headingLineTwo: getLocalizedText(
+                sectionData.headingLineTwo,
+                language,
+              ),
+              description: getLocalizedText(sectionData.description, language),
+            });
+          } else {
+            setSection({
+              badgeText: "",
+              highlightWord: "",
+              headingLineOne: "",
+              headingLineTwo: "",
+              description: "",
             });
           }
 
           if (Array.isArray(result.data.reviews)) {
             setTestimonials(
-              result.data.reviews.filter(
-                (testimonial) =>
-                  testimonial &&
-                  (testimonial.text || testimonial.comment || testimonial.name),
-              ),
+              result.data.reviews
+                .filter(
+                  (testimonial) =>
+                    testimonial &&
+                    (testimonial.text ||
+                      testimonial.comment ||
+                      testimonial.name),
+                )
+                .map((testimonial, index) => ({
+                  ...testimonial,
+                  _renderKey:
+                    testimonial._id ||
+                    testimonial.id ||
+                    `${index}-${getLocalizedText(testimonial.name, language)}`,
+                  name: getLocalizedText(testimonial.name, language),
+                  role: getLocalizedText(testimonial.role, language),
+                  text: getLocalizedText(
+                    testimonial.text || testimonial.comment,
+                    language,
+                  ),
+                })),
             );
           } else {
             setTestimonials([]);
           }
+
+          setCurrentSlide(0);
+        } else {
+          setTestimonials([]);
+          setSection({
+            badgeText: "",
+            highlightWord: "",
+            headingLineOne: "",
+            headingLineTwo: "",
+            description: "",
+          });
         }
       } catch (error) {
-        console.error("Failed to load testimonials:", error);
-        setTestimonials([]);
+        if (active && currentRequestId === requestId) {
+          console.error("Failed to load testimonials:", error);
+          setTestimonials([]);
+        }
       } finally {
-        setIsLoading(false);
+        if (active && currentRequestId === requestId) {
+          setIsLoading(false);
+        }
       }
     };
 
-    loadTestimonials();
+    const initialLanguage = localStorage.getItem("site-language") || "en";
+
+    loadTestimonials(initialLanguage);
+
+    const handleLanguageChange = (event) => {
+      const nextLanguage =
+        event.detail?.language || localStorage.getItem("site-language") || "en";
+
+      loadTestimonials(nextLanguage);
+    };
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+
+    return () => {
+      active = false;
+
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
   }, []);
 
   const slideSets = testimonials.map((_, index) => {
@@ -86,7 +177,9 @@ export default function SectionEight() {
 
   const visibleTestimonials =
     slideSets.length > 0
-      ? slideSets[currentSlide].map((index) => testimonials[index])
+      ? slideSets[currentSlide % slideSets.length].map(
+          (index) => testimonials[index],
+        )
       : [];
 
   const headingParts = section.headingLineOne
@@ -213,7 +306,7 @@ export default function SectionEight() {
             <div className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-3">
               {visibleTestimonials.map((testimonial, index) => (
                 <div
-                  key={testimonial._id || testimonial.id || index}
+                  key={`${testimonial._renderKey}-${index}`}
                   data-wow-duration="0.8s"
                   data-wow-delay={`${0.1 + index * 0.12}s`}
                   className="wow animate__animated animate__fadeInUp group relative flex min-h-80 flex-col justify-between overflow-hidden rounded-3xl border border-[#102326]/8 bg-white/80 p-6 shadow-[0_10px_40px_rgba(16,35,38,0.06)] backdrop-blur-sm transition-all duration-500 hover:-translate-y-2 hover:border-[#1E8A8A]/20 hover:shadow-[0_20px_50px_rgba(16,35,38,0.1)] sm:p-7"
@@ -239,9 +332,9 @@ export default function SectionEight() {
                       </div>
                     </div>
 
-                    {(testimonial.text || testimonial.comment) && (
+                    {testimonial.text && (
                       <p className="mt-7 text-sm leading-7 text-zinc-600 sm:text-base">
-                        {testimonial.text || testimonial.comment}
+                        {testimonial.text}
                       </p>
                     )}
                   </div>
@@ -294,7 +387,7 @@ export default function SectionEight() {
             >
               {slideSets.map((_, index) => (
                 <button
-                  key={index}
+                  key={`testimonial-slide-${index}`}
                   type="button"
                   aria-label={`Go to testimonial slide ${index + 1}`}
                   onClick={() => setCurrentSlide(index)}

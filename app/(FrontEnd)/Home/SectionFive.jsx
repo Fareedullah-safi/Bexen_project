@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, Box } from "lucide-react";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 export default function SectionFive() {
   const [current, setCurrent] = useState(0);
@@ -13,32 +13,102 @@ export default function SectionFive() {
   const [headingTwo, setHeadingTwo] = useState("");
   const [highlight, setHighlight] = useState("");
   const [solutions, setSolutions] = useState([]);
+  const [language, setLanguage] = useState("en");
 
+  // Get text for the currently selected language.
+  const getLocalizedText = (value, selectedLanguage = language) => {
+    if (typeof value === "string") return value;
+
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value[selectedLanguage] || value.en || value.fa || value.ps || "";
+    }
+
+    return "";
+  };
+
+  // Load services and reload them whenever the language changes.
   useEffect(() => {
-    const loadData = async () => {
+    let active = true;
+    let requestId = 0;
+
+    const loadData = async (selectedLanguage) => {
+      const currentRequestId = ++requestId;
+
       try {
-        const res = await fetch("/api/homepage/services", {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `/api/homepage/services?lang=${encodeURIComponent(selectedLanguage)}`,
+          { cache: "no-store" },
+        );
+
         const result = await res.json();
 
-        if (result.success && result.data) {
-          setBadge(result.data.badge || "");
-          setHeadingOne(result.data.headingOne || "");
-          setHeadingTwo(result.data.headingTwo || "");
-          setHighlight(result.data.highlight || "");
-          setSolutions(
-            result.data.solutions?.filter(
-              (solution) => solution?.image && solution?.title,
-            ) || [],
-          );
+        // Prevent an older language request from overwriting newer data.
+        if (
+          !active ||
+          currentRequestId !== requestId ||
+          !result.success ||
+          !result.data
+        ) {
+          return;
         }
+
+        setBadge(getLocalizedText(result.data.badge, selectedLanguage));
+        setHeadingOne(
+          getLocalizedText(result.data.headingOne, selectedLanguage),
+        );
+        setHeadingTwo(
+          getLocalizedText(result.data.headingTwo, selectedLanguage),
+        );
+        setHighlight(getLocalizedText(result.data.highlight, selectedLanguage));
+
+        setSolutions(
+          (Array.isArray(result.data.solutions) ? result.data.solutions : [])
+            .filter(
+              (solution) =>
+                solution?.image &&
+                getLocalizedText(solution?.title, selectedLanguage),
+            )
+            .map((solution) => ({
+              ...solution,
+              title: getLocalizedText(solution.title, selectedLanguage),
+              description: getLocalizedText(
+                solution.description,
+                selectedLanguage,
+              ),
+            })),
+        );
+
+        setCurrent(0);
+        setAnimate(true);
       } catch (error) {
-        console.error("Error loading services:", error);
+        if (active) {
+          console.error("Error loading services:", error);
+        }
       }
     };
 
-    loadData();
+    const initialLanguage =
+      typeof window !== "undefined"
+        ? localStorage.getItem("site-language") || "en"
+        : "en";
+
+    setLanguage(initialLanguage);
+    loadData(initialLanguage);
+
+    const handleLanguageChange = (event) => {
+      const nextLanguage =
+        event.detail?.language || localStorage.getItem("site-language") || "en";
+
+      setLanguage(nextLanguage);
+      loadData(nextLanguage);
+    };
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+
+    return () => {
+      active = false;
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
   }, []);
 
   const sliderItems =
@@ -154,7 +224,7 @@ export default function SectionFive() {
               >
                 {sliderItems.map((solution, index) => (
                   <div
-                    key={`${solution.title}-${index}`}
+                    key={`${solution._id || solution.title}-${index}`}
                     className="w-full shrink-0 px-2 lg:w-1/3"
                   >
                     {/* Card */}

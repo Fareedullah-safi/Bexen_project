@@ -1,9 +1,9 @@
 "use client";
 
+import axios from "axios";
 import { ArrowRight, Box } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import axios from "axios";
 
 export default function SectionSix() {
   const [headerData, setHeaderData] = useState({
@@ -17,27 +17,62 @@ export default function SectionSix() {
   });
 
   const [projects, setProjects] = useState([]);
+  const [language, setLanguage] = useState("en");
+
+  // Get the text for the selected language.
+  const getLocalizedText = (value, selectedLanguage = language) => {
+    if (typeof value === "string") return value;
+
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value[selectedLanguage] || value.en || value.fa || value.ps || "";
+    }
+
+    return "";
+  };
 
   useEffect(() => {
-    const loadData = async () => {
+    let active = true;
+    let requestId = 0;
+
+    const loadData = async (selectedLanguage) => {
+      const currentRequestId = ++requestId;
+
       try {
         const [headerRes, projectsRes] = await Promise.all([
-          axios.get("/api/homepage/projects/header").catch(() => null),
-          axios.get("/api/homepage/projects").catch(() => null),
+          axios
+            .get(
+              `/api/homepage/projects/header?lang=${encodeURIComponent(selectedLanguage)}`,
+              { params: { lang: selectedLanguage } },
+            )
+            .catch(() => null),
+
+          axios
+            .get(
+              `/api/homepage/projects?lang=${encodeURIComponent(selectedLanguage)}`,
+              { params: { lang: selectedLanguage } },
+            )
+            .catch(() => null),
         ]);
+
+        // Ignore outdated responses after a language change.
+        if (!active || currentRequestId !== requestId) return;
 
         if (headerRes?.data) {
           const header =
             headerRes.data.header || headerRes.data.data || headerRes.data;
 
           setHeaderData({
-            badgeText: header.badgeText || "",
-            headingLine: header.headingLine || "",
-            headingText: header.headingText || "",
-            highlightWord: header.highlightWord || "",
-            description: header.description || "",
-            buttonText: header.buttonText || "",
-            buttonLink: header.buttonLink || "",
+            badgeText: getLocalizedText(header.badgeText, selectedLanguage),
+            headingLine: getLocalizedText(header.headingLine, selectedLanguage),
+            headingText: getLocalizedText(header.headingText, selectedLanguage),
+            highlightWord: getLocalizedText(
+              header.highlightWord,
+              selectedLanguage,
+            ),
+            description: getLocalizedText(header.description, selectedLanguage),
+            buttonText: getLocalizedText(header.buttonText, selectedLanguage),
+            buttonLink:
+              typeof header.buttonLink === "string" ? header.buttonLink : "",
           });
         }
 
@@ -50,21 +85,44 @@ export default function SectionSix() {
                 .map((project) => ({
                   ...project,
                   image: project.image || project.imageUrl || project.url || "",
-                  tag: project.tag || "",
-                  title: project.title || "",
+                  tag: getLocalizedText(project.tag, selectedLanguage),
+                  title: getLocalizedText(project.title, selectedLanguage),
                 }))
                 .filter((project) => project.image && project.title),
             );
           } else {
             setProjects([]);
           }
+        } else {
+          setProjects([]);
         }
       } catch (error) {
-        console.error("Failed to load projects:", error);
+        if (active) {
+          console.error("Failed to load projects:", error);
+        }
       }
     };
 
-    loadData();
+    const initialLanguage = localStorage.getItem("site-language") || "en";
+
+    setLanguage(initialLanguage);
+    loadData(initialLanguage);
+
+    const handleLanguageChange = (event) => {
+      const nextLanguage =
+        event.detail?.language || localStorage.getItem("site-language") || "en";
+
+      setLanguage(nextLanguage);
+      loadData(nextLanguage);
+    };
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+
+    return () => {
+      active = false;
+
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
   }, []);
 
   const handleButtonClick = () => {
@@ -182,7 +240,6 @@ export default function SectionSix() {
                 >
                   {headerData.headingLine}
                   {headerData.headingText}
-                  {/* {headerData.headingText}{" "} */}
                   <span className="text-[#1E8A8A]">
                     {" " + headerData.highlightWord}
                   </span>
@@ -239,7 +296,9 @@ export default function SectionSix() {
           (_, rowIndex) => (
             <div
               key={rowIndex}
-              className={`${rowIndex === 0 ? "mt-10" : "pt-5"} w-full px-0 sm:px-4 lg:px-8`}
+              className={`${
+                rowIndex === 0 ? "mt-10" : "pt-5"
+              } w-full px-0 sm:px-4 lg:px-8`}
             >
               <div className="flex w-full flex-col gap-6 lg:flex-row">
                 {projects

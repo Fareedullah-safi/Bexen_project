@@ -1,29 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { ArrowRight, Box, Play, Star } from "lucide-react";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 export default function SectionFour() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [aboutData, setAboutData] = useState(null);
+  const [language, setLanguage] = useState("en");
 
   useEffect(() => {
-    async function fetchAboutData() {
+    let active = true;
+
+    async function fetchAboutData(language = "en") {
       try {
-        const response = await fetch("/api/homepage/about-us", {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/homepage/about-us?lang=${encodeURIComponent(language)}`,
+          {
+            cache: "no-store",
+          }
+        );
 
         const result = await response.json();
 
-        if (result.success && result.data) {
+        if (active && result.success && result.data) {
           setAboutData({
             ...result.data,
-            mainImage: result.data.mainImage || { url: "", publicId: "" },
+            mainImage: result.data.mainImage || {
+              url: "",
+              publicId: "",
+            },
             thumbnailImage: result.data.thumbnailImage?.url
               ? result.data.thumbnailImage
-              : result.data.clientImage || { url: "", publicId: "" },
+              : result.data.clientImage || {
+                  url: "",
+                  publicId: "",
+                },
           });
         }
       } catch (error) {
@@ -31,8 +43,51 @@ export default function SectionFour() {
       }
     }
 
-    fetchAboutData();
+    const savedLanguage =
+      localStorage.getItem("site-language") || "en";
+
+    setLanguage(savedLanguage);
+    fetchAboutData(savedLanguage);
+
+    const handleLanguageChange = (event) => {
+      const nextLanguage =
+        event.detail?.language ||
+        localStorage.getItem("site-language") ||
+        "en";
+
+      setLanguage(nextLanguage);
+      fetchAboutData(nextLanguage);
+    };
+
+    window.addEventListener(
+      "site-language-change",
+      handleLanguageChange
+    );
+
+    return () => {
+      active = false;
+      window.removeEventListener(
+        "site-language-change",
+        handleLanguageChange
+      );
+    };
   }, []);
+
+  const getLocalizedText = (value) => {
+    if (typeof value === "string") return value;
+
+    if (value && typeof value === "object") {
+      return (
+        value[language] ||
+        value.en ||
+        value.fa ||
+        value.ps ||
+        ""
+      );
+    }
+
+    return "";
+  };
 
   const getImageUrl = (image) => {
     let url = "";
@@ -43,7 +98,9 @@ export default function SectionFour() {
       url = image.url;
     }
 
-    return typeof url === "string" ? url.replace(/^http:\/\//, "https://") : "";
+    return typeof url === "string"
+      ? url.replace(/^http:\/\//, "https://")
+      : "";
   };
 
   const mainImage = getImageUrl(aboutData?.mainImage);
@@ -76,15 +133,15 @@ export default function SectionFour() {
           >
             <div className="w-52.5 rounded-tr-2xl bg-white p-5 sm:w-62.5 sm:p-6 md:w-70 md:p-7">
               <p className="text-sm font-medium text-[#229393] sm:text-base md:text-lg">
-                {aboutData?.experienceLabel}
+                {getLocalizedText(aboutData?.experienceLabel)}
               </p>
 
               <h2 className="mt-6 text-4xl leading-none font-bold text-[#102326] sm:mt-8 sm:text-5xl md:mt-10 md:text-6xl">
-                {aboutData?.experienceNumber}
+                {getLocalizedText(aboutData?.experienceNumber)}
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base sm:leading-7 md:text-lg">
-                {aboutData?.experienceText}
+                {getLocalizedText(aboutData?.experienceText)}
               </p>
             </div>
           </div>
@@ -110,7 +167,7 @@ export default function SectionFour() {
               />
 
               <span className="text-sm font-bold tracking-wide text-zinc-950">
-                {aboutData?.sectionLabel}
+                {getLocalizedText(aboutData?.sectionLabel)}
               </span>
             </span>
 
@@ -120,7 +177,7 @@ export default function SectionFour() {
               data-wow-duration="1s"
               data-wow-delay="0.5s"
             >
-              {aboutData?.title}
+              {getLocalizedText(aboutData?.title)}
             </h1>
 
             {/* Button */}
@@ -129,25 +186,26 @@ export default function SectionFour() {
               data-wow-duration="0.8s"
               data-wow-delay="0.7s"
             >
-              {aboutData?.buttonText && aboutData?.buttonLink && (
-                <a
-                  href={aboutData.buttonLink}
-                  className="group/button inline-flex w-35 cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#0C1E21] py-1 pr-1 pl-4 text-xs font-semibold text-white transition-colors duration-300 hover:bg-[#1E8A8A]"
-                >
-                  <span className="overflow-hidden leading-none">
-                    <span className="block transition-transform duration-400 ease-in-out [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5">
-                      {aboutData.buttonText}
+              {getLocalizedText(aboutData?.buttonText) &&
+                aboutData?.buttonLink && (
+                  <a
+                    href={aboutData.buttonLink}
+                    className="group/button inline-flex w-35 cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#0C1E21] py-1 pr-1 pl-4 text-xs font-semibold text-white transition-colors duration-300 hover:bg-[#1E8A8A]"
+                  >
+                    <span className="overflow-hidden leading-none">
+                      <span className="block transition-transform duration-400 ease-in-out [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5">
+                        {getLocalizedText(aboutData.buttonText)}
+                      </span>
                     </span>
-                  </span>
 
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white">
-                    <ArrowRight
-                      size={16}
-                      className="-rotate-45 text-[#0C1E21] transition-transform duration-300 group-hover/button:rotate-0"
-                    />
-                  </span>
-                </a>
-              )}
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white">
+                      <ArrowRight
+                        size={16}
+                        className="-rotate-45 text-[#0C1E21] transition-transform duration-300 group-hover/button:rotate-0"
+                      />
+                    </span>
+                  </a>
+                )}
             </div>
           </div>
 
@@ -173,15 +231,17 @@ export default function SectionFour() {
 
               {/* Testimonial */}
               <p className="mt-5 text-sm leading-6 text-white/90 sm:text-base">
-                {aboutData?.description}
+                {getLocalizedText(aboutData?.description)}
               </p>
 
               {/* Person */}
               <div className="mt-5">
-                <p className="text-sm font-semibold">{aboutData?.clientName}</p>
+                <p className="text-sm font-semibold">
+                  {getLocalizedText(aboutData?.clientName)}
+                </p>
 
                 <p className="mt-1 text-xs text-white/70">
-                  {aboutData?.clientRole}
+                  {getLocalizedText(aboutData?.clientRole)}
                 </p>
               </div>
             </div>
@@ -233,7 +293,14 @@ export default function SectionFour() {
               ) : (
                 <iframe
                   className="absolute inset-0 h-full w-full"
-                  src={`https://www.youtube.com/embed/${(aboutData?.videoUrl || "https://youtu.be/bAhM3td5PzY").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&/]+)/)?.[1] || "bAhM3td5PzY"}?autoplay=1`}
+                  src={`https://www.youtube.com/embed/${
+                    (
+                      aboutData?.videoUrl ||
+                      "https://youtu.be/bAhM3td5PzY"
+                    ).match(
+                      /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&/]+)/
+                    )?.[1] || "bAhM3td5PzY"
+                  }?autoplay=1`}
                   title="Discover Our Story"
                   allow="autoplay; encrypted-media; picture-in-picture"
                   allowFullScreen

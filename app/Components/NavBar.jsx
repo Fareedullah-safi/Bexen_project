@@ -51,6 +51,18 @@ export const NavBar = () => {
   const isRTL = lang.code === "fa" || lang.code === "ps";
 
   useEffect(() => {
+    const savedLanguage = localStorage.getItem("site-language");
+    const selectedLanguage =
+      LANGUAGES.find((item) => item.code === savedLanguage) || LANGUAGES[0];
+
+    setLang(selectedLanguage);
+
+    document.documentElement.lang = selectedLanguage.code;
+    document.documentElement.dir =
+      selectedLanguage.code === "en" ? "ltr" : "rtl";
+  }, []);
+
+  useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;
 
@@ -73,8 +85,16 @@ export const NavBar = () => {
   const pickLanguage = (e, l) => {
     setLang(l);
 
+    localStorage.setItem("site-language", l.code);
+
     document.documentElement.lang = l.code;
     document.documentElement.dir = l.code === "en" ? "ltr" : "rtl";
+
+    window.dispatchEvent(
+      new CustomEvent("site-language-change", {
+        detail: { language: l.code },
+      }),
+    );
 
     e.currentTarget.blur();
   };
@@ -244,6 +264,7 @@ export const NavBar = () => {
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search..."
                     aria-label="Search"
+                    dir={isRTL ? "rtl" : "ltr"}
                     className={`h-11 w-full rounded-full border border-gray-200 px-5 text-sm transition-colors outline-none focus:border-[#1E8A8A] ${
                       isRTL ? "text-right" : "text-left"
                     }`}

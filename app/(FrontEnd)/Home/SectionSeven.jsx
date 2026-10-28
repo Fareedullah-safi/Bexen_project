@@ -1,69 +1,38 @@
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-
-function AnimatedNumber({ value }) {
-  const [number, setNumber] = useState(0);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const element = ref.current;
-
-    if (!element) return;
-
-    let animationFrame;
-    let observer;
-
-    observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return;
-
-        const startTime = performance.now();
-        const duration = 2000;
-
-        const animate = (currentTime) => {
-          const progress = Math.min((currentTime - startTime) / duration, 1);
-
-          const easeOut = 1 - Math.pow(1 - progress, 4);
-          const currentValue = value * easeOut;
-
-          setNumber(Number(currentValue.toFixed(1)));
-
-          if (progress < 1) {
-            animationFrame = requestAnimationFrame(animate);
-          }
-        };
-
-        animationFrame = requestAnimationFrame(animate);
-        observer.disconnect();
-      },
-      {
-        threshold: 0.3,
-      },
-    );
-
-    observer.observe(element);
-
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(animationFrame);
-    };
-  }, [value]);
-
-  return <span ref={ref}>{number}</span>;
-}
+import { useEffect, useState } from "react";
 
 export default function SectionSeven() {
   const [stats, setStats] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const getLocalizedText = (value, language = "en") => {
+    if (typeof value === "string") return value;
+
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value[language] || value.en || value.fa || value.ps || "";
+    }
+
+    return "";
+  };
+
   useEffect(() => {
-    const loadStats = async () => {
+    let active = true;
+    let requestId = 0;
+
+    const loadStats = async (language) => {
+      const currentRequestId = ++requestId;
+
+      setIsLoading(true);
+
       try {
-        const response = await fetch("/api/homepage/reviews-section", {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/homepage/reviews-section?lang=${encodeURIComponent(language)}`,
+          {
+            cache: "no-store",
+          },
+        );
 
         if (!response.ok) {
           throw new Error("Failed to load stats");
@@ -71,32 +40,52 @@ export default function SectionSeven() {
 
         const result = await response.json();
 
+        if (!active || currentRequestId !== requestId) {
+          return;
+        }
+
         if (result.success && Array.isArray(result.data?.stats)) {
           setStats(
             result.data.stats
-              .map((stat) => {
-                const match = String(stat.value || "").match(
-                  /^(\d+(?:\.\d+)?)(.*)$/,
-                );
-
-                return {
-                  number: match ? Number(match[1]) : 0,
-                  suffix: match ? match[2] : "",
-                  title: stat.label || "",
-                };
-              })
-              .filter((stat) => stat.title || stat.number || stat.suffix),
+              .map((stat) => ({
+                value: getLocalizedText(stat.value, language),
+                title: getLocalizedText(stat.label, language),
+              }))
+              .filter((stat) => stat.value || stat.title),
           );
+        } else {
+          setStats([]);
         }
       } catch (error) {
-        console.error("Failed to load stats:", error);
-        setStats([]);
+        if (active && currentRequestId === requestId) {
+          console.error("Failed to load stats:", error);
+          setStats([]);
+        }
       } finally {
-        setIsLoading(false);
+        if (active && currentRequestId === requestId) {
+          setIsLoading(false);
+        }
       }
     };
 
-    loadStats();
+    const initialLanguage = localStorage.getItem("site-language") || "en";
+
+    loadStats(initialLanguage);
+
+    const handleLanguageChange = (event) => {
+      const nextLanguage =
+        event.detail?.language || localStorage.getItem("site-language") || "en";
+
+      loadStats(nextLanguage);
+    };
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+
+    return () => {
+      active = false;
+
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
   }, []);
 
   if (isLoading) {
@@ -117,7 +106,7 @@ export default function SectionSeven() {
         <div className="grid grid-cols-1 overflow-hidden rounded-3xl border border-white/15 bg-[#1E8A8A] shadow-2xl sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat, index) => (
             <div
-              key={stat.title || index}
+              key={`${stat.title}-${index}`}
               data-wow-duration="0.8s"
               data-wow-delay={`${index * 0.12}s`}
               className="wow animate__animated animate__fadeInUp group relative flex min-h-52 cursor-pointer flex-col justify-between overflow-hidden border-b border-white/15 px-6 py-7 transition-all duration-500 hover:bg-[#0C1E21]/15 sm:px-8 lg:min-h-60 lg:border-r lg:border-b-0 lg:last:border-r-0"
@@ -143,11 +132,7 @@ export default function SectionSeven() {
               <div className="relative mt-6">
                 <div className="flex items-end gap-2">
                   <span className="text-5xl leading-none font-medium tracking-tight text-white sm:text-7xl">
-                    <AnimatedNumber value={stat.number} />
-                  </span>
-
-                  <span className="pb-1 text-2xl leading-none font-medium text-white/70 sm:text-3xl">
-                    {stat.suffix}
+                    {stat.value}
                   </span>
                 </div>
 

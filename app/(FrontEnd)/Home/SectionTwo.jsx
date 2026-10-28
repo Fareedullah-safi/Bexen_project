@@ -1,36 +1,56 @@
 "use client";
 
+import Loader from "@/app/Components/Loader";
+import { Box } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Box } from "lucide-react";
-import Loader from "@/app/Components/Loader";
 
 export default function SectionTwo() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = async () => {
+    let active = true;
+
+    const loadData = async (language = "en") => {
       try {
-        const res = await fetch("/api/homepage/features", {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `/api/homepage/features?lang=${encodeURIComponent(language)}`,
+          {
+            cache: "no-store",
+          },
+        );
 
         const result = await res.json().catch(() => null);
 
-        if (res.ok && result?.data) {
+        if (active && res.ok && result?.data) {
           setData(result.data);
         }
       } catch (err) {
         console.error("Failed to load features data:", err);
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
-    loadData();
-  }, []);
+    loadData(localStorage.getItem("site-language") || "en");
 
+    const handleLanguageChange = (event) => {
+      const language =
+        event.detail?.language || localStorage.getItem("site-language") || "en";
+
+      loadData(language);
+    };
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+
+    return () => {
+      active = false;
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
+  }, []);
   if (loading) {
     return (
       <section className="w-full">

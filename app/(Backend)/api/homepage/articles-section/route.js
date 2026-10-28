@@ -131,6 +131,10 @@ export async function GET() {
 
     const section = await BlogSection.findOne().lean();
 
+    console.log("Blog section found:", Boolean(section));
+    console.log("Posts count:", section?.posts?.length);
+    console.log("Posts data:", JSON.stringify(section?.posts, null, 2));
+
     return NextResponse.json({
       success: true,
       data: {
