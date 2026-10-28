@@ -34,6 +34,12 @@ export async function GET() {
 // POST: Update or Insert data
 export async function POST(req) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+
     await dbConnect();
 
     // Parse incoming JSON safely

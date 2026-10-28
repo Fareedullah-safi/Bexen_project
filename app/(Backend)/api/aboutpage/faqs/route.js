@@ -1,3 +1,4 @@
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import dbConnect from "@/Lib/mongoDB"; // Adjust path to your db connection helper
 import AboutUsFaqs from "@/Models/About-Page-Models/AboutUsFaqs/FAQS";
 import { NextResponse } from "next/server";
@@ -32,6 +33,12 @@ export async function GET() {
 // POST: Update existing FAQ section or create single document
 export async function POST(req) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+
     await dbConnect();
     const body = await req.json();
 

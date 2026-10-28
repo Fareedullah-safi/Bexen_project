@@ -1,3 +1,4 @@
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import dbConnect from "@/Lib/mongoDB"; // your MongoDB connection utility
 import AboutSection from "@/Models/About-Page-Models/MissionVision/MissionVision";
 import { NextResponse } from "next/server";
@@ -27,6 +28,12 @@ export async function GET() {
 // POST/PUT: Update or Create section data
 export async function POST(req) {
   try {
+    const permission = await requireEditPermission();
+    
+      if (!permission.authorized) {
+        return permission.response;
+      }
+    
     await dbConnect();
     const body = await req.json();
 
