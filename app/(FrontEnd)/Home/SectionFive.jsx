@@ -42,13 +42,16 @@ export default function SectionFive() {
 
         const result = await res.json();
 
-        // Prevent an older language request from overwriting newer data.
         if (
           !active ||
           currentRequestId !== requestId ||
+          !res.ok ||
           !result.success ||
           !result.data
         ) {
+          if (active && !res.ok) {
+            console.error("Failed to load services:", res.status);
+          }
           return;
         }
 
@@ -87,20 +90,38 @@ export default function SectionFive() {
       }
     };
 
-    const initialLanguage =
-      typeof window !== "undefined"
-        ? localStorage.getItem("site-language") || "en"
-        : "en";
+    let initialLanguage = "en";
+
+    try {
+      initialLanguage = localStorage.getItem("site-language") || "en";
+    } catch {
+      // Use English if localStorage is unavailable.
+    }
+
+    if (!["en", "fa", "ps"].includes(initialLanguage)) {
+      initialLanguage = "en";
+    }
 
     setLanguage(initialLanguage);
     loadData(initialLanguage);
 
     const handleLanguageChange = (event) => {
-      const nextLanguage =
-        event.detail?.language || localStorage.getItem("site-language") || "en";
+      let storedLanguage = "en";
 
-      setLanguage(nextLanguage);
-      loadData(nextLanguage);
+      try {
+        storedLanguage = localStorage.getItem("site-language") || "en";
+      } catch {
+        // Use English if localStorage is unavailable.
+      }
+
+      const nextLanguage = event.detail?.language || storedLanguage;
+
+      const validLanguage = ["en", "fa", "ps"].includes(nextLanguage)
+        ? nextLanguage
+        : "en";
+
+      setLanguage(validLanguage);
+      loadData(validLanguage);
     };
 
     window.addEventListener("site-language-change", handleLanguageChange);
@@ -233,17 +254,17 @@ export default function SectionFive() {
                       data-wow-duration="0.8s"
                       data-wow-delay={`${0.1 + (index % 3) * 0.15}s`}
                     >
-                      {/* Image */}
+                      {/* Image: visible on mobile/tablet, hover reveal on desktop */}
                       <Image
                         src={solution.image}
                         alt={solution.title || "Service"}
                         fill
                         sizes="(max-width: 1023px) calc(100vw - 40px), (max-width: 1280px) 33vw, 400px"
-                        className="scale-105 object-cover opacity-0 transition-all duration-700 group-hover:scale-110 group-hover:opacity-100"
+                        className="scale-105 object-cover opacity-100 transition-all duration-700 group-hover:scale-110 lg:opacity-0 lg:group-hover:opacity-100"
                       />
 
                       {/* Dark Overlay */}
-                      <div className="absolute inset-0 bg-linear-to-t from-[#071719] via-[#071719]/70 to-[#071719]/20 opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
+                      <div className="absolute inset-0 bg-linear-to-t from-[#071719] via-[#071719]/70 to-[#071719]/20 opacity-100 transition-opacity duration-700 lg:opacity-0 lg:group-hover:opacity-100" />
 
                       {/* Content */}
                       <div className="absolute right-0 bottom-0 left-0 z-10 p-5 sm:p-6">
@@ -260,8 +281,8 @@ export default function SectionFive() {
                           {solution.title}
                         </h2>
 
-                        {/* Hidden Content */}
-                        <div className="max-h-0 overflow-hidden opacity-0 transition-all duration-500 group-hover:max-h-48 group-hover:opacity-100">
+                        {/* Description and Learn More: always visible on mobile/tablet */}
+                        <div className="max-h-48 overflow-hidden opacity-100 transition-all duration-500 lg:max-h-0 lg:opacity-0 lg:group-hover:max-h-48 lg:group-hover:opacity-100">
                           {solution.description && (
                             <p className="mt-4 text-sm leading-6 text-zinc-300">
                               {solution.description}
