@@ -1,5 +1,5 @@
 import dbConnect from "@/Lib/mongoDB"; // your MongoDB connection utility
-import AboutSection from "@/models/About-Page-Models/MissionVision/MissionVision";
+import AboutSection from "@/Models/About-Page-Models/MissionVision/MissionVision";
 import { NextResponse } from "next/server";
 
 // GET: Fetch the section data
