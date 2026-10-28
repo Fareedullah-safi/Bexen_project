@@ -399,6 +399,7 @@ export default function Features() {
   }, []);
 
   /* ==================== LANGUAGE SELECTOR ==================== */
+  /* ==================== LANGUAGE SELECTOR ==================== */
 
   useEffect(() => {
     const handleLanguageChange = (event) => {
@@ -643,7 +644,7 @@ export default function Features() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px]">
-      <AdminLanguageBall />
+      <AdminLanguageBall language={language} onLanguageChange={setLanguage} />
 
       <Script
         src="https://upload-widget.cloudinary.com/latest/global/all.js"
