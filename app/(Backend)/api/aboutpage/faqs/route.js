@@ -1,50 +1,58 @@
-import dbConnect from "@/Lib/mongoDB"; // Change this if your DB connection file is located elsewhere
-import FAQSection from "@/Models/About-Page-Models/faqs/FAQS";
+import dbConnect from "@/Lib/mongoDB"; // Adjust path to your db connection helper
+import AboutUsFaqs from "@/Models/About-Page-Models/AboutUsFaqs/FAQS";
 import { NextResponse } from "next/server";
 
-// GET: Fetch the FAQ data
+// GET: Fetch existing FAQs or create initial default record if empty
 export async function GET() {
   try {
     await dbConnect();
 
-    // Find the single document
-    let data = await FAQSection.findOne();
+    let faqData = await AboutUsFaqs.findOne();
 
-    // If it's the very first time loading and the DB is empty, create the default structure
-    if (!data) {
-      data = await FAQSection.create({});
+    // If no document exists yet, create default record
+    if (!faqData) {
+      faqData = await AboutUsFaqs.create({});
     }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({
+      success: true,
+      data: faqData,
+    });
   } catch (error) {
     return NextResponse.json(
-      { success: false, message: error.message },
+      {
+        success: false,
+        message: error.message || "Failed to fetch FAQ section",
+      },
       { status: 500 },
     );
   }
 }
 
-// POST: Update the FAQ Data
+// POST: Update existing FAQ section or create single document
 export async function POST(req) {
   try {
     await dbConnect();
     const body = await req.json();
 
-    // Updates the existing document, or creates it if it doesn't exist yet
-    const updatedData = await FAQSection.findOneAndUpdate(
-      {}, // Empty filter targets the first/only document
-      body,
-      { new: true, upsert: true, runValidators: true },
-    );
+    const updatedFaq = await AboutUsFaqs.findOneAndUpdate({}, body, {
+      new: true,
+      upsert: true,
+      runValidators: true,
+      setDefaultsOnInsert: true,
+    });
 
     return NextResponse.json({
       success: true,
-      message: "FAQ Section updated successfully",
-      data: updatedData,
+      message: "FAQ Section updated successfully.",
+      data: updatedFaq,
     });
   } catch (error) {
     return NextResponse.json(
-      { success: false, message: error.message },
+      {
+        success: false,
+        message: error.message || "Failed to update FAQ section",
+      },
       { status: 500 },
     );
   }
