@@ -1,24 +1,9 @@
 "use client";
 
-// ============================================================================
-// SectionOne — Service Details Page
-// ----------------------------------------------------------------------------
-// Uses WOW.js + animate.css for scroll/on-load entrance animations.
-// FAQ accordion uses a pure CSS height transition (no animation library).
-// ============================================================================
-
-import { useId, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Plus,
-  Minus,
-  Grid3x3,
-  Phone,
-} from "lucide-react";
+import { useId, useState } from "react";
 
 // ----------------------------------------------------------------------------
 // Constants
@@ -130,7 +115,7 @@ export default function SectionOne() {
         {/* ------------------------------------------------------------- */}
 
         <main className="min-w-0">
-          {/* Hero image */}
+          {/* Hero image — fixed loading */}
           <div
             data-wow-duration="1s"
             data-wow-delay="0.1s"
@@ -143,12 +128,13 @@ export default function SectionOne() {
               width={1000}
               height={700}
               priority
+              unoptimized
               sizes="(max-width: 1024px) 100vw, 70vw"
               className="xs:h-[200px] h-[180px] w-full object-cover transition-transform duration-700 hover:scale-[1.03] sm:h-[280px] md:h-[360px] lg:h-[420px]"
             />
           </div>
 
-          {/* Heading + intro */}
+          {/* Heading + intro — VISIBLE (Image 1) */}
           <div className="mt-7 sm:mt-10">
             <h1
               data-wow-duration="0.9s"
@@ -197,7 +183,8 @@ export default function SectionOne() {
             </p>
           </div>
 
-          {/* Feature list */}
+          {/* ===================== HIDDEN: Feature list ===================== */}
+          {/*
           <div className="mt-7 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-2">
             {FEATURES.map((feature, index) => (
               <div
@@ -214,15 +201,16 @@ export default function SectionOne() {
                     aria-hidden="true"
                   />
                 </span>
-
                 <span className="text-sm font-semibold text-[#0C1E21] sm:text-[15px]">
                   {feature.label}
                 </span>
               </div>
             ))}
           </div>
+          */}
 
-          {/* Supporting images */}
+          {/* ===================== HIDDEN: Supporting images ===================== */}
+          {/*
           <div className="mt-10 grid grid-cols-1 gap-4 sm:mt-14 sm:gap-5 md:grid-cols-2 md:gap-6">
             <div
               data-wow-duration="0.9s"
@@ -235,6 +223,7 @@ export default function SectionOne() {
                 alt="Customer service team at work"
                 width={800}
                 height={600}
+                unoptimized
                 sizes="(max-width: 768px) 100vw, 50vw"
                 className="h-[240px] w-full object-cover transition-transform duration-700 hover:scale-105 sm:h-[300px] md:h-[420px]"
               />
@@ -251,13 +240,16 @@ export default function SectionOne() {
                 alt="Business discussing customer experience strategy"
                 width={800}
                 height={600}
+                unoptimized
                 sizes="(max-width: 768px) 100vw, 50vw"
                 className="h-[240px] w-full object-cover transition-transform duration-700 hover:scale-105 sm:h-[300px] md:h-[420px]"
               />
             </div>
           </div>
+          */}
 
-          {/* Services intro */}
+          {/* ===================== HIDDEN: Services intro ===================== */}
+          {/*
           <div className="mt-10 sm:mt-16">
             <h2
               data-wow-duration="0.8s"
@@ -281,8 +273,10 @@ export default function SectionOne() {
               customers and improve every interaction.
             </p>
           </div>
+          */}
 
-          {/* Benefits — stacked rows */}
+          {/* ===================== HIDDEN: Benefits ===================== */}
+          {/*
           <div className="mt-8 flex flex-col sm:mt-10">
             {BENEFITS.map((item, index) => (
               <div
@@ -299,12 +293,10 @@ export default function SectionOne() {
                 <span className="shrink-0 text-sm font-bold tracking-wider text-[#1E8A8A]">
                   {item.number}
                 </span>
-
                 <div>
                   <h3 className="text-lg font-semibold text-[#0C1E21] sm:text-xl md:text-2xl">
                     {item.title}
                   </h3>
-
                   <p className="mt-2 max-w-2xl text-sm leading-7 text-[#102326]/60 sm:text-base">
                     {item.text}
                   </p>
@@ -312,8 +304,10 @@ export default function SectionOne() {
               </div>
             ))}
           </div>
+          */}
 
-          {/* FAQ */}
+          {/* ===================== HIDDEN: FAQ ===================== */}
+          {/*
           <div className="mt-14 sm:mt-20">
             <h2
               data-wow-duration="0.8s"
@@ -361,7 +355,6 @@ export default function SectionOne() {
                       >
                         {faq.question}
                       </span>
-
                       <span
                         className={`flex shrink-0 items-center justify-center rounded-full border-2 transition-all duration-500 ease-in-out ${
                           isOpen
@@ -377,7 +370,6 @@ export default function SectionOne() {
                       </span>
                     </button>
 
-                    {/* Pure CSS slow-mo height transition */}
                     <div
                       id={panelId}
                       role="region"
@@ -390,7 +382,6 @@ export default function SectionOne() {
                     >
                       <div className="overflow-hidden">
                         <div className="mx-4 border-t border-dashed border-white/25 sm:mx-6" />
-
                         <p className="px-4 pt-4 pb-4 text-sm leading-7 text-white/85 transition-all duration-500 sm:px-6 sm:pb-5">
                           {faq.answer}
                         </p>
@@ -401,8 +392,10 @@ export default function SectionOne() {
               })}
             </div>
           </div>
+          */}
 
-          {/* Previous / Grid / Next */}
+          {/* ===================== HIDDEN: Previous / Grid / Next ===================== */}
+          {/*
           <nav
             data-wow-duration="0.6s"
             data-wow-delay="0.1s"
@@ -418,7 +411,6 @@ export default function SectionOne() {
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm transition-all duration-300 group-hover:bg-[#1E8A8A] group-hover:text-white sm:h-11 sm:w-11">
                 <ArrowLeft size={ICON_SIZE_LG} aria-hidden="true" />
               </span>
-
               <span className="hidden sm:inline">Previous</span>
             </Link>
 
@@ -436,12 +428,12 @@ export default function SectionOne() {
               className="group inline-flex items-center gap-2.5 text-sm font-semibold text-[#0C1E21] transition-colors duration-300 hover:text-[#1E8A8A] focus-visible:ring-2 focus-visible:ring-[#1E8A8A] focus-visible:ring-offset-2 focus-visible:outline-none sm:gap-3"
             >
               <span className="hidden sm:inline">Next</span>
-
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm transition-all duration-300 group-hover:bg-[#1E8A8A] group-hover:text-white sm:h-11 sm:w-11">
                 <ArrowRight size={ICON_SIZE_LG} aria-hidden="true" />
               </span>
             </Link>
           </nav>
+          */}
         </main>
 
         {/* ------------------------------------------------------------- */}
@@ -452,7 +444,7 @@ export default function SectionOne() {
           style={{ contain: "layout" }}
           className="will-change-transform lg:sticky lg:top-10 lg:self-start"
         >
-          {/* More services */}
+          {/* More services — VISIBLE (Image 2) */}
           <div
             data-wow-duration="0.9s"
             data-wow-delay="0.15s"
@@ -463,7 +455,6 @@ export default function SectionOne() {
               <span className="text-xs font-bold tracking-[0.18em] text-[#1E8A8A]">
                 SERVICES
               </span>
-
               <h3 className="mt-2 text-xl font-medium text-[#0C1E21] sm:text-2xl">
                 More services
               </h3>
@@ -486,7 +477,6 @@ export default function SectionOne() {
                   <span className="text-sm leading-5 font-semibold">
                     {service.label}
                   </span>
-
                   <span
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
                       index === 0
@@ -505,7 +495,8 @@ export default function SectionOne() {
             </div>
           </div>
 
-          {/* Promo card */}
+          {/* ===================== HIDDEN: Promo card ===================== */}
+          {/*
           <div
             data-wow-duration="0.8s"
             data-wow-delay="0.3s"
@@ -515,11 +506,9 @@ export default function SectionOne() {
             <h3 className="text-4xl leading-none font-bold sm:text-5xl">
               Modern
             </h3>
-
             <p className="mt-2 text-lg text-white/80 sm:text-xl">
               Home Makeover
             </p>
-
             <a
               href="tel:+8321890640"
               className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#1E8A8A] px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-300 hover:bg-[#167575] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:outline-none"
@@ -527,20 +516,20 @@ export default function SectionOne() {
               <Phone size={ICON_SIZE_SM} aria-hidden="true" />
               +8 (321) 890-640
             </a>
-
-            {/* Image bleeding off the card */}
             <div className="relative mt-6 flex justify-end sm:mt-8">
               <div className="xs:h-56 xs:w-56 relative -mr-8 -mb-8 h-48 w-48 overflow-hidden rounded-full border-[3px] border-[#1E8A8A] sm:-mr-12 sm:-mb-12 sm:h-64 sm:w-64 md:-mr-16 md:-mb-16 md:h-72 md:w-72">
                 <Image
                   src={`${IMG_BASE}/service-ad.webp`}
                   alt="Customer experience consultant"
                   fill
+                  unoptimized
                   sizes="(max-width: 640px) 192px, (max-width: 768px) 256px, 288px"
                   className="object-cover"
                 />
               </div>
             </div>
           </div>
+          */}
         </aside>
       </div>
     </section>

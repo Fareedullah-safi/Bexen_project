@@ -69,24 +69,12 @@ const navigation = [
         ],
       },
       {
-        name: "Services",
+        name: "Services Page",
         icon: BriefcaseBusiness,
         children: [
           {
-            name: "Business Strategy Development",
-            href: "/admin/services/business-strategy-development",
-          },
-          {
-            name: "Customer Experience Solutions",
-            href: "/admin/services/customer-experience-solutions",
-          },
-          {
-            name: "Sustainability and ESG Consulting",
-            href: "/admin/services/sustainability-esg-consulting",
-          },
-          {
-            name: "Training and Development Programs",
-            href: "/admin/services/training-development-programs",
+            name: "Services",
+            href: "/admin/services/services-details",
           },
         ],
       },
