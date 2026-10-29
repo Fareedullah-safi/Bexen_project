@@ -27,8 +27,14 @@ const NAV = [
       { label: "Portfolio Details", href: "/portfolio-details" },
     ],
   },
-  { label: "Blog", href: "/blog", blog: true },
-  { label: "Contact", href: "/contact" },
+  {
+    label: "Media",
+    href: "/media/ablums",
+    children: [
+      { label: "Ablums", href: "/media/ablums" },
+      { label: "Videos", href: "/media/videos" },
+    ],
+  },
 ];
 
 const DROP =
