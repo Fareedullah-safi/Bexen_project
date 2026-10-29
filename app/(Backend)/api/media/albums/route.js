@@ -1,89 +1,66 @@
-import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
-import GallerySection from "@/Models/Media/Albums/AblumsSection";
+import GalleryAlbum from "@/Models/Media/Albums/AblumsSection";
 import { NextResponse } from "next/server";
 
-// GET gallery
 export async function GET() {
   try {
     await connectDB();
-    let data = await GallerySection.findOne().lean();
-    if (!data) data = await GallerySection.create({});
-    return NextResponse.json({ success: true, data });
+    let doc = await GalleryAlbum.findOne().lean();
+    if (!doc) {
+      doc = await GalleryAlbum.create({
+        translations: {
+          en: {
+            title: "Photo Albums",
+            subtitle: "Explore our image collections.",
+          },
+          ps: {
+            title: "د انځورونو البومونه",
+            subtitle: "زموږ د انځورونو ټولګې وګورئ.",
+          },
+          fa: {
+            title: "آلبوم‌های عکس",
+            subtitle: "مجموعه‌های تصاویر ما را مشاهده کنید.",
+          },
+        },
+        albums: [],
+      });
+    }
+    return NextResponse.json({ success: true, data: doc });
   } catch (error) {
     return NextResponse.json(
-      { success: false, message: error.message },
+      { success: false, message: error.message || "Failed to fetch albums." },
       { status: 500 },
     );
   }
 }
 
-// POST: save gallery OR delete one image
-export async function POST(request) {
+export async function POST(req) {
   try {
-    const permission = await requireEditPermission();
-    if (!permission.authorized) return permission.response;
-
     await connectDB();
-    const body = await request.json();
+    const body = await req.json();
 
-    // ── Delete image (Cloudinary + DB) ─────────────────────────────
-    if (body?.action === "deleteImage") {
-      const { publicId } = body;
-
-      if (!publicId || typeof publicId !== "string") {
-        return NextResponse.json(
-          { success: false, message: "publicId is required" },
-          { status: 400 },
-        );
-      }
-
+    // Single Cloudinary image destruction handler
+    if (body.publicId && !body.albums) {
       try {
-        await cloudinary.uploader.destroy(publicId);
-      } catch (err) {
-        console.error("Cloudinary destroy:", err.message);
-        // still remove from DB
+        await cloudinary.uploader.destroy(body.publicId);
+      } catch (e) {
+        console.warn("Cloudinary delete warning:", e.message);
       }
-
-      const data = await GallerySection.findOneAndUpdate(
-        {},
-        { $pull: { images: { publicId } } },
-        { new: true, upsert: true },
-      );
-
-      return NextResponse.json({
-        success: true,
-        message: "Image deleted",
-        data,
-      });
+      return NextResponse.json({ success: true, message: "Image destroyed." });
     }
 
-    // ── Full save (titles + images order) ──────────────────────────
-    const data = await GallerySection.findOneAndUpdate(
-      {},
-      {
-        $set: {
-          translations: body.translations,
-          images: body.images || [],
-        },
-      },
-      {
-        new: true,
-        upsert: true,
-        runValidators: true,
-        setDefaultsOnInsert: true,
-      },
-    );
+    let doc = await GalleryAlbum.findOne();
+    if (!doc) doc = new GalleryAlbum();
 
-    return NextResponse.json({
-      success: true,
-      message: "Gallery updated successfully",
-      data,
-    });
+    doc.translations = body.translations || doc.translations;
+    doc.albums = Array.isArray(body.albums) ? body.albums : [];
+
+    await doc.save();
+    return NextResponse.json({ success: true, data: doc });
   } catch (error) {
     return NextResponse.json(
-      { success: false, message: error.message },
+      { success: false, message: error.message || "Failed to save albums." },
       { status: 500 },
     );
   }

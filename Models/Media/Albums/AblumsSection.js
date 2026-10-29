@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const TranslationSchema = new mongoose.Schema(
+const translationSchema = new mongoose.Schema(
   {
     title: { type: String, default: "" },
     subtitle: { type: String, default: "" },
@@ -8,25 +8,39 @@ const TranslationSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const ImageSchema = new mongoose.Schema(
+const imageSchema = new mongoose.Schema(
   {
     url: { type: String, required: true },
-    publicId: { type: String, required: true },
+    publicId: { type: String, default: "" },
   },
   { _id: false },
 );
 
-const GallerySectionSchema = new mongoose.Schema(
+const albumSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    coverImage: { type: String, default: "" },
+    translations: {
+      en: { type: translationSchema, default: () => ({}) },
+      ps: { type: translationSchema, default: () => ({}) },
+      fa: { type: translationSchema, default: () => ({}) },
+    },
+    images: { type: [imageSchema], default: [] },
+  },
+  { _id: false },
+);
+
+const galleryAlbumSchema = new mongoose.Schema(
   {
     translations: {
-      en: { type: TranslationSchema, default: () => ({}) },
-      ps: { type: TranslationSchema, default: () => ({}) },
-      fa: { type: TranslationSchema, default: () => ({}) },
+      en: { type: translationSchema, default: () => ({}) },
+      ps: { type: translationSchema, default: () => ({}) },
+      fa: { type: translationSchema, default: () => ({}) },
     },
-    images: { type: [ImageSchema], default: [] },
+    albums: { type: [albumSchema], default: [] },
   },
   { timestamps: true },
 );
 
-export default mongoose.models.GallerySection ||
-  mongoose.model("GallerySection", GallerySectionSchema);
+export default mongoose.models.GalleryAlbum ||
+  mongoose.model("GalleryAlbum", galleryAlbumSchema);
