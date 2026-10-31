@@ -16,10 +16,6 @@ const CtaBannerSchema = new mongoose.Schema(
     },
     // Where the button goes when clicked (Same for all languages)
     buttonLink: { type: String, default: "/contact" },
-
-    // The uploaded image URL
-    image: { type: String, default: "" },
-    imagePublicId: { type: String, default: "" }, // Used to delete old images from Cloudinary
   },
   { timestamps: true },
 );

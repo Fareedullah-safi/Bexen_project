@@ -1,4 +1,3 @@
-import cloudinary from "@/Lib/cloudinary";
 import connectMongo from "@/Lib/mongoDB";
 import Footer from "@/Models/Footer/Footer";
 import { NextResponse } from "next/server";
@@ -18,12 +17,6 @@ export async function POST(req) {
   try {
     await connectMongo();
     const body = await req.json();
-
-    // 1. If request is ONLY to delete the logo
-    if (body.publicId && !body.projectName) {
-      await cloudinary.uploader.destroy(body.publicId);
-      return NextResponse.json({ success: true });
-    }
 
     // 2. Normal save: Update database
     delete body._id;

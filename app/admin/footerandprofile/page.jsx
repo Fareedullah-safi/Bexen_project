@@ -10,11 +10,8 @@ import {
   Phone,
   Save,
   Settings,
-  Trash2,
   Type,
-  Upload,
 } from "lucide-react";
-import Script from "next/script";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -42,8 +39,6 @@ const SOCIAL_PLATFORMS = [
 const emptyText3 = () => ({ en: "", ps: "", fa: "" });
 
 const defaultData = () => ({
-  logo: "",
-  logoPublicId: "",
   projectName: "Bexon",
   description: emptyText3(),
   contact: { phone: "", email: "" },
@@ -80,7 +75,7 @@ export default function FooterAdmin() {
     axios
       .get(API_URL)
       .then((res) => {
-        const d = res.data;
+        const d = res.data?.data || res.data;
         if (!d) return;
         setData({
           ...defaultData(),
@@ -100,7 +95,7 @@ export default function FooterAdmin() {
   }, []);
 
   // ==========================================
-  // 4. LANGUAGE (same pattern as Video admin)
+  // 4. LANGUAGE
   // ==========================================
   const changeLanguage = (code) => {
     if (!LANGS.some((l) => l.code === code)) return;
@@ -161,7 +156,6 @@ export default function FooterAdmin() {
       return false;
     }
 
-    // Required translated fields in EVERY language
     for (const { code } of LANGS) {
       const desc = data.description?.[code]?.trim();
       const heading = data.newsletter?.heading?.[code]?.trim();
@@ -183,7 +177,6 @@ export default function FooterAdmin() {
       return false;
     }
 
-    // Soft email check (optional field)
     if (data.contact?.email?.trim()) {
       const email = data.contact.email.trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -192,9 +185,6 @@ export default function FooterAdmin() {
       }
     }
 
-    // Social URLs are SAME for all languages
-    // empty or "#" = hide on frontend
-    // otherwise must start with http/https
     for (const platform of SOCIAL_PLATFORMS) {
       const url = String(data.socials?.[platform.id] || "").trim();
       if (!url || url === "#") continue;
@@ -217,7 +207,9 @@ export default function FooterAdmin() {
 
     setSaving(true);
     try {
-      await axios.post(API_URL, data);
+      // Do not send logo fields from this admin
+      const { logo, logoPublicId, _id, ...payload } = data;
+      await axios.post(API_URL, payload);
       toast.success("Footer saved successfully.");
     } catch (e) {
       toast.error(e.response?.data?.error || e.message || "Failed to save.");
@@ -227,65 +219,7 @@ export default function FooterAdmin() {
   };
 
   // ==========================================
-  // 8. LOGO UPLOAD / REMOVE
-  // ==========================================
-  const uploadLogo = () => {
-    if (!window.cloudinary) return toast.error("Cloudinary is loading...");
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-    if (!cloudName || !uploadPreset)
-      return toast.error("Cloudinary keys missing.");
-
-    window.cloudinary
-      .createUploadWidget(
-        {
-          cloudName,
-          uploadPreset,
-          multiple: false,
-          folder: "bexon/footer",
-          clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "svg"],
-          maxFileSize: 5 * 1024 * 1024,
-        },
-        (err, result) => {
-          if (err) return toast.error("Upload failed.");
-          if (result?.event !== "success") return;
-
-          // destroy old logo if exists
-          if (data.logoPublicId) {
-            axios
-              .post(API_URL, { publicId: data.logoPublicId })
-              .catch(() => {});
-          }
-
-          setData((p) => ({
-            ...p,
-            logo: result.info.secure_url,
-            logoPublicId: result.info.public_id,
-          }));
-          toast.success("Logo uploaded.");
-        },
-      )
-      .open();
-  };
-
-  const removeLogo = async () => {
-    if (!confirm("Remove footer logo?")) return;
-    setSaving(true);
-    try {
-      if (data.logoPublicId) {
-        await axios.post(API_URL, { publicId: data.logoPublicId });
-      }
-      setData((p) => ({ ...p, logo: "", logoPublicId: "" }));
-      toast.success("Logo removed.");
-    } catch {
-      toast.error("Failed to remove logo.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // ==========================================
-  // 9. RENDER
+  // 8. RENDER
   // ==========================================
   if (loading) {
     return (
@@ -301,11 +235,6 @@ export default function FooterAdmin() {
 
   return (
     <div className="min-h-screen bg-[var(--background)] p-3 text-[var(--foreground)] sm:p-5 lg:p-8">
-      <Script
-        src="https://upload-widget.cloudinary.com/latest/global/all.js"
-        strategy="lazyOnload"
-      />
-
       <div className="mx-auto max-w-6xl space-y-6">
         {/* HEADER */}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -317,7 +246,7 @@ export default function FooterAdmin() {
               Footer & Profile Admin
             </h1>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Logo, project name, contact, social URLs, and newsletter copy.
+              Project name, contact, social URLs, and newsletter copy.
             </p>
           </div>
 
@@ -349,73 +278,31 @@ export default function FooterAdmin() {
           </div>
         </header>
 
-        {/* LOGO + PROJECT NAME */}
+        {/* PROJECT NAME ONLY (no logo upload) */}
         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
             <Settings size={18} className="text-[var(--accent)]" />
             <h2 className="font-bold">Brand / Project</h2>
           </div>
 
-          <div className="grid gap-5 p-4 sm:grid-cols-2 sm:p-6">
-            {/* Logo */}
-            <div className="sm:col-span-2">
-              <label className="mb-1.5 block text-sm font-semibold">
-                Footer Logo
-              </label>
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-soft)]">
-                  {data.logo ? (
-                    <img
-                      src={data.logo}
-                      alt="Footer logo"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-xs text-[var(--muted)]">None</span>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={uploadLogo}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
-                  >
-                    <Upload size={16} />
-                    {data.logo ? "Replace Logo" : "Upload Logo"}
-                  </button>
-
-                  {data.logo && (
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={removeLogo}
-                      className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-500 transition hover:bg-red-500 hover:text-white disabled:opacity-50"
-                    >
-                      <Trash2 size={16} /> Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Project name (same in all languages) */}
-            <div className="sm:col-span-2">
-              <label className="mb-1.5 block text-sm font-semibold">
-                Project / Company Name *
-              </label>
-              <input
-                dir="ltr"
-                value={data.projectName || ""}
-                onChange={(e) => setField("projectName", e.target.value)}
-                className={inputClass}
-                placeholder="e.g. Bexon"
-              />
-            </div>
+          <div className="p-4 sm:p-6">
+            <label className="mb-1.5 block text-sm font-semibold">
+              Project / Company Name *
+            </label>
+            <input
+              dir="ltr"
+              value={data.projectName || ""}
+              onChange={(e) => setField("projectName", e.target.value)}
+              className={inputClass}
+              placeholder="e.g. Bexon"
+            />
+            <p className="mt-2 text-xs text-[var(--muted)]">
+              Logo is managed in Navbar Admin and reused in Footer / Hamburger.
+            </p>
           </div>
         </section>
 
-        {/* DESCRIPTION (per language) */}
+        {/* DESCRIPTION */}
         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
             <Type size={18} className="text-[var(--accent)]" />
@@ -438,7 +325,7 @@ export default function FooterAdmin() {
           </div>
         </section>
 
-        {/* CONTACT (same in all languages) */}
+        {/* CONTACT */}
         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
             <Phone size={18} className="text-[var(--accent)]" />
@@ -484,7 +371,7 @@ export default function FooterAdmin() {
           </div>
         </section>
 
-        {/* SOCIALS (same URLs for every language) */}
+        {/* SOCIALS */}
         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
             <Globe size={18} className="text-[var(--accent)]" />
@@ -521,7 +408,7 @@ export default function FooterAdmin() {
           </div>
         </section>
 
-        {/* NEWSLETTER (per language) */}
+        {/* NEWSLETTER */}
         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
             <Mail size={18} className="text-[var(--accent)]" />
