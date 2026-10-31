@@ -1,9 +1,9 @@
 import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
-import dbConnect from "@/Lib/mongoDB"; // Adjust path to your db connection helper
+import dbConnect from "@/Lib/mongoDB";
 import AboutUsFaqs from "@/Models/About-Page-Models/AboutUsFaqs/FAQS";
 import { NextResponse } from "next/server";
 
-// GET: Fetch existing FAQs or create initial default record if empty
+// GET: Fetch existing section header or create initial default record
 export async function GET() {
   try {
     await dbConnect();
@@ -30,7 +30,7 @@ export async function GET() {
   }
 }
 
-// POST: Update existing FAQ section or create single document
+// POST: Update existing FAQ section header fields
 export async function POST(req) {
   try {
     const permission = await requireEditPermission();

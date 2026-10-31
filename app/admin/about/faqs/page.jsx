@@ -5,16 +5,19 @@ import Spinner from "@/app/Components/Admin/Spinner";
 import axios from "axios";
 import {
   ChevronRight,
+  ExternalLink,
   HelpCircle,
+  Info,
   Link as LinkIcon,
-  MessageCircleQuestion,
   Save,
   Type,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const API = "/api/aboutpage/faqs";
+const HOME_FAQ_ADMIN = "/admin/home/faq";
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -31,21 +34,6 @@ const emptyTranslation = () => ({
   buttonText: "Request a Call",
 });
 
-const emptyFAQTranslation = () => ({
-  question: "",
-  answer: "",
-});
-
-const defaultFaqs = () =>
-  Array.from({ length: 5 }, (_, i) => ({
-    id: String(i + 1),
-    translations: {
-      en: emptyFAQTranslation(),
-      ps: emptyFAQTranslation(),
-      fa: emptyFAQTranslation(),
-    },
-  }));
-
 const emptyData = () => ({
   buttonLink: "/contact",
   translations: {
@@ -53,22 +41,15 @@ const emptyData = () => ({
     ps: emptyTranslation(),
     fa: emptyTranslation(),
   },
-  faqs: defaultFaqs(),
 });
 
 const initializeErrors = () => {
-  const errs = {
+  return {
     shared: {},
-    en: { faqs: [] },
-    ps: { faqs: [] },
-    fa: { faqs: [] },
+    en: {},
+    ps: {},
+    fa: {},
   };
-  LANGUAGES.forEach((l) => {
-    errs[l.code].faqs = Array(5)
-      .fill(null)
-      .map(() => ({}));
-  });
-  return errs;
 };
 
 const inputClass =
@@ -102,23 +83,9 @@ export default function FAQSectionAdmin() {
         if (response.data?.success && response.data?.data) {
           const fetched = response.data.data;
 
-          const incomingFaqs = Array.isArray(fetched.faqs) ? fetched.faqs : [];
-          const mergedFaqs = defaultFaqs().map((def, i) => {
-            const item = incomingFaqs[i] || {};
-            return {
-              id: def.id,
-              translations: {
-                en: { ...def.translations.en, ...item.translations?.en },
-                ps: { ...def.translations.ps, ...item.translations?.ps },
-                fa: { ...def.translations.fa, ...item.translations?.fa },
-              },
-            };
-          });
-
           setData({
             ...emptyData(),
             ...fetched,
-            faqs: mergedFaqs,
             translations: {
               en: { ...emptyTranslation(), ...fetched.translations?.en },
               ps: { ...emptyTranslation(), ...fetched.translations?.ps },
@@ -127,7 +94,7 @@ export default function FAQSectionAdmin() {
           });
         }
       } catch (error) {
-        toast.error("Failed to load FAQ data.");
+        toast.error("Failed to load FAQ header data.");
       } finally {
         setLoading(false);
       }
@@ -174,31 +141,6 @@ export default function FAQSectionAdmin() {
     }));
   };
 
-  const handleFAQChange = (index, field, value) => {
-    setData((prev) => {
-      const newFaqs = [...prev.faqs];
-      newFaqs[index] = {
-        ...newFaqs[index],
-        translations: {
-          ...newFaqs[index].translations,
-          [language]: {
-            ...newFaqs[index].translations[language],
-            [field]: value,
-          },
-        },
-      };
-      return { ...prev, faqs: newFaqs };
-    });
-
-    setErrors((prev) => {
-      const next = { ...prev };
-      if (next[language]?.faqs?.[index]) {
-        next[language].faqs[index][field] = null;
-      }
-      return next;
-    });
-  };
-
   // --- VALIDATION ---
   const validateForm = () => {
     const newErrors = initializeErrors();
@@ -229,22 +171,12 @@ export default function FAQSectionAdmin() {
       const trans = data.translations[lang.code];
 
       headerFields.forEach((field) => {
-        if (!String(trans[field] || "").trim()) {
+        // Highlighted title is optional in most designs, but if you want it strict, keep it here
+        if (
+          !String(trans[field] || "").trim() &&
+          field !== "highlightedTitle"
+        ) {
           newErrors[lang.code][field] = "This field cannot be empty.";
-          isValid = false;
-          if (!firstErrorLanguage) firstErrorLanguage = lang.code;
-        }
-      });
-
-      data.faqs.forEach((faq, index) => {
-        const faqTrans = faq.translations[lang.code];
-        if (!String(faqTrans.question || "").trim()) {
-          newErrors[lang.code].faqs[index].question = "Question is required.";
-          isValid = false;
-          if (!firstErrorLanguage) firstErrorLanguage = lang.code;
-        }
-        if (!String(faqTrans.answer || "").trim()) {
-          newErrors[lang.code].faqs[index].answer = "Answer is required.";
           isValid = false;
           if (!firstErrorLanguage) firstErrorLanguage = lang.code;
         }
@@ -302,14 +234,7 @@ export default function FAQSectionAdmin() {
   const currentE = errors[language];
 
   const hasLanguageErrors = (code) => {
-    const errs = errors[code];
-    const hasHeaderError = Object.keys(errs).some(
-      (k) => k !== "faqs" && errs[k],
-    );
-    const hasFaqError = errs.faqs.some((faqErr) =>
-      Object.values(faqErr).some(Boolean),
-    );
-    return hasHeaderError || hasFaqError;
+    return Object.values(errors[code] || {}).some(Boolean);
   };
 
   return (
@@ -321,9 +246,11 @@ export default function FAQSectionAdmin() {
             <HelpCircle size={23} />
           </div>
           <div>
-            <h1 className="text-xl font-bold sm:text-2xl">FAQ Section</h1>
+            <h1 className="text-xl font-bold sm:text-2xl">
+              FAQ Section Header
+            </h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Update the help block and frequently asked questions.
+              Update the presentation block and button.
             </p>
           </div>
         </div>
@@ -354,6 +281,29 @@ export default function FAQSectionAdmin() {
             onLanguageChange={changeLanguage}
           />
         </div>
+      </div>
+
+      {/* INFO BANNER: Q&A are from Home */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-[#1e8a8a]/20 bg-[#1e8a8a]/5 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-[#1e8a8a]/30 dark:bg-[#1e8a8a]/10">
+        <div className="flex items-start gap-3">
+          <Info size={20} className="mt-0.5 shrink-0 text-[#1e8a8a]" />
+          <div>
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Questions & answers are shared with the Home Page
+            </p>
+            <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+              This page only controls the header and button. Edit the actual FAQ
+              list directly in the Home FAQ admin.
+            </p>
+          </div>
+        </div>
+        <Link
+          href={HOME_FAQ_ADMIN}
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#167878]"
+        >
+          <ExternalLink size={16} />
+          Go to Home FAQ
+        </Link>
       </div>
 
       {/* Presentation Text */}
@@ -475,72 +425,6 @@ export default function FAQSectionAdmin() {
         </div>
       </section>
 
-      {/* Questions and Answers */}
-      <section className={sectionClass}>
-        <h2 className="mb-4 flex items-center justify-between font-bold">
-          Questions & Answers (5)
-          <MessageCircleQuestion size={19} className="text-[#1e8a8a]" />
-        </h2>
-
-        <div className="space-y-4">
-          {data.faqs.map((faq, index) => {
-            const faqT = faq.translations[language];
-            const faqE = currentE.faqs[index] || {};
-
-            return (
-              <div
-                key={index}
-                className="overflow-hidden rounded-xl border border-gray-200 p-4 dark:border-[#263442]"
-              >
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1e8a8a] text-xs font-bold text-white">
-                    {index + 1}
-                  </span>
-                  <p className="text-sm font-semibold">FAQ {index + 1}</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">
-                      Question
-                    </label>
-                    <input
-                      dir={inputDirection}
-                      value={faqT.question}
-                      onChange={(e) =>
-                        handleFAQChange(index, "question", e.target.value)
-                      }
-                      placeholder="Enter the question here..."
-                      className={faqE.question ? inputErrorClass : inputClass}
-                    />
-                    <FieldError message={faqE.question} />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">
-                      Full Answer
-                    </label>
-                    <textarea
-                      dir={inputDirection}
-                      value={faqT.answer}
-                      onChange={(e) =>
-                        handleFAQChange(index, "answer", e.target.value)
-                      }
-                      rows="6"
-                      placeholder="Write a comprehensive answer..."
-                      className={`${
-                        faqE.answer ? inputErrorClass : inputClass
-                      } min-h-[160px] resize-y leading-relaxed`}
-                    />
-                    <FieldError message={faqE.answer} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
       {/* Sticky Save Bar */}
       <div className="sticky bottom-4 z-40 mt-8 flex items-center justify-between rounded-2xl border border-gray-200 bg-white/90 px-5 py-4 shadow-lg backdrop-blur dark:border-[#263442] dark:bg-[#111a23]/90">
         <div className="hidden items-center gap-3 sm:flex">
@@ -564,7 +448,7 @@ export default function FAQSectionAdmin() {
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
         >
           <Save size={16} />
-          {saving ? "Saving..." : "Save FAQ Section"}
+          {saving ? "Saving..." : "Save Header"}
         </button>
       </div>
     </div>

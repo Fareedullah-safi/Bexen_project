@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-// Sub-schema for Header Translations (EN, PS, FA)
+// Header only (EN, PS, FA) — no question/answer here
 const HeaderTranslationSchema = new mongoose.Schema(
   {
     topTag: { type: String, default: "COMMON QUESTIONS" },
@@ -16,29 +16,6 @@ const HeaderTranslationSchema = new mongoose.Schema(
   { _id: false },
 );
 
-// Sub-schema for FAQ Item Question & Answer
-const FAQTranslationSchema = new mongoose.Schema(
-  {
-    question: { type: String, default: "" },
-    answer: { type: String, default: "" },
-  },
-  { _id: false },
-);
-
-// Sub-schema for an FAQ Item containing translations for all 3 languages
-const FAQItemSchema = new mongoose.Schema(
-  {
-    id: { type: String, required: true },
-    translations: {
-      en: { type: FAQTranslationSchema, default: () => ({}) },
-      ps: { type: FAQTranslationSchema, default: () => ({}) },
-      fa: { type: FAQTranslationSchema, default: () => ({}) },
-    },
-  },
-  { _id: false },
-);
-
-// Main Schema named AboutUsFaqs
 const AboutUsFaqsSchema = new mongoose.Schema(
   {
     buttonLink: {
@@ -49,18 +26,6 @@ const AboutUsFaqsSchema = new mongoose.Schema(
       en: { type: HeaderTranslationSchema, default: () => ({}) },
       ps: { type: HeaderTranslationSchema, default: () => ({}) },
       fa: { type: HeaderTranslationSchema, default: () => ({}) },
-    },
-    faqs: {
-      type: [FAQItemSchema],
-      default: () =>
-        Array.from({ length: 5 }, (_, i) => ({
-          id: String(i + 1),
-          translations: {
-            en: { question: "", answer: "" },
-            ps: { question: "", answer: "" },
-            fa: { question: "", answer: "" },
-          },
-        })),
     },
   },
   { timestamps: true },
