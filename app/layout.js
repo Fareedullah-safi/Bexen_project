@@ -10,7 +10,7 @@ const monaSans = Mona_Sans({
 
 export const metadata = {
   title: "Bexon - Corporate Business",
-  description: "Corporate Business Website",
+  description: "Corporate Business Website ",
 };
 
 export default function RootLayout({ children }) {
