@@ -30,6 +30,7 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { TbLayoutNavbar } from "react-icons/tb";
 
 /* ============ MENU LINKS ============ */
 
@@ -44,6 +45,11 @@ const navigation = [
   {
     label: "Website Content",
     items: [
+      {
+        name: "NavBar",
+        href: "/admin/navbar",
+        icon: TbLayoutNavbar,
+      },
       {
         name: "Home Page",
         icon: FileText,
