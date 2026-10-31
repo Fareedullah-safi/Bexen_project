@@ -1,5 +1,5 @@
 import cloudinary from "@/Lib/cloudinary";
-import connectDB from "@/lib/mongoDB";
+import connectDB from "@/Lib/mongoDB";
 import CtaBanner from "@/Models/CtaBanner/CtaBanner";
 import { NextResponse } from "next/server";
 
