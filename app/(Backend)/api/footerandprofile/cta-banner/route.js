@@ -1,3 +1,4 @@
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
 import CtaBanner from "@/Models/CtaBanner/CtaBanner";
@@ -18,6 +19,11 @@ export async function GET() {
 
 // 2. POST: Save changes from Admin Panel
 export async function POST(req) {
+    const permission = await requireEditPermission();
+  
+    if (!permission.authorized) {
+      return permission.response;
+    }
   await connectDB();
   const body = await req.json();
 

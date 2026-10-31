@@ -1,3 +1,4 @@
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import connectMongo from "@/Lib/mongoDB";
 import Footer from "@/Models/Footer/Footer";
 import { NextResponse } from "next/server";
@@ -15,6 +16,11 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+      const permission = await requireEditPermission();
+    
+      if (!permission.authorized) {
+        return permission.response;
+      }
     await connectMongo();
     const body = await req.json();
 

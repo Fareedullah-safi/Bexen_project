@@ -234,7 +234,7 @@ export default function FooterAdmin() {
     "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10";
 
   return (
-    <div className="min-h-screen bg-[var(--background)] p-3 text-[var(--foreground)] sm:p-5 lg:p-8">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="mx-auto max-w-6xl space-y-6">
         {/* HEADER */}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">

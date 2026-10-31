@@ -145,6 +145,7 @@ export default function AdminShell({ children }) {
   const [adminName, setAdminName] = useState("Administrator");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminImage, setAdminImage] = useState("");
+  const [adminRole, setAdminRole] = useState(""); // NEW: Role State
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
 
@@ -369,6 +370,43 @@ export default function AdminShell({ children }) {
       cancelled = true;
     };
   }, [adminUid]);
+
+  /* ============ NEW: LOAD ADMIN ROLE ============ */
+
+  useEffect(() => {
+    if (!adminEmail) return;
+
+    let cancelled = false;
+
+    const loadRole = async () => {
+      try {
+        const res = await axios.get("/api/admin/adminusers/addAdmin");
+        if (cancelled) return;
+
+        // Handle both array and { data: [...] } structures
+        const adminsList = Array.isArray(res.data)
+          ? res.data
+          : res.data?.data || [];
+
+        // Find the current logged-in user by email
+        const currentUser = adminsList.find(
+          (user) => user.email === adminEmail,
+        );
+
+        if (currentUser && currentUser.role) {
+          setAdminRole(currentUser.role);
+        }
+      } catch (error) {
+        console.error("Unable to load admin role:", error);
+      }
+    };
+
+    loadRole();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminEmail]);
 
   /* ============ PROFILE HELPERS ============ */
 
@@ -598,6 +636,12 @@ export default function AdminShell({ children }) {
                 <p className="truncate text-xs text-[var(--muted)]">
                   {adminEmail || "Administrator"}
                 </p>
+                {/* NEW: Role Badge */}
+                {adminRole && (
+                  <p className="mt-1 inline-block rounded-md border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[var(--accent)] uppercase">
+                    {adminRole.replace("-", " ")}
+                  </p>
+                )}
               </div>
             </div>
           </Link>
@@ -804,6 +848,12 @@ export default function AdminShell({ children }) {
                       <p className="truncate text-xs text-[var(--muted)]">
                         {adminEmail || "Administrator"}
                       </p>
+                      {/* NEW: Role Badge */}
+                      {adminRole && (
+                        <p className="mt-1 inline-block rounded-md border border-[var(--accent)]/20 bg-[var(--accent)]/10 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[var(--accent)] uppercase">
+                          {adminRole.replace("-", " ")}
+                        </p>
+                      )}
                     </div>
                   </div>
 

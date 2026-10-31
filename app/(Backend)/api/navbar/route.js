@@ -1,3 +1,4 @@
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
 import connectMongo from "@/Lib/mongoDB";
 import NavMenu from "@/Models/NavBar/NavBar";
@@ -16,6 +17,11 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+      const permission = await requireEditPermission();
+    
+      if (!permission.authorized) {
+        return permission.response;
+      }
     await connectMongo();
     const body = await req.json();
 

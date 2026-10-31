@@ -1,3 +1,4 @@
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import cloudinary from "@/Lib/cloudinary";
 import connectDB from "@/Lib/mongoDB";
 import GalleryAlbum from "@/Models/Media/Albums/AblumsSection";
@@ -37,6 +38,11 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+      const permission = await requireEditPermission();
+    
+      if (!permission.authorized) {
+        return permission.response;
+      }
     await connectDB();
     const body = await req.json();
 
