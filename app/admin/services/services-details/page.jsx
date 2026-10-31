@@ -1,7 +1,7 @@
 "use client";
 
-import AdminLanguageBall from "@/app/admin/Components/Admin/AdminLanguageBall";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
+import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import Spinner from "@/app/Components/Admin/Spinner";
 import axios from "axios";
 import {
   Image as ImageIcon,

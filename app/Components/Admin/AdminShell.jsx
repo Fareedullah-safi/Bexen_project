@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import Spinner from "@/app/admin/Components/Admin/Spinner";
+import Spinner from "@/app/Components/Admin/Spinner";
 import axios from "axios";
 import {
   BarChart3,
@@ -63,6 +63,7 @@ const navigation = [
           { name: "Counters", href: "/admin/home/counters" },
           { name: "FAQ", href: "/admin/home/faq" },
           { name: "Articles Section", href: "/admin/home/articles-section" },
+          { name: "CTA-Banner", href: "/admin/home/cta-banner" },
         ],
       },
       {
@@ -93,8 +94,8 @@ const navigation = [
         ],
       },
       {
-        name: "Footer and Contact Info",
-        href: "/admin/site/footer",
+        name: "Footer and Profile",
+        href: "/admin/footerandprofile",
         icon: Phone,
       },
     ],
@@ -102,13 +103,17 @@ const navigation = [
   {
     label: "Management",
     items: [
-      { name: "Users", href: "/admin/users", icon: Users },
+      {
+        name: "Admin Users Management",
+        href: "/admin/adminusersmanagment",
+        icon: Users,
+      },
       { name: "Messages", href: "/admin/messages", icon: MessageSquare },
     ],
   },
   {
     label: "System",
-    items: [{ name: "Settings", href: "/admin/settings", icon: Settings }],
+    items: [{ name: "Settings", href: "admin/adminusers", icon: Settings }],
   },
 ];
 

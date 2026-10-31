@@ -1,6 +1,6 @@
 "use client";
 
-import Spinner from "@/app/admin/Components/Admin/Spinner";
+import Spinner from "@/app/Components/Admin/Spinner";
 import {
   AlertCircle,
   CheckCircle2,

@@ -1,6 +1,6 @@
 "use client";
 
-import Spinner from "@/app/admin/Components/Admin/Spinner";
+import Spinner from "@/app/Components/Admin/Spinner";
 import axios from "axios";
 import { ImagePlus, Link, Trash2Icon, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

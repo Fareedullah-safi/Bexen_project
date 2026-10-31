@@ -27,7 +27,7 @@ import {
 import Script from "next/script";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import Spinner from "../Components/Admin/Spinner";
+import Spinner from "../../Components/Admin/Spinner";
 
 /* ==========================================================================
    CONSTANTS & STYLES

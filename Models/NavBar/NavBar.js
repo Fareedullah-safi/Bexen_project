@@ -18,6 +18,7 @@ const subLinkSchema = new mongoose.Schema(
   {
     id: { type: String, required: true },
     href: { type: String, required: true, default: "/" },
+    showInFooter: { type: Boolean, default: false }, // <--- ADD THIS LINE
     translations: {
       en: { type: translationSchema, default: () => ({}) },
       ps: { type: translationSchema, default: () => ({}) },
@@ -31,7 +32,8 @@ const navItemSchema = new mongoose.Schema(
   {
     id: { type: String, required: true },
     href: { type: String, required: true, default: "/" },
-    hasDropdown: { type: Boolean, default: false }, // REPLACED isBlog WITH hasDropdown
+    hasDropdown: { type: Boolean, default: false },
+    showInFooter: { type: Boolean, default: false }, // <--- ADD THIS LINE
     translations: {
       en: { type: translationSchema, default: () => ({}) },
       ps: { type: translationSchema, default: () => ({}) },

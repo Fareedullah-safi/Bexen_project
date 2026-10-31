@@ -1,20 +1,155 @@
 "use client";
 
+import { ChevronDown, X } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
-import { X, ChevronDown } from "lucide-react";
-
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
   FaFacebookF,
+  FaGithub,
   FaInstagram,
   FaLinkedinIn,
+  FaWhatsapp,
   FaXTwitter,
+  FaYoutube,
 } from "react-icons/fa6";
+
+// Same 7 icons as Footer
+const SOCIAL_ICON_MAP = {
+  facebook: { name: "Facebook", icon: <FaFacebookF size={15} /> },
+  instagram: { name: "Instagram", icon: <FaInstagram size={17} /> },
+  x: { name: "X", icon: <FaXTwitter size={15} /> },
+  linkedin: { name: "LinkedIn", icon: <FaLinkedinIn size={16} /> },
+  youtube: { name: "YouTube", icon: <FaYoutube size={16} /> },
+  github: { name: "GitHub", icon: <FaGithub size={15} /> },
+  whatsapp: { name: "WhatsApp", icon: <FaWhatsapp size={16} /> },
+};
+
+const isValidSocialUrl = (url) => {
+  const v = String(url || "").trim();
+  return v !== "" && v !== "#";
+};
 
 export default function Hamburger() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openAccordion, setOpenAccordion] = useState(null);
+  const [lang, setLang] = useState("en");
+  const [navData, setNavData] = useState(null);
+  const [footerData, setFooterData] = useState(null);
 
+  // ----------------------------------------
+  // 1. Load language + API data
+  // ----------------------------------------
+  useEffect(() => {
+    const saved = localStorage.getItem("site-language") || "en";
+    setLang(saved);
+
+    const onLangChange = (e) => {
+      const next =
+        e?.detail?.language || localStorage.getItem("site-language") || "en";
+      setLang(next);
+    };
+
+    window.addEventListener("site-language-change", onLangChange);
+    window.addEventListener("storage", onLangChange);
+
+    // Navbar
+    fetch("/api/navbar")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const data = json?.data || json;
+        if (data) setNavData(data);
+      })
+      .catch(() => {});
+
+    // Footer
+    fetch("/api/footer")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const data = json?.data || json;
+        if (data) setFooterData(data);
+      })
+      .catch(() => {});
+
+    return () => {
+      window.removeEventListener("site-language-change", onLangChange);
+      window.removeEventListener("storage", onLangChange);
+    };
+  }, []);
+
+  // ----------------------------------------
+  // 2. Safe values from DB
+  // ----------------------------------------
+  const logo =
+    navData?.logo ||
+    "https://themejunction.net/html/bexon/demo/assets/images/logos/logo-2.webp";
+
+  const searchPlaceholder =
+    navData?.search?.placeholder?.[lang] ||
+    navData?.search?.placeholder?.en ||
+    "Search here...";
+
+  const searchHeading =
+    navData?.search?.heading?.[lang] ||
+    navData?.search?.heading?.en ||
+    "Search Now!";
+
+  const description =
+    footerData?.description?.[lang] ||
+    footerData?.description?.en ||
+    "Developing personalize our customer journeys to increase satisfaction & loyalty of our expansion recognized by industry leaders.";
+
+  const phone = footerData?.contact?.phone || "";
+  const email = footerData?.contact?.email || "";
+  const location = footerData?.contact?.location || "";
+
+  // Menu links from Navbar
+  const navItems = useMemo(() => {
+    return (navData?.items || []).map((item) => {
+      const children = (item?.children || []).map((sub) => ({
+        id: sub.id || sub._id,
+        href: sub.href || "#",
+        label:
+          sub?.translations?.[lang]?.label ||
+          sub?.translations?.en?.label ||
+          "Link",
+      }));
+
+      return {
+        id: item.id || item._id,
+        href: item.href || "#",
+        label:
+          item?.translations?.[lang]?.label ||
+          item?.translations?.en?.label ||
+          "Link",
+        hasDropdown: Boolean(item.hasDropdown && children.length > 0),
+        children,
+      };
+    });
+  }, [navData, lang]);
+
+  // Social icons from Footer (hide if empty or #)
+  const socials = useMemo(() => {
+    const db = footerData?.socials || {};
+    return Object.keys(SOCIAL_ICON_MAP)
+      .map((key) => {
+        const href = db?.[key];
+        if (!isValidSocialUrl(href)) return null;
+        return {
+          key,
+          href: href.trim(),
+          name: SOCIAL_ICON_MAP[key].name,
+          icon: SOCIAL_ICON_MAP[key].icon,
+        };
+      })
+      .filter(Boolean);
+  }, [footerData]);
+
+  const isRTL = lang === "ps" || lang === "fa";
+
+  // ----------------------------------------
+  // 3. Open / Close helpers
+  // ----------------------------------------
   const openMenu = () => {
     setIsMenuOpen(true);
     document.body.classList.add("overflow-hidden");
@@ -22,39 +157,17 @@ export default function Hamburger() {
 
   const closeMenu = () => {
     setIsMenuOpen(false);
+    setOpenAccordion(null);
     document.body.classList.remove("overflow-hidden");
   };
 
-  const toggleAccordion = (name) => {
-    setOpenAccordion(openAccordion === name ? null : name);
+  const toggleAccordion = (id) => {
+    setOpenAccordion((prev) => (prev === id ? null : id));
   };
 
-  const navItems = [
-    {
-      name: "Home",
-    },
-    {
-      name: "Pages",
-    },
-    {
-      name: "Services",
-    },
-    {
-      name: "Portfolio",
-      hasDropdown: true,
-      links: ["Portfolio", "Portfolio Details"],
-    },
-    {
-      name: "Blog",
-      hasDropdown: true,
-      links: ["Blog", "Blog Grid", "Blog Right Sidebar", "Blog Details"],
-    },
-    {
-      name: "Contact",
-      hasDropdown: false,
-    },
-  ];
-
+  // ----------------------------------------
+  // 4. RENDER
+  // ----------------------------------------
   return (
     <div className="relative">
       {/* Hamburger Button */}
@@ -62,119 +175,150 @@ export default function Hamburger() {
         <button
           type="button"
           onClick={openMenu}
+          aria-label="Open menu"
           className="group relative z-60 flex cursor-pointer flex-col space-y-1.5 rounded-md bg-[#1E8A8A] p-3 text-white lg:bg-white lg:p-0"
         >
-          <span className="h-0.5 w-8 bg-gray-100 transition-all duration-300 lg:bg-black lg:group-hover:bg-[#1E8A8A]"></span>
-          <span className="h-0.5 w-6 bg-gray-100 transition-all duration-300 group-hover:w-8 lg:bg-black lg:group-hover:bg-[#1E8A8A]"></span>
-          <span className="h-0.5 w-8 bg-gray-100 transition-all duration-300 lg:bg-black lg:group-hover:bg-[#1E8A8A]"></span>
+          <span className="h-0.5 w-8 bg-gray-100 transition-all duration-300 lg:bg-black lg:group-hover:bg-[#1E8A8A]" />
+          <span className="h-0.5 w-6 bg-gray-100 transition-all duration-300 group-hover:w-8 lg:bg-black lg:group-hover:bg-[#1E8A8A]" />
+          <span className="h-0.5 w-8 bg-gray-100 transition-all duration-300 lg:bg-black lg:group-hover:bg-[#1E8A8A]" />
         </button>
       )}
 
-      {/* Blur Background */}
+      {/* Backdrop — click outside to close */}
       {isMenuOpen && (
         <div
           onClick={closeMenu}
           className="fixed inset-0 z-40 bg-black/25 backdrop-blur-sm"
-        ></div>
+        />
       )}
 
-      {/* Hamburger Menu */}
+      {/* Menu Panel — mouse leave closes on desktop */}
       {isMenuOpen && (
-        <div className="scrollbar-cyan fixed top-5 right-5 z-50 max-h-[calc(100vh-40px)] w-[480px] max-w-[calc(100vw-30px)] overflow-y-auto rounded-xl bg-[#0C2426] text-white shadow-2xl">
+        <div
+          dir={isRTL ? "rtl" : "ltr"}
+          onMouseLeave={closeMenu}
+          className="scrollbar-cyan fixed top-5 right-5 z-50 max-h-[calc(100vh-40px)] w-[480px] max-w-[calc(100vw-30px)] overflow-y-auto rounded-xl bg-[#0C2426] text-white shadow-2xl"
+        >
           {/* Header */}
           <div className="sticky top-0 z-10 flex h-24 items-center justify-between border-b border-white/10 bg-[#0C2426] px-7">
-            {/* Logo */}
-            <Image
-              src="https://themejunction.net/html/bexon/demo/assets/images/logos/logo-2.webp"
-              alt="Bexon Logo"
-              width={150}
-              height={60}
-              className="w-32"
-            />
+            <Link href="/" onClick={closeMenu}>
+              {logo ? (
+                <Image
+                  src={logo}
+                  alt="Logo"
+                  width={150}
+                  height={60}
+                  className="h-10 w-auto object-contain sm:h-12"
+                  unoptimized
+                />
+              ) : (
+                <span className="text-xl font-bold text-white">Bexon</span>
+              )}
+            </Link>
 
-            {/* Close Button */}
             <button
               type="button"
               onClick={closeMenu}
+              aria-label="Close menu"
               className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/10 transition-all duration-300 hover:rotate-90 hover:bg-[#1E8A8A]"
             >
               <X size={22} />
             </button>
           </div>
 
-          {/* Content */}
+          {/* Body */}
           <div className="p-7">
-            {/* Navigation Links - Accordion */}
+            {/* Nav links (mobile accordion) */}
             <nav className="mb-8 flex flex-col lg:hidden">
-              {navItems.map((item) => (
-                <div key={item.name} className="border-b border-white/10">
-                  <button
-                    onClick={() =>
-                      item.hasDropdown && toggleAccordion(item.name)
-                    }
-                    className="flex w-full cursor-pointer items-center justify-between py-4 text-left text-lg font-semibold text-white transition-colors duration-300 hover:text-[#1E8A8A]"
-                  >
-                    {item.name}
-                    {item.hasDropdown && (
-                      <ChevronDown
-                        size={20}
-                        className={`transition-transform duration-300 ${
-                          openAccordion === item.name ? "rotate-180" : ""
-                        }`}
-                      />
-                    )}
-                  </button>
+              {navItems.length > 0 ? (
+                navItems.map((item) => (
+                  <div key={item.id} className="border-b border-white/10">
+                    {item.hasDropdown ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion(item.id)}
+                          className="flex w-full cursor-pointer items-center justify-between py-4 text-left text-lg font-semibold text-white transition-colors duration-300 hover:text-[#1E8A8A]"
+                        >
+                          <span>{item.label}</span>
+                          <ChevronDown
+                            size={20}
+                            className={`transition-transform duration-300 ${
+                              openAccordion === item.id ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
 
-                  {/* Accordion Content */}
-                  {item.hasDropdown && (
-                    <div
-                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                        openAccordion === item.name
-                          ? "max-h-60 pb-4 opacity-100"
-                          : "max-h-0 opacity-0"
-                      }`}
-                    >
-                      <div className="flex flex-col gap-3 pl-2">
-                        {item.links.map((link) => (
-                          <a
-                            key={link}
-                            href="#"
-                            className="text-md px-6 font-semibold text-gray-300 transition-colors duration-300 hover:text-[#1E8A8A]"
-                          >
-                            {link}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                        <div
+                          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                            openAccordion === item.id
+                              ? "max-h-60 pb-4 opacity-100"
+                              : "max-h-0 opacity-0"
+                          }`}
+                        >
+                          <div className="flex flex-col gap-3 pl-2">
+                            {item.href && item.href !== "#" && (
+                              <Link
+                                href={item.href}
+                                onClick={closeMenu}
+                                className="text-md px-6 font-semibold text-gray-300 transition-colors duration-300 hover:text-[#1E8A8A]"
+                              >
+                                {item.label}
+                              </Link>
+                            )}
+                            {item.children.map((sub) => (
+                              <Link
+                                key={sub.id}
+                                href={sub.href}
+                                onClick={closeMenu}
+                                className="text-md px-6 font-semibold text-gray-300 transition-colors duration-300 hover:text-[#1E8A8A]"
+                              >
+                                {sub.label}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        onClick={closeMenu}
+                        className="flex w-full items-center justify-between py-4 text-left text-lg font-semibold text-white transition-colors duration-300 hover:text-[#1E8A8A]"
+                      >
+                        {item.label}
+                      </Link>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="py-4 text-sm text-gray-500">No menu items</p>
+              )}
             </nav>
 
             {/* Description */}
-            <div className="mb-8 -mt-4">
+            <div className="-mt-4 mb-8">
               <p className="text-[16px] leading-7 text-gray-400">
-                Developing personalize our customer journeys to increase
-                satisfaction & loyalty of our expansion recognized by industry
-                leaders.
+                {description}
               </p>
             </div>
 
             {/* Search */}
             <div className="mb-8">
               <h2 className="mb-4 text-2xl font-semibold text-white">
-                Search Now!
+                {searchHeading}
               </h2>
-
-              <div className="flex h-12 overflow-hidden rounded-lg bg-white">
+              <form
+                className="flex h-12 overflow-hidden rounded-lg bg-white"
+                onSubmit={(e) => e.preventDefault()}
+              >
                 <input
                   type="text"
-                  placeholder="Search here..."
+                  placeholder={searchPlaceholder}
                   className="w-full px-4 text-sm text-[#0C1E21] outline-none placeholder:text-gray-500"
                 />
-
                 <button
-                  type="button"
+                  type="submit"
+                  aria-label="Search"
                   className="flex w-14 shrink-0 items-center justify-center bg-[#1E8A8A] text-white transition-colors duration-300 hover:bg-[#167272]"
                 >
                   <Image
@@ -185,88 +329,68 @@ export default function Hamburger() {
                     className="h-5 w-5 brightness-0 invert"
                   />
                 </button>
-              </div>
+              </form>
             </div>
 
-            {/* Contact Info */}
+            {/* Contact */}
             <div className="mb-8">
               <h2 className="mb-5 text-2xl font-semibold text-white">
                 Contact Info
               </h2>
-
               <div className="space-y-5">
-                {/* Phone */}
-                <div>
-                  <p className="mb-1 text-sm text-gray-400">Phone</p>
-                  <a
-                    href="tel:10095447818"
-                    className="text-base text-white transition-colors duration-300 hover:text-[#1E8A8A]"
-                  >
-                    +1 (009) 544-7818
-                  </a>
-                </div>
-
-                {/* Email */}
-                <div>
-                  <p className="mb-1 text-sm text-gray-400">Email</p>
-                  <a
-                    href="mailto:info@bexon.com"
-                    className="text-base text-white transition-colors duration-300 hover:text-[#1E8A8A]"
-                  >
-                    info@bexon.com
-                  </a>
-                </div>
-
-                {/* Location */}
-                <div>
-                  <p className="mb-1 text-sm text-gray-400">Location</p>
-                  <p className="text-base leading-6 text-white">
-                    993 Renner Burg, West Rond, MT 94251-030
-                  </p>
-                </div>
+                {!!phone && (
+                  <div>
+                    <p className="mb-1 text-sm text-gray-400">Phone</p>
+                    <a
+                      href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+                      className="text-base text-white transition-colors duration-300 hover:text-[#1E8A8A]"
+                    >
+                      {phone}
+                    </a>
+                  </div>
+                )}
+                {!!email && (
+                  <div>
+                    <p className="mb-1 text-sm text-gray-400">Email</p>
+                    <a
+                      href={`mailto:${email}`}
+                      className="text-base text-white transition-colors duration-300 hover:text-[#1E8A8A]"
+                    >
+                      {email}
+                    </a>
+                  </div>
+                )}
+                {!!location && (
+                  <div>
+                    <p className="mb-1 text-sm text-gray-400">Location</p>
+                    <p className="text-base leading-6 text-white">{location}</p>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Follow Us */}
-            <div className="pb-3">
-              <h2 className="mb-4 text-2xl font-semibold text-white">
-                Follow Us
-              </h2>
-
-              <div className="flex gap-3">
-                <a
-                  href="#"
-                  aria-label="Facebook"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 hover:bg-[#1E8A8A]"
-                >
-                  <FaFacebookF size={15} />
-                </a>
-
-                <a
-                  href="#"
-                  aria-label="X"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 hover:bg-[#1E8A8A]"
-                >
-                  <FaXTwitter size={15} />
-                </a>
-
-                <a
-                  href="#"
-                  aria-label="LinkedIn"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 hover:bg-[#1E8A8A]"
-                >
-                  <FaLinkedinIn size={16} />
-                </a>
-
-                <a
-                  href="#"
-                  aria-label="Instagram"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 hover:bg-[#1E8A8A]"
-                >
-                  <FaInstagram size={17} />
-                </a>
+            {/* Socials */}
+            {socials.length > 0 && (
+              <div className="pb-3">
+                <h2 className="mb-4 text-2xl font-semibold text-white">
+                  Follow Us
+                </h2>
+                <div className="flex flex-wrap gap-3">
+                  {socials.map((s) => (
+                    <a
+                      key={s.key}
+                      href={s.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={s.name}
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 hover:bg-[#1E8A8A]"
+                    >
+                      {s.icon}
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

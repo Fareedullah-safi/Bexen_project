@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import AdminLanguageBall from "@/app/admin/Components/Admin/AdminLanguageBall";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
+import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import Spinner from "@/app/Components/Admin/Spinner";
 import { ImagePlus, Plus, Save, Trash2 } from "lucide-react";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";

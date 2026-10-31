@@ -1,9 +1,9 @@
 "use client";
 
+import Spinner from "@/app/Components/Admin/Spinner";
+import { ImagePlus, Link, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
-import { ImagePlus, Trash2, Link } from "lucide-react";
 import { toast } from "sonner";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
 
 export default function ImageManager({
   items = [],

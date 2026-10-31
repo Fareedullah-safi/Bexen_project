@@ -1,7 +1,7 @@
 "use client";
 
-import AdminLanguageBall from "@/app/admin/Components/Admin/AdminLanguageBall";
-import Spinner from "@/app/admin/Components/Admin/Spinner";
+import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import Spinner from "@/app/Components/Admin/Spinner";
 import axios from "axios";
 import {
   ArrowLeft,
@@ -290,6 +290,7 @@ export default function NavigationAdmin() {
       id: generateId(),
       href: "/",
       hasDropdown: false,
+      showInFooter: false, // <-- Added for footer
       translations: { en: emptyLabel(), ps: emptyLabel(), fa: emptyLabel() },
       children: [],
     };
@@ -302,6 +303,7 @@ export default function NavigationAdmin() {
     const newSubLink = {
       id: generateId(),
       href: "/",
+      showInFooter: false, // <-- Added for footer
       translations: { en: emptyLabel(), ps: emptyLabel(), fa: emptyLabel() },
     };
     allItems[index].children.push(newSubLink);
@@ -356,6 +358,13 @@ export default function NavigationAdmin() {
     updateConfig("items", allItems);
   };
 
+  // Turn Footer on/off for MAIN link
+  const setFooterMain = (index, isChecked) => {
+    const allItems = [...config.items];
+    allItems[index].showInFooter = isChecked;
+    updateConfig("items", allItems);
+  };
+
   // Update Sub-Link Text
   const setSubLabel = (mainIndex, subIndex, value) => {
     const allItems = [...config.items];
@@ -367,6 +376,13 @@ export default function NavigationAdmin() {
   const setSubHref = (mainIndex, subIndex, value) => {
     const allItems = [...config.items];
     allItems[mainIndex].children[subIndex].href = cleanPath(value);
+    updateConfig("items", allItems);
+  };
+
+  // Turn Footer on/off for SUB link
+  const setFooterSub = (mainIndex, subIndex, isChecked) => {
+    const allItems = [...config.items];
+    allItems[mainIndex].children[subIndex].showInFooter = isChecked;
     updateConfig("items", allItems);
   };
 
@@ -494,7 +510,7 @@ export default function NavigationAdmin() {
               <div>
                 <label className={labelCls}>Label / Name</label>
                 <input
-                  dir={inputDirection} // This changes rtl/ltr based on language!
+                  dir={inputDirection}
                   className={inputCls}
                   value={ctaLabel}
                   onChange={(e) => setCtaLabel(e.target.value)}
@@ -504,7 +520,7 @@ export default function NavigationAdmin() {
               <div>
                 <label className={labelCls}>Link URL</label>
                 <input
-                  dir="ltr" // URLs should ALWAYS be LTR!
+                  dir="ltr"
                   className={inputCls}
                   value={config.cta?.href || ""}
                   onChange={(e) =>
@@ -529,7 +545,7 @@ export default function NavigationAdmin() {
                     {field[0].toUpperCase() + field.slice(1)}
                   </label>
                   <input
-                    dir={inputDirection} // Changes based on language
+                    dir={inputDirection}
                     className={inputCls}
                     value={search[field] || ""}
                     onChange={(e) => setSearchField(field, e.target.value)}
@@ -557,7 +573,6 @@ export default function NavigationAdmin() {
           </div>
 
           <div className="space-y-5 p-5 sm:p-6">
-            {/* If there are no links, show a friendly message */}
             {config.items.length === 0 ? (
               <div className="rounded-2xl border-2 border-dashed border-[var(--border)] py-14 text-center">
                 <LayoutGrid
@@ -569,13 +584,11 @@ export default function NavigationAdmin() {
                 </p>
               </div>
             ) : (
-              /* Otherwise, map through all links and display them */
               config.items.map((item, index) => (
                 <article
                   key={item.id}
                   className="overflow-hidden rounded-2xl border border-[var(--border)] shadow-sm"
                 >
-                  {/* Top bar of the Link Card (Title and Move/Delete buttons) */}
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
                     <span className="text-sm font-bold text-[var(--accent)]">
                       Link #{index + 1}
@@ -608,14 +621,13 @@ export default function NavigationAdmin() {
                   </div>
 
                   <div className="space-y-4 p-4 sm:p-5">
-                    {/* Link Label and URL Inputs */}
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
                         <label className={labelCls}>
                           Label ({lang.toUpperCase()})
                         </label>
                         <input
-                          dir={inputDirection} // Changes based on language
+                          dir={inputDirection}
                           className={inputCls}
                           value={item.translations?.[lang]?.label || ""}
                           onChange={(e) => setItemLabel(index, e.target.value)}
@@ -625,7 +637,7 @@ export default function NavigationAdmin() {
                       <div>
                         <label className={labelCls}>URL</label>
                         <input
-                          dir="ltr" // Always LTR
+                          dir="ltr"
                           className={inputCls}
                           value={item.href || ""}
                           onChange={(e) => setItemHref(index, e.target.value)}
@@ -634,20 +646,35 @@ export default function NavigationAdmin() {
                       </div>
                     </div>
 
-                    {/* Checkbox for Dropdown */}
-                    <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                      <input
-                        type="checkbox"
-                        className="accent-[var(--accent)]"
-                        checked={!!item.hasDropdown}
-                        onChange={(e) => setDropdown(index, e.target.checked)}
-                      />
-                      Enable Dropdown (Sub-links)
-                    </label>
+                    {/* NEW: Flex container for Checkboxes to keep them neat */}
+                    <div className="flex flex-wrap items-center gap-6">
+                      {/* Checkbox for Dropdown */}
+                      <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--foreground)]">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded accent-[var(--accent)]"
+                          checked={!!item.hasDropdown}
+                          onChange={(e) => setDropdown(index, e.target.checked)}
+                        />
+                        Enable Dropdown (Sub-links)
+                      </label>
 
-                    {/* Sub-links Section (Only shows if Dropdown is checked) */}
+                      {/* NEW: Checkbox for Footer */}
+                      <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[var(--foreground)]">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded accent-[var(--accent)]"
+                          checked={!!item.showInFooter}
+                          onChange={(e) =>
+                            setFooterMain(index, e.target.checked)
+                          }
+                        />
+                        Show in Footer
+                      </label>
+                    </div>
+
                     {item.hasDropdown && (
-                      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+                      <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
                         <div className="mb-3 flex items-center justify-between">
                           <span className="text-xs font-semibold text-[var(--muted)]">
                             Sub-links ({item.children?.length || 0})
@@ -670,9 +697,8 @@ export default function NavigationAdmin() {
                             {item.children.map((sub, subIndex) => (
                               <div
                                 key={sub.id}
-                                className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2"
+                                className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 sm:flex-nowrap"
                               >
-                                {/* Move Sub-link buttons */}
                                 <div className="flex flex-col">
                                   <button
                                     type="button"
@@ -704,10 +730,9 @@ export default function NavigationAdmin() {
                                   </button>
                                 </div>
 
-                                {/* Sub-link Inputs */}
                                 <input
-                                  dir={inputDirection} // Changes based on language
-                                  className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                                  dir={inputDirection}
+                                  className="w-full flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)] sm:w-auto"
                                   placeholder="Sub-link Name"
                                   value={sub.translations?.[lang]?.label || ""}
                                   onChange={(e) =>
@@ -715,8 +740,8 @@ export default function NavigationAdmin() {
                                   }
                                 />
                                 <input
-                                  dir="ltr" // Always LTR
-                                  className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+                                  dir="ltr"
+                                  className="w-full flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)] sm:w-auto"
                                   placeholder="/path"
                                   value={sub.href || ""}
                                   onChange={(e) =>
@@ -724,11 +749,34 @@ export default function NavigationAdmin() {
                                   }
                                 />
 
-                                {/* Delete Sub-link Button */}
+                                {/* NEW: Checkbox for Footer (Sub-links) */}
+                                <label
+                                  title="Show in Footer"
+                                  className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                                    sub.showInFooter
+                                      ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]"
+                                      : "border-[var(--border)] bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--foreground)]"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-3.5 w-3.5 rounded accent-[var(--accent)]"
+                                    checked={!!sub.showInFooter}
+                                    onChange={(e) =>
+                                      setFooterSub(
+                                        index,
+                                        subIndex,
+                                        e.target.checked,
+                                      )
+                                    }
+                                  />
+                                  Footer
+                                </label>
+
                                 <button
                                   type="button"
                                   onClick={() => remove(subIndex, true, index)}
-                                  className="rounded-lg p-2 text-red-500 hover:bg-red-500/10"
+                                  className="shrink-0 rounded-lg p-2 text-red-500 hover:bg-red-500/10"
                                 >
                                   <Trash2 size={16} />
                                 </button>
@@ -743,7 +791,6 @@ export default function NavigationAdmin() {
               ))
             )}
 
-            {/* Bottom Button to add another link */}
             <button
               type="button"
               onClick={addLink}
