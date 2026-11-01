@@ -95,7 +95,7 @@ export default function Footer() {
   }, []);
 
   // ==========================================
-  // 4. DYNAMIC VALUES FROM DB
+  // 4.DYNAMIC VALUES FROM DB
   // ==========================================
   const logo = navLogo || footerData?.logo || "";
   const projectName = footerData?.projectName || "Bexon";

@@ -1,8 +1,9 @@
+import FrontEndLayout from "@/app/Components/HelperHooks/FrontEndLayout";
+import WowAnimation from "@/app/Components/WowAnimation";
+import "@/app/globals.css";
 import { Mona_Sans } from "next/font/google";
-import "./globals.css";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "sonner";
-import WowAnimation from "./Components/WowAnimation";
 
 const monaSans = Mona_Sans({
   subsets: ["latin"],
@@ -10,12 +11,20 @@ const monaSans = Mona_Sans({
 
 export const metadata = {
   title: "Bexon - Corporate Business",
-  description: "Corporate Business Website ",
+  description: "Corporate Business Website",
+  icons: {
+    icon: "/project-logo.jpg?v=1",
+    shortcut: "/project-logo.jpg?v=1",
+    apple: "/project-logo.jpg?v=1",
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/project-logo.jpg?v=1" sizes="any" />
+      </head>
       <body className={monaSans.className} suppressHydrationWarning>
         <NextTopLoader
           color="#1D8B8A"
@@ -31,14 +40,9 @@ export default function RootLayout({ children }) {
 
         <WowAnimation />
 
-        {children}
+        <FrontEndLayout>{children}</FrontEndLayout>
 
-        <Toaster
-          position="top-right"
-          richColors
-          closeButton
-          duration={3000}
-        />
+        <Toaster position="top-right" richColors closeButton duration={3000} />
       </body>
     </html>
   );
