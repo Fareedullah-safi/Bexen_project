@@ -2,13 +2,21 @@
 
 import Spinner from "@/app/Components/Admin/Spinner";
 import axios from "axios";
-import { Loader2, Shield, Trash2, Users } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Shield,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const API_URL = "/api/admin/adminusers/addAdmin";
 
-// 4 Role Options
 const ROLES = [
   { value: "super-admin", label: "Super Admin" },
   { value: "admin", label: "Admin" },
@@ -16,7 +24,6 @@ const ROLES = [
   { value: "viewer", label: "Viewer" },
 ];
 
-// Color badge for each role
 const roleBadge = (role) => {
   switch (role) {
     case "super-admin":
@@ -36,17 +43,14 @@ export default function AdminsManager() {
   const [savingId, setSavingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [admins, setAdmins] = useState([]);
+  const [reset, setReset] = useState(null); // null = closed, { id, name, email, password, show, loading }
 
-  // Fetch all admins
   const loadAdmins = async () => {
     try {
       setLoading(true);
       const res = await axios.get(API_URL);
-      if (res.data?.success) {
-        setAdmins(res.data.data || []);
-      } else {
-        toast.error(res.data?.msg || "Failed to load admins.");
-      }
+      if (res.data?.success) setAdmins(res.data.data || []);
+      else toast.error(res.data?.msg || "Failed to load admins.");
     } catch {
       toast.error("Failed to load admins from database.");
     } finally {
@@ -58,14 +62,11 @@ export default function AdminsManager() {
     loadAdmins();
   }, []);
 
-  // Update role handler
   const handleRoleChange = async (id, newRole) => {
     setSavingId(id);
     try {
       const res = await axios.patch(API_URL, { id, role: newRole });
       if (!res.data?.success) throw new Error(res.data?.msg || "Update failed");
-
-      // Update local state immediately
       setAdmins((prev) =>
         prev.map((u) =>
           u._id === id ? { ...u, role: res.data.data.role } : u,
@@ -76,20 +77,17 @@ export default function AdminsManager() {
       toast.error(
         e.response?.data?.msg || e.message || "Failed to update role",
       );
-      // Reload to revert UI if failed
       loadAdmins();
     } finally {
       setSavingId(null);
     }
   };
 
-  // Delete admin handler
   const handleDelete = async (id, name) => {
     setDeletingId(id);
     try {
       const res = await axios.delete(`${API_URL}?id=${id}`);
       if (!res.data?.success) throw new Error(res.data?.msg || "Delete failed");
-
       setAdmins((prev) => prev.filter((u) => u._id !== id));
       toast.success("Admin deleted successfully.");
     } catch (e) {
@@ -98,6 +96,26 @@ export default function AdminsManager() {
       );
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const submitReset = async () => {
+    if (!reset?.password || reset.password.length < 6)
+      return toast.error("Min 6 characters.");
+    setReset((r) => ({ ...r, loading: true }));
+    try {
+      const res = await axios.patch(API_URL, {
+        id: reset.id,
+        password: reset.password,
+      });
+      if (!res.data?.success) throw new Error(res.data?.msg || "Failed.");
+      toast.success(`Password reset for "${reset.name}".`);
+      setReset(null);
+    } catch (e) {
+      toast.error(
+        e.response?.data?.msg || e.message || "Failed to reset password.",
+      );
+      setReset((r) => ({ ...r, loading: false }));
     }
   };
 
@@ -112,7 +130,6 @@ export default function AdminsManager() {
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="mx-auto max-w-6xl space-y-6">
-        {/* HEADER */}
         <header>
           <p className="mb-1 text-[11px] font-bold tracking-[0.2em] text-[var(--accent)] uppercase">
             Access Control
@@ -123,7 +140,6 @@ export default function AdminsManager() {
           </p>
         </header>
 
-        {/* ADMINS LIST TABLE */}
         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-4 sm:px-6">
             <div className="flex items-center gap-2">
@@ -153,13 +169,11 @@ export default function AdminsManager() {
                 <tbody>
                   {admins.map((user) => {
                     const currentRole = user.role || "viewer";
-
                     return (
                       <tr
                         key={user._id}
                         className="border-b border-[var(--border)] transition-colors last:border-0 hover:bg-[var(--accent)]/5"
                       >
-                        {/* Avatar & Name */}
                         <td className="px-4 py-4 sm:px-6">
                           <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)]/15 text-sm font-bold text-[var(--accent)] shadow-sm">
@@ -170,34 +184,24 @@ export default function AdminsManager() {
                             </span>
                           </div>
                         </td>
-
-                        {/* Email */}
                         <td className="px-4 py-4 font-mono text-xs text-[var(--muted)]">
                           {user.email}
                         </td>
-
-                        {/* Teal Styled Role Select Dropdown */}
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-2">
-                            {/* Role Badge Indicator */}
                             <span
-                              className={`hidden rounded-full border px-2.5 py-0.5 text-[11px] font-bold capitalize sm:inline-block ${roleBadge(
-                                currentRole,
-                              )}`}
+                              className={`hidden rounded-full border px-2.5 py-0.5 text-[11px] font-bold capitalize sm:inline-block ${roleBadge(currentRole)}`}
                             >
                               {currentRole}
                             </span>
-
-                            {/* Dropdown Input */}
                             <div className="relative">
                               <select
                                 value={currentRole}
                                 disabled={savingId === user._id}
                                 onChange={(e) => {
                                   const val = e.target.value;
-                                  if (val !== currentRole) {
+                                  if (val !== currentRole)
                                     handleRoleChange(user._id, val);
-                                  }
                                 }}
                                 className="cursor-pointer rounded-xl border-2 border-[var(--accent)]/30 bg-[var(--surface)] px-3 py-1.5 text-xs font-bold text-[var(--foreground)] shadow-sm transition-all outline-none hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/20 disabled:cursor-not-allowed disabled:opacity-50"
                               >
@@ -211,8 +215,6 @@ export default function AdminsManager() {
                                   </option>
                                 ))}
                               </select>
-
-                              {/* Loading Spinner during role save */}
                               {savingId === user._id && (
                                 <Loader2
                                   size={14}
@@ -222,29 +224,44 @@ export default function AdminsManager() {
                             </div>
                           </div>
                         </td>
-
-                        {/* Created Date */}
                         <td className="px-4 py-4 text-xs text-[var(--muted)]">
                           {user.createdAt
                             ? new Date(user.createdAt).toLocaleDateString()
                             : "—"}
                         </td>
-
-                        {/* Delete Button */}
                         <td className="px-4 py-4 text-right sm:px-6">
-                          <button
-                            type="button"
-                            disabled={deletingId === user._id}
-                            onClick={() => handleDelete(user._id, user.name)}
-                            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 disabled:opacity-50"
-                          >
-                            {deletingId === user._id ? (
-                              <Loader2 size={15} className="animate-spin" />
-                            ) : (
-                              <Trash2 size={15} />
-                            )}
-                            Delete
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setReset({
+                                  id: user._id,
+                                  name: user.name,
+                                  email: user.email,
+                                  password: "",
+                                  show: false,
+                                  loading: false,
+                                })
+                              }
+                              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)]/10"
+                            >
+                              <KeyRound size={15} />
+                              <span className="hidden sm:inline">Reset</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deletingId === user._id}
+                              onClick={() => handleDelete(user._id, user.name)}
+                              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 disabled:opacity-50"
+                            >
+                              {deletingId === user._id ? (
+                                <Loader2 size={15} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={15} />
+                              )}
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -255,7 +272,6 @@ export default function AdminsManager() {
           )}
         </section>
 
-        {/* ROLE LEGEND */}
         <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--muted)]">
           <Shield size={15} className="text-[var(--accent)]" />
           <span>
@@ -265,6 +281,78 @@ export default function AdminsManager() {
           </span>
         </div>
       </div>
+
+      {/* RESET PASSWORD MODAL */}
+      {reset && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => !reset.loading && setReset(null)}
+          />
+          <div className="relative w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => !reset.loading && setReset(null)}
+              className="absolute top-4 right-4 rounded-lg p-1 text-[var(--muted)] hover:text-[var(--foreground)]"
+            >
+              <X size={18} />
+            </button>
+            <h3 className="mb-1 text-lg font-bold">Reset Password</h3>
+            <p className="mb-5 text-xs text-[var(--muted)]">
+              New password for{" "}
+              <b className="text-[var(--foreground)]">{reset.name}</b>
+            </p>
+            <div className="mb-2 text-xs text-[var(--muted)]">
+              Email: {reset.email}
+            </div>
+            <div className="relative mb-5">
+              <input
+                type={reset.show ? "text" : "password"}
+                value={reset.password}
+                onChange={(e) =>
+                  setReset((r) => ({ ...r, password: e.target.value }))
+                }
+                onKeyDown={(e) => e.key === "Enter" && submitReset()}
+                placeholder="New password (min 6 chars)"
+                disabled={reset.loading}
+                autoFocus
+                className="w-full rounded-xl border-2 border-[var(--border)] bg-[var(--background)] px-4 py-2.5 pr-10 text-sm outline-none focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/20 disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={() => setReset((r) => ({ ...r, show: !r.show }))}
+                className="absolute top-1/2 right-3 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)]"
+                tabIndex={-1}
+              >
+                {reset.show ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setReset(null)}
+                disabled={reset.loading}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-[var(--muted)] hover:bg-[var(--accent)]/10 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitReset}
+                disabled={reset.loading || reset.password.length < 6}
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {reset.loading ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <KeyRound size={15} />
+                )}
+                {reset.loading ? "Saving..." : "Reset"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

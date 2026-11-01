@@ -83,12 +83,11 @@ export async function POST(req) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // 🔴 FIX IS HERE: Added `role` below 👇
     const newAdmin = await AddAdmin.create({
       name: name.trim(),
       email: normalizedEmail,
       password: hashedPassword,
-      role: role || "super-admin", // 👈 NOW SAVES THE SELECTED ROLE!
+      role: role || "super-admin",
     });
 
     return NextResponse.json(
@@ -115,7 +114,7 @@ export async function POST(req) {
 }
 
 // ==========================================
-// 3. PATCH: Update Admin Role
+// 3. PATCH: Update Role OR Reset Password
 // ==========================================
 export async function PATCH(req) {
   try {
@@ -125,18 +124,39 @@ export async function PATCH(req) {
       return permission.response;
     }
     await connectDB();
-    const { id, role } = await req.json();
+    const { id, role, password } = await req.json();
 
-    if (!id || !role) {
+    if (!id) {
       return NextResponse.json(
-        { success: false, msg: "Admin ID and role are required." },
+        { success: false, msg: "Admin ID is required." },
         { status: 400 },
       );
     }
 
+    if (!role && !password) {
+      return NextResponse.json(
+        { success: false, msg: "Provide a role or password to update." },
+        { status: 400 },
+      );
+    }
+
+    const update = {};
+
+    if (role) update.role = role;
+
+    if (password) {
+      if (password.length < 6) {
+        return NextResponse.json(
+          { success: false, msg: "Password must be at least 6 characters." },
+          { status: 400 },
+        );
+      }
+      update.password = await bcrypt.hash(password, 12);
+    }
+
     const updatedAdmin = await AddAdmin.findByIdAndUpdate(
       id,
-      { $set: { role } },
+      { $set: update },
       { returnDocument: "after" },
     ).select("-password -__v");
 
@@ -148,13 +168,20 @@ export async function PATCH(req) {
     }
 
     return NextResponse.json(
-      { success: true, msg: "Role updated successfully.", data: updatedAdmin },
+      {
+        success: true,
+        msg:
+          password && !role
+            ? "Password reset successfully."
+            : "Role updated successfully.",
+        data: updatedAdmin,
+      },
       { status: 200 },
     );
   } catch (error) {
-    console.error("Update role error:", error);
+    console.error("Update admin error:", error);
     return NextResponse.json(
-      { success: false, msg: "Unable to update role." },
+      { success: false, msg: "Unable to update admin." },
       { status: 500 },
     );
   }
