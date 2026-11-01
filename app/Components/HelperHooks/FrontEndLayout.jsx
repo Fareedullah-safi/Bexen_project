@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
-// Check if Navbar/Footer are exported as default OR named imports in your project
+// Check if Navbar/Footer are exported as default OR  named imports in your project
 import FooterComponent from "../Footer"; // Default import
 import NavbarComponent from "../Navbar"; // Default import
 
