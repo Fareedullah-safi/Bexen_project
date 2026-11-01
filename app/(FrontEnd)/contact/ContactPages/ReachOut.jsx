@@ -1,40 +1,115 @@
 "use client";
 
-import { useEffect } from "react";
-import { MapPin, Mail, Phone, MessageCircle, Box } from "lucide-react";
+import { Box, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import { useEffect, useState } from "react";
 
-const CONTACT_CARDS = [
-  {
-    id: "location",
-    icon: MapPin,
-    title: "Our Location",
-    lines: ["993 Renner Burg, West", "Rond, MT 94251-030"],
-  },
-  {
-    id: "email",
-    icon: Mail,
-    title: "Email us",
-    lines: ["support@bexon.com", "info@bexon.com"],
-  },
-  {
-    id: "call",
-    icon: Phone,
-    title: "Call us",
-    lines: ["+1 (009) 544-7818", "+1 (009) 880-1810"],
-  },
-  {
-    id: "chat",
-    icon: MessageCircle,
-    title: "Live chat",
-    lines: ["livechat@bexon.com"],
-    link: {
-      label: "Need help?",
-      href: "/contact",
+const defaultData = {
+  translations: {
+    en: {
+      topTag: "CONTACT INFO",
+      highlightedTitle: "Reach",
+      mainTitle: "Out to Us",
+      locationTitle: "Our Location",
+      locationAddress: "993 Renner Burg, West Rond, MT 94251-030",
+      emailTitle: "Email us",
+      phoneTitle: "Call us",
+      chatTitle: "Live chat",
+      chatLinkText: "Need help?",
     },
   },
-];
+  shared: {
+    email1: "support@bexon.com",
+    email2: "info@bexon.com",
+    phone1: "+1 (009) 544-7818",
+    phone2: "+1 (009) 880-1810",
+    chatEmail: "livechat@bexon.com",
+    chatLinkUrl: "/contact",
+  },
+};
+
+function getSiteLanguage() {
+  if (typeof window === "undefined") return "en";
+  try {
+    const value = (localStorage.getItem("site-language") || "en")
+      .toLowerCase()
+      .trim();
+    if (value === "ps" || value === "fa" || value === "en") return value;
+  } catch (_) {}
+  return "en";
+}
+
+function parseAddressLines(address) {
+  if (!address) return ["993 Renner Burg, West", "Rond, MT 94251-030"];
+  if (address.includes("\n")) return address.split("\n");
+  if (address.includes(",")) {
+    const commaIdx = address.indexOf(",");
+    return [
+      address.substring(0, commaIdx).trim(),
+      address.substring(commaIdx + 1).trim(),
+    ];
+  }
+  return [address];
+}
 
 export default function ReachOut() {
+  const [data, setData] = useState(defaultData);
+  const [lang, setLang] = useState("en");
+
+  // Sync language with site-language in localStorage
+  useEffect(() => {
+    const syncLang = () => {
+      const next = getSiteLanguage();
+      setLang((prev) => (prev !== next ? next : prev));
+    };
+
+    syncLang();
+    const intervalId = setInterval(syncLang, 300);
+
+    const onStorage = (e) => {
+      if (e.key === "site-language") syncLang();
+    };
+    const onLangChange = () => syncLang();
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("languageChange", onLangChange);
+    window.addEventListener("site-language-change", onLangChange);
+    document.addEventListener("visibilitychange", syncLang);
+    window.addEventListener("focus", syncLang);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("languageChange", onLangChange);
+      window.removeEventListener("site-language-change", onLangChange);
+      document.removeEventListener("visibilitychange", syncLang);
+      window.removeEventListener("focus", syncLang);
+    };
+  }, []);
+
+  // Fetch API data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/contactpage/contact-details", {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+
+        const json = await res.json();
+        const payload = json?.data || json;
+
+        if (payload && (payload.translations || payload.shared)) {
+          setData(payload);
+        }
+      } catch (error) {
+        console.error("Failed to fetch contact details:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Intersection observer for WOW animations
   useEffect(() => {
     const elements = document.querySelectorAll(".wow");
 
@@ -66,7 +141,7 @@ export default function ReachOut() {
       {
         threshold: 0.1,
         rootMargin: "0px 0px -60px 0px",
-      }
+      },
     );
 
     elements.forEach((element) => observer.observe(element));
@@ -74,10 +149,53 @@ export default function ReachOut() {
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [data]);
+
+  const content =
+    data?.translations?.[lang] ||
+    data?.translations?.en ||
+    defaultData.translations.en;
+
+  const shared = data?.shared || defaultData.shared;
+  const isRTL = lang === "ps" || lang === "fa";
+
+  const CONTACT_CARDS = [
+    {
+      id: "location",
+      icon: MapPin,
+      title: content.locationTitle || "Our Location",
+      lines: parseAddressLines(content.locationAddress),
+    },
+    {
+      id: "email",
+      icon: Mail,
+      title: content.emailTitle || "Email us",
+      lines: [shared.email1, shared.email2].filter(Boolean),
+    },
+    {
+      id: "call",
+      icon: Phone,
+      title: content.phoneTitle || "Call us",
+      lines: [shared.phone1, shared.phone2].filter(Boolean),
+    },
+    {
+      id: "chat",
+      icon: MessageCircle,
+      title: content.chatTitle || "Live chat",
+      lines: [shared.chatEmail].filter(Boolean),
+      link: {
+        label: content.chatLinkText || "Need help?",
+        href: shared.chatLinkUrl || "/contact",
+      },
+    },
+  ];
 
   return (
-    <section className="w-full overflow-hidden bg-[#EAEFEF] px-4 py-14 sm:px-6 sm:py-16 md:px-8 lg:px-10 lg:py-24 xl:px-16">
+    <section
+      dir={isRTL ? "rtl" : "ltr"}
+      lang={lang}
+      className="w-full overflow-hidden bg-[#EAEFEF] px-4 py-14 sm:px-6 sm:py-16 md:px-8 lg:px-10 lg:py-24 xl:px-16"
+    >
       <div className="mx-auto w-full max-w-7xl">
         {/* Badge */}
         <div
@@ -88,8 +206,8 @@ export default function ReachOut() {
         >
           <Box size={20} className="text-[#1E8A8A]" aria-hidden="true" />
 
-          <span className="text-sm font-bold tracking-[0.12em] text-[#102326]">
-            CONTACT INFO
+          <span className="text-sm font-bold tracking-[0.12em] text-[#102326] uppercase">
+            {content.topTag}
           </span>
         </div>
 
@@ -100,8 +218,8 @@ export default function ReachOut() {
           data-wow-offset="50"
           className="wow animate__animated animate__fadeInUp mt-5 text-center text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl"
         >
-          <span className="text-[#1E8A8A]">Reach</span>{" "}
-          <span className="text-[#102326]">Out to Us</span>
+          <span className="text-[#1E8A8A]">{content.highlightedTitle}</span>{" "}
+          <span className="text-[#102326]">{content.mainTitle}</span>
         </h2>
 
         {/* Contact cards */}

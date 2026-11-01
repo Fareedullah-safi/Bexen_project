@@ -1,12 +1,128 @@
 "use client";
 
 import ProgressBox from "@/app/Components/ProgressBox";
-import { Box, ArrowRight, CheckCircle } from "lucide-react";
+import { ArrowRight, Box, CheckCircle } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+const defaultData = {
+  image:
+    "https://res.cloudinary.com/dbz6ftcwo/image/upload/v1793183536/bexon/about/y7rvbnak6sbxnzg0rbey.jpg",
+  buttonLink: "/about",
+  progressValue1: 82,
+  progressValue2: 90,
+  translations: {
+    en: {
+      topTag: "CHOOSE THE BEST",
+      mainTitle:
+        "Driving Innovation and Excellence for Sustainable Corporate Success",
+      highlightedTitle: "Worldwide.",
+      missionTitle: "Our Mission",
+      missionDesc:
+        "Our mission is to empower businesses through innovative best solutions, exceptional service.",
+      missionList: [
+        "Innovation & Excellence",
+        "Exceptional Customer",
+        "Business Growth",
+      ],
+      visionTitle: "Our Vision",
+      visionDesc:
+        "Our vision is to become a global leader in providing transformative business solutions.",
+      visionList: [
+        "Global Leadership",
+        "Transformative Impact",
+        "Sustainable Success",
+      ],
+      progressTitle: "Business Progress",
+      progressLabel1: "Revenue",
+      progressLabel2: "Satisfaction",
+      buttonText: "Learn More About Us",
+    },
+  },
+};
+
+function getSiteLanguage() {
+  if (typeof window === "undefined") return "en";
+  try {
+    const value = (localStorage.getItem("site-language") || "en")
+      .toLowerCase()
+      .trim();
+    if (value === "ps" || value === "fa" || value === "en") return value;
+  } catch (_) {}
+  return "en";
+}
 
 export default function SectionTwo() {
+  const [data, setData] = useState(defaultData);
+  const [lang, setLang] = useState("en");
+
+  // Listen to site-language in localStorage and update instantly
+  useEffect(() => {
+    const syncLang = () => {
+      const next = getSiteLanguage();
+      setLang((prev) => (prev !== next ? next : prev));
+    };
+
+    syncLang();
+
+    // Same-tab changes (storage event does NOT fire in the same tab)
+    const intervalId = setInterval(syncLang, 300);
+
+    // Cross-tab changes
+    const onStorage = (e) => {
+      if (e.key === "site-language") syncLang();
+    };
+
+    // Optional custom event from your language switcher
+    const onLangChange = () => syncLang();
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("languageChange", onLangChange);
+    window.addEventListener("site-language-change", onLangChange);
+    document.addEventListener("visibilitychange", syncLang);
+    window.addEventListener("focus", syncLang);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("languageChange", onLangChange);
+      window.removeEventListener("site-language-change", onLangChange);
+      document.removeEventListener("visibilitychange", syncLang);
+      window.removeEventListener("focus", syncLang);
+    };
+  }, []);
+
+  // Fetch dynamic data once
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/aboutpage/mission-vision");
+        const json = await res.json();
+        if (json?.success && json?.data) {
+          setData(json.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch Section Two data:", error);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Data according to site-language
+  const content =
+    data?.translations?.[lang] ||
+    data?.translations?.en ||
+    defaultData.translations.en;
+
+  const isRTL = lang === "ps" || lang === "fa";
+
   return (
-    <section className="relative w-full px-3 py-3 sm:px-4 sm:py-4">
+    <section
+      className="relative w-full px-3 py-3 sm:px-4 sm:py-4"
+      dir={isRTL ? "rtl" : "ltr"}
+      lang={lang}
+    >
       <div className="relative overflow-hidden rounded-2xl bg-[#dce8e8] sm:rounded-3xl">
         <div
           className="pointer-events-none absolute top-0 left-0 z-0 h-[55%] w-[55%] opacity-[0.09]"
@@ -40,7 +156,7 @@ export default function SectionTwo() {
               width={999}
               height={999}
               sizes="(max-width: 1024px) 100vw, 50vw"
-              src="https://themejunction.net/html/bexon/demo/assets/images/about/about-5.webp"
+              src={data.image || defaultData.image}
               className="h-[280px] w-full rounded-2xl object-cover sm:h-[400px] md:h-[480px] lg:h-full lg:min-h-[500px]"
             />
 
@@ -50,7 +166,13 @@ export default function SectionTwo() {
               data-wow-offset="80"
               className="wow animate__animated animate__fadeInUp"
             >
-              <ProgressBox />
+              <ProgressBox
+                title={content.progressTitle}
+                label1={content.progressLabel1}
+                value1={data.progressValue1}
+                label2={content.progressLabel2}
+                value2={data.progressValue2}
+              />
             </div>
           </div>
 
@@ -66,9 +188,8 @@ export default function SectionTwo() {
                   size={18}
                   className="shrink-0 text-[#1E8A8A] transition-transform duration-300 group-hover:rotate-180"
                 />
-
-                <span className="text-xs font-bold tracking-wide text-zinc-950 sm:text-sm md:text-base">
-                  CHOOSE THE BEST
+                <span className="text-xs font-bold tracking-wide text-zinc-950 uppercase sm:text-sm md:text-base">
+                  {content.topTag}
                 </span>
               </span>
             </div>
@@ -79,8 +200,8 @@ export default function SectionTwo() {
               data-wow-offset="100"
               className="wow animate__animated animate__fadeInRight text-2xl leading-tight font-medium text-[#102326] sm:text-3xl md:text-4xl xl:text-5xl"
             >
-              Driving Innovation and Excellence for Sustainable Corporate
-              Success <span className="text-[#1E8A8A]">Worldwide.</span>
+              {content.mainTitle}{" "}
+              <span className="text-[#1E8A8A]">{content.highlightedTitle}</span>
             </h2>
 
             <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
@@ -91,38 +212,24 @@ export default function SectionTwo() {
                 className="wow animate__animated animate__fadeInUp flex flex-col gap-4 rounded-2xl bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:p-6"
               >
                 <h3 className="text-lg font-bold text-[#0C1E21] sm:text-xl">
-                  Our Mission
+                  {content.missionTitle}
                 </h3>
-
                 <p className="text-sm leading-relaxed text-[#0C1E21]/70 sm:text-[15px]">
-                  Our mission is to empower businesses through innovative best
-                  solutions, exceptional service.
+                  {content.missionDesc}
                 </p>
-
                 <ul className="flex flex-col gap-2">
-                  <li className="flex items-center gap-2 text-sm text-[#0C1E21]/80 sm:text-[15px]">
-                    <CheckCircle
-                      size={17}
-                      className="shrink-0 text-[#1D8B8A]"
-                    />
-                    Innovation & Excellence
-                  </li>
-
-                  <li className="flex items-center gap-2 text-sm text-[#0C1E21]/80 sm:text-[15px]">
-                    <CheckCircle
-                      size={17}
-                      className="shrink-0 text-[#1D8B8A]"
-                    />
-                    Exceptional Customer
-                  </li>
-
-                  <li className="flex items-center gap-2 text-sm text-[#0C1E21]/80 sm:text-[15px]">
-                    <CheckCircle
-                      size={17}
-                      className="shrink-0 text-[#1D8B8A]"
-                    />
-                    Business Growth
-                  </li>
+                  {(content.missionList || []).map((item, i) => (
+                    <li
+                      key={i}
+                      className="flex items-center gap-2 text-sm text-[#0C1E21]/80 sm:text-[15px]"
+                    >
+                      <CheckCircle
+                        size={17}
+                        className="shrink-0 text-[#1D8B8A]"
+                      />
+                      {item}
+                    </li>
+                  ))}
                 </ul>
               </div>
 
@@ -133,38 +240,24 @@ export default function SectionTwo() {
                 className="wow animate__animated animate__fadeInUp flex flex-col gap-4 rounded-2xl bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:p-6"
               >
                 <h3 className="text-lg font-bold text-[#0C1E21] sm:text-xl">
-                  Our Vision
+                  {content.visionTitle}
                 </h3>
-
                 <p className="text-sm leading-relaxed text-[#0C1E21]/70 sm:text-[15px]">
-                  Our vision is to become a global leader in providing
-                  transformative business solutions.
+                  {content.visionDesc}
                 </p>
-
                 <ul className="flex flex-col gap-2">
-                  <li className="flex items-center gap-2 text-sm text-[#0C1E21]/80 sm:text-[15px]">
-                    <CheckCircle
-                      size={17}
-                      className="shrink-0 text-[#1D8B8A]"
-                    />
-                    Global Leadership
-                  </li>
-
-                  <li className="flex items-center gap-2 text-sm text-[#0C1E21]/80 sm:text-[15px]">
-                    <CheckCircle
-                      size={17}
-                      className="shrink-0 text-[#1D8B8A]"
-                    />
-                    Transformative Impact
-                  </li>
-
-                  <li className="flex items-center gap-2 text-sm text-[#0C1E21]/80 sm:text-[15px]">
-                    <CheckCircle
-                      size={17}
-                      className="shrink-0 text-[#1D8B8A]"
-                    />
-                    Sustainable Success
-                  </li>
+                  {(content.visionList || []).map((item, i) => (
+                    <li
+                      key={i}
+                      className="flex items-center gap-2 text-sm text-[#0C1E21]/80 sm:text-[15px]"
+                    >
+                      <CheckCircle
+                        size={17}
+                        className="shrink-0 text-[#1D8B8A]"
+                      />
+                      {item}
+                    </li>
+                  ))}
                 </ul>
               </div>
             </div>
@@ -175,23 +268,31 @@ export default function SectionTwo() {
               data-wow-offset="80"
               className="wow animate__animated animate__fadeInUp w-full"
             >
-              <button
-                type="button"
-                className="group/button flex h-12 w-full cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#1D8B8A] py-1.5 pr-1.5 pl-5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-1 hover:bg-[#167575] hover:shadow-xl hover:shadow-[#1D8B8A]/30 sm:h-14 sm:pl-6 sm:text-base"
-              >
-                <span className="overflow-hidden leading-none">
-                  <span className="block transition-transform duration-300 [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-[30px]">
-                    Learn More About Us
+              <Link href={data.buttonLink || "/about"}>
+                <button
+                  type="button"
+                  className={`group/button flex h-12 w-full cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#1D8B8A] px-1.5 py-1.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-1 hover:bg-[#167575] hover:shadow-xl hover:shadow-[#1D8B8A]/30 sm:h-14 sm:text-base ${
+                    isRTL ? "pr-5 sm:pr-6" : "pl-5 sm:pl-6"
+                  }`}
+                >
+                  <span className="overflow-hidden leading-none">
+                    <span className="block transition-transform duration-300 [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-[30px]">
+                      {content.buttonText}
+                    </span>
                   </span>
-                </span>
 
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0C1E21] sm:h-11 sm:w-11">
-                  <ArrowRight
-                    size={18}
-                    className="-rotate-45 text-white transition-transform duration-300 group-hover/button:rotate-0"
-                  />
-                </span>
-              </button>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0C1E21] sm:h-11 sm:w-11">
+                    <ArrowRight
+                      size={18}
+                      className={`${
+                        isRTL
+                          ? "rotate-135 group-hover/button:rotate-180"
+                          : "-rotate-45 group-hover/button:rotate-0"
+                      } text-white transition-transform duration-300`}
+                    />
+                  </span>
+                </button>
+              </Link>
             </div>
           </div>
         </div>

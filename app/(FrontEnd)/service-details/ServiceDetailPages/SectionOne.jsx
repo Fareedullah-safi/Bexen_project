@@ -1,9 +1,10 @@
 "use client";
 
 import { ArrowRight } from "lucide-react";
+import { details } from "motion/react-client";
 import Image from "next/image";
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 // ----------------------------------------------------------------------------
 // Constants
@@ -17,7 +18,7 @@ const ICON_SIZE_MD = 16;
 const ICON_SIZE_LG = 18;
 
 // ----------------------------------------------------------------------------
-// Static content
+// Static content (Fallback)
 // ----------------------------------------------------------------------------
 
 const FEATURES = [
@@ -100,6 +101,40 @@ const FAQS = [
 ];
 
 // ----------------------------------------------------------------------------
+// Language Helpers
+// ----------------------------------------------------------------------------
+
+function getSiteLanguage() {
+  if (typeof window === "undefined") return "en";
+  try {
+    const value = (localStorage.getItem("site-language") || "en")
+      .toLowerCase()
+      .trim();
+    if (value === "ps" || value === "fa" || value === "en") return value;
+  } catch (_) {}
+  return "en";
+}
+
+const defaultData = {
+  heroImage: { url: `${IMG_BASE}/service-details.webp` },
+  services: MORE_SERVICES,
+  translations: {
+    en: {
+      mainTitle: "Transforming Customer:",
+      highlightedTitle: "Tailored Solutions for Experiences.",
+      description1:
+        "Exceptional customer experiences are at the heart of every successful business. Our Customer Experience Solutions help transform every interaction into a meaningful and positive experience.",
+      description2:
+        "By understanding the customer journey and creating personalized, seamless experiences, businesses can improve customer satisfaction, loyalty, and long-term value.",
+      description3:
+        "Our approach is comprehensive and data-driven. We assess customer touchpoints, identify areas for improvement, and develop strategies that adapt to evolving customer needs.",
+      sidebarTag: "SERVICES",
+      sidebarTitle: "More services",
+    },
+  },
+};
+
+// ----------------------------------------------------------------------------
 // Component
 // ----------------------------------------------------------------------------
 
@@ -107,8 +142,104 @@ export default function SectionOne() {
   const [openFaq, setOpenFaq] = useState(0);
   const faqBaseId = useId();
 
+  const [data, setData] = useState(defaultData);
+  const [lang, setLang] = useState("en");
+
+  // Handle site-language synchronization
+  useEffect(() => {
+    const syncLang = () => {
+      const next = getSiteLanguage();
+      setLang((prev) => (prev !== next ? next : prev));
+    };
+
+    syncLang();
+    const intervalId = setInterval(syncLang, 300);
+
+    const onStorage = (e) => {
+      if (e.key === "site-language") syncLang();
+    };
+    const onLangChange = () => syncLang();
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("languageChange", onLangChange);
+    window.addEventListener("site-language-change", onLangChange);
+    document.addEventListener("visibilitychange", syncLang);
+    window.addEventListener("focus", syncLang);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("languageChange", onLangChange);
+      window.removeEventListener("site-language-change", onLangChange);
+      document.removeEventListener("visibilitychange", syncLang);
+      window.removeEventListener("focus", syncLang);
+    };
+  }, []);
+
+  // Fetch API data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/servicespage/services-details", {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+
+        const json = await res.json();
+        const payload = json?.data || json;
+
+        if (payload) {
+          setData(payload);
+        }
+      } catch (error) {
+        console.error("Failed to fetch Service Details data:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Get localized content with English fallback
+  const content =
+    data?.translations?.[lang] ||
+    data?.translations?.en ||
+    defaultData.translations.en;
+
+  const isRTL = lang === "ps" || lang === "fa";
+
+  // Map image URL from schema
+  const heroImageUrl =
+    data?.heroImage?.url || data?.image || defaultData.heroImage.url;
+
+  // Map services list from MongoDB schema
+  const rawServices = data?.services || data?.moreServices || MORE_SERVICES;
+
+  const displayServices = rawServices.map((svc, i) => {
+    let label = "";
+
+    if (typeof svc === "string") {
+      label = svc;
+    } else if (svc?.translations) {
+      label =
+        svc.translations?.[lang]?.label || svc.translations?.en?.label || "";
+    } else {
+      label =
+        svc?.label?.[lang] || svc?.label?.en || svc?.label || svc?.name || "";
+    }
+
+    return {
+      id: svc?.id || `svc-${i}`,
+      label: label || "Service",
+      href: svc?.href || "/service-details",
+    };
+  });
+
   return (
-    <section className="w-full bg-white px-4 py-14 sm:px-6 sm:py-16 md:px-8 lg:px-10 lg:py-24 xl:px-16">
+    <section
+      className="w-full bg-white px-4 py-14 sm:px-6 sm:py-16 md:px-8 lg:px-10 lg:py-24 xl:px-16"
+      dir={isRTL ? "rtl" : "ltr"}
+      lang={lang}
+    >
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-14 xl:grid-cols-[minmax(0,1fr)_350px] xl:gap-20">
         {/* ------------------------------------------------------------- */}
         {/* Left content                                                   */}
@@ -123,7 +254,7 @@ export default function SectionOne() {
             className="wow animate__animated animate__fadeInUp relative overflow-hidden rounded-2xl sm:rounded-3xl"
           >
             <Image
-              src={`${IMG_BASE}/service-details.webp`}
+              src={heroImageUrl}
               alt="Customer Experience"
               width={1000}
               height={700}
@@ -142,45 +273,42 @@ export default function SectionOne() {
               data-wow-offset="60"
               className="wow animate__animated animate__fadeInUp xs:text-3xl text-[26px] leading-[1.18] font-medium tracking-tight text-[#102326] sm:text-4xl md:text-5xl"
             >
-              Transforming Customer:{" "}
-              <span className="text-[#1E8A8A]">
-                Tailored Solutions for Experiences.
-              </span>
+              {content.mainTitle}{" "}
+              <span className="text-[#1E8A8A]">{content.highlightedTitle}</span>
             </h1>
 
-            <p
-              data-wow-duration="0.8s"
-              data-wow-delay="0.25s"
-              data-wow-offset="60"
-              className="wow animate__animated animate__fadeInUp mt-5 text-sm leading-7 text-[#102326]/65 sm:mt-6 sm:text-base sm:leading-8"
-            >
-              Exceptional customer experiences are at the heart of every
-              successful business. Our Customer Experience Solutions help
-              transform every interaction into a meaningful and positive
-              experience.
-            </p>
+            {(content.description1 || content.desc1) && (
+              <p
+                data-wow-duration="0.8s"
+                data-wow-delay="0.25s"
+                data-wow-offset="60"
+                className="wow animate__animated animate__fadeInUp mt-5 text-sm leading-7 text-[#102326]/65 sm:mt-6 sm:text-base sm:leading-8"
+              >
+                {content.description1 || content.desc1}
+              </p>
+            )}
 
-            <p
-              data-wow-duration="0.8s"
-              data-wow-delay="0.35s"
-              data-wow-offset="60"
-              className="wow animate__animated animate__fadeInUp mt-4 text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
-            >
-              By understanding the customer journey and creating personalized,
-              seamless experiences, businesses can improve customer
-              satisfaction, loyalty, and long-term value.
-            </p>
+            {(content.description2 || content.desc2) && (
+              <p
+                data-wow-duration="0.8s"
+                data-wow-delay="0.35s"
+                data-wow-offset="60"
+                className="wow animate__animated animate__fadeInUp mt-4 text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+              >
+                {content.description2 || content.desc2}
+              </p>
+            )}
 
-            <p
-              data-wow-duration="0.8s"
-              data-wow-delay="0.45s"
-              data-wow-offset="60"
-              className="wow animate__animated animate__fadeInUp mt-4 text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
-            >
-              Our approach is comprehensive and data-driven. We assess customer
-              touchpoints, identify areas for improvement, and develop
-              strategies that adapt to evolving customer needs.
-            </p>
+            {(content.description3 || content.desc3) && (
+              <p
+                data-wow-duration="0.8s"
+                data-wow-delay="0.45s"
+                data-wow-offset="60"
+                className="wow animate__animated animate__fadeInUp mt-4 text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+              >
+                {content.description3 || content.desc3}
+              </p>
+            )}
           </div>
 
           {/* ===================== HIDDEN: Feature list ===================== */}
@@ -452,18 +580,20 @@ export default function SectionOne() {
             className="wow animate__animated animate__fadeInRight rounded-2xl bg-[#ECF0F0] p-5 sm:rounded-3xl sm:p-6"
           >
             <div className="mb-5">
-              <span className="text-xs font-bold tracking-[0.18em] text-[#1E8A8A]">
-                SERVICES
+              <span className="text-xs font-bold tracking-[0.18em] text-[#1E8A8A] uppercase">
+                {content.sidebarTag || content.servicesTag || "SERVICES"}
               </span>
               <h3 className="mt-2 text-xl font-medium text-[#0C1E21] sm:text-2xl">
-                More services
+                {content.sidebarTitle ||
+                  content.servicesTitle ||
+                  "More services"}
               </h3>
             </div>
 
             <div className="flex flex-col gap-2">
-              {MORE_SERVICES.map((service, index) => (
+              {displayServices.map((service, index) => (
                 <Link
-                  key={service.id}
+                  key={service.id || index}
                   href={service.href}
                   data-wow-duration="0.7s"
                   data-wow-delay={`${0.15 + index * 0.08}s`}
@@ -487,7 +617,11 @@ export default function SectionOne() {
                     <ArrowRight
                       size={ICON_SIZE_SM}
                       aria-hidden="true"
-                      className="transition-transform duration-300 group-hover:translate-x-1"
+                      className={`transition-transform duration-300 ${
+                        isRTL
+                          ? "rotate-180 group-hover:-translate-x-1"
+                          : "group-hover:translate-x-1"
+                      }`}
                     />
                   </span>
                 </Link>
@@ -535,3 +669,4 @@ export default function SectionOne() {
     </section>
   );
 }
+

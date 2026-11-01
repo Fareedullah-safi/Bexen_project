@@ -1,3 +1,4 @@
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import dbConnect from "@/Lib/mongoDB"; // Ensure this path points to your DB connection file
 import ServiceDetails from "@/Models/Services-Details/Service-Details/ServiceDetails";
 import { NextResponse } from "next/server";

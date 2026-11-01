@@ -7,7 +7,7 @@ const LANGUAGES = ["en", "ps", "fa"];
 
 // Get the title for the selected language
 export async function GET(request) {
-  try {
+  try { 
     await connectDB();
 
     const lang = request.nextUrl.searchParams.get("lang") || "en";

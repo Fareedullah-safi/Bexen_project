@@ -1,13 +1,89 @@
+"use client";
+
+import { ChevronLeft, ChevronRight, Home } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronRight, Home } from "lucide-react";
+import { useEffect, useState } from "react";
+
+const DEFAULT_BG =
+  "https://themejunction.net/html/bexon/demo/assets/images/bg/pheader-bg.webp";
+
+const translations = {
+  en: {
+    title: "Contact Us",
+    home: "Home",
+  },
+  ps: {
+    title: "موږ سره اړیکه",
+    home: "کور",
+  },
+  fa: {
+    title: "تماس با ما",
+    home: "خانه",
+  },
+};
 
 export default function Contact() {
+  const [bgImage, setBgImage] = useState(DEFAULT_BG);
+  const [lang, setLang] = useState("en");
+
+  useEffect(() => {
+    const syncLanguage = () => {
+      const storedLang = localStorage.getItem("site-language") || "en";
+      setLang(storedLang);
+    };
+
+    syncLanguage();
+
+    window.addEventListener("storage", syncLanguage);
+    window.addEventListener("languageChange", syncLanguage);
+    window.addEventListener("site-language-change", syncLanguage);
+    window.addEventListener("focus", syncLanguage);
+
+    return () => {
+      window.removeEventListener("storage", syncLanguage);
+      window.removeEventListener("languageChange", syncLanguage);
+      window.removeEventListener("site-language-change", syncLanguage);
+      window.removeEventListener("focus", syncLanguage);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function fetchBanner() {
+      try {
+        const res = await fetch("/api/aboutpage/banner", { cache: "no-store" });
+        if (!res.ok) return;
+
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) return;
+
+        const data = await res.json();
+
+        if (active && data?.success && data?.data?.bgImage) {
+          setBgImage(data.data.bgImage);
+        }
+      } catch (error) {
+        console.error("Failed to load banner image:", error);
+      }
+    }
+
+    fetchBanner();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const t = translations[lang] || translations.en;
+  const isRtl = lang === "ps" || lang === "fa";
+
   return (
     <section className="w-full px-4">
       <div className="xs:h-[260px] max-w-8xl relative flex h-55 w-full items-center justify-center overflow-hidden rounded-2xl border border-white/10 shadow-2xl sm:h-82.5 md:h-100 lg:h-95">
         <Image
-          src="https://themejunction.net/html/bexon/demo/assets/images/bg/pheader-bg.webp"
+          src={bgImage}
           fill
           alt="Page Header Background"
           className="object-cover object-center"
@@ -31,14 +107,17 @@ export default function Contact() {
           className="wow animate__animated animate__fadeIn pointer-events-none absolute h-40 w-40 rounded-full bg-[#1D8B8A]/30 blur-3xl sm:h-60 sm:w-60"
         />
 
-        <div className="relative z-10 flex flex-col items-center justify-center px-4 text-center">
+        <div
+          className="relative z-10 flex flex-col items-center justify-center px-4 text-center"
+          dir={isRtl ? "rtl" : "ltr"}
+        >
           <h1
             data-wow-duration="0.9s"
             data-wow-delay="0.15s"
             data-wow-offset="80"
             className="wow animate__animated animate__fadeInDown xs:text-3xl mb-3 text-2xl font-bold tracking-tight text-white sm:mb-4 sm:text-4xl md:text-5xl lg:text-6xl"
           >
-            Contact Us
+            {t.title}
           </h1>
 
           <div
@@ -53,13 +132,17 @@ export default function Contact() {
               href="/"
               className="text-xs font-medium text-gray-200 transition-colors duration-300 hover:text-[#1D8B8A] sm:text-sm"
             >
-              Home
+              {t.home}
             </Link>
 
-            <ChevronRight size={14} className="text-gray-400 sm:size-4" />
+            {isRtl ? (
+              <ChevronLeft size={14} className="text-gray-400 sm:size-4" />
+            ) : (
+              <ChevronRight size={14} className="text-gray-400 sm:size-4" />
+            )}
 
             <span className="text-xs font-semibold text-[#1D8B8A] sm:text-sm">
-              About Us
+              {t.title}
             </span>
           </div>
         </div>

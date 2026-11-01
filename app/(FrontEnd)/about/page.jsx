@@ -1,4 +1,4 @@
-import SectionThree from "../Home/SectionThree";
+import SectionThree from "@/app/(FrontEnd)/Home/SectionThree";
 import About from "./AboutPages/About";
 import SectionSix from "./AboutPages/SectionSix";
 import SectionTwo from "./AboutPages/SectionTwo";
