@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 
 // Absolute imports using '@' alias (avoids relative path issues)
 import Footer from "@/app/Components/Footer";
-import { NavBar } from "@/app/Components/Navbar";
+import { NavBar } from "../NavBar";
 import SectionTwelve from "../SectionTwelve";
 
 export default function FrontEndLayout({ children }) {
