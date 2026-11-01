@@ -63,10 +63,6 @@ function validateTranslations(translations) {
     }
 
     const day = Number(item.day);
-
-    if (!Number.isInteger(day) || day < 1 || day > 31) {
-      return `${label}: day must be a number between 1 and 31.`;
-    }
   }
 
   return "";

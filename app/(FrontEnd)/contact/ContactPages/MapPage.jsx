@@ -29,6 +29,13 @@ const TRANSLATIONS = {
     successMsg: "Your message has been sent successfully.",
     errorMsg: "Failed to send message. Please try again.",
     mapBadge: "OUR LOCATION",
+    errors: {
+      fullName: "Please enter your full name.",
+      email: "Please enter a valid email address.",
+      phone: "Please enter a valid phone number.",
+      subject: "Please choose an option.",
+      message: "Please write your message.",
+    },
     subjectOptions: [
       "Business Strategy",
       "Customer Experience",
@@ -54,6 +61,13 @@ const TRANSLATIONS = {
     successMsg: "ستاسو پیغام په بریالیتوب سره ولیږل شو.",
     errorMsg: "پیغام ونه لیږل شو. مهرباني وکړئ بیا هڅه وکړئ.",
     mapBadge: "زموږ ادرس",
+    errors: {
+      fullName: "مهرباني وکړئ خپل بشپړ نوم ولیکئ.",
+      email: "مهرباني وکړئ سم برېښنالیک ولیکئ.",
+      phone: "مهرباني وکړئ سمه د تلیفون شمیره ولیکئ.",
+      subject: "مهرباني وکړئ یو اختیار وټاکئ.",
+      message: "مهرباني وکړئ خپل پیغام ولیکئ.",
+    },
     subjectOptions: [
       "د سوداګرۍ ستراتیژي",
       "د پیرودونکي تجربه",
@@ -79,6 +93,13 @@ const TRANSLATIONS = {
     successMsg: "پیام شما با موفقیت ارسال شد.",
     errorMsg: "ارسال پیام ناموفق بود. لطفاً دوباره تلاش کنید.",
     mapBadge: "موقعیت ما",
+    errors: {
+      fullName: "لطفاً نام کامل خود را وارد کنید.",
+      email: "لطفاً یک ایمیل معتبر وارد کنید.",
+      phone: "لطفاً شماره تماس معتبر وارد کنید.",
+      subject: "لطفاً یک گزینه را انتخاب کنید.",
+      message: "لطفاً پیام خود را بنویسید.",
+    },
     subjectOptions: [
       "استراتژی کسب‌وکار",
       "تجربه مشتری",
@@ -90,14 +111,25 @@ const TRANSLATIONS = {
   },
 };
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^[\d\s+\-()]{7,20}$/;
+
+const emptyErrors = () => ({
+  fullName: "",
+  email: "",
+  phone: "",
+  subject: "",
+  message: "",
+});
+
 export default function MapPage() {
   const [isSubjectOpen, setIsSubjectOpen] = useState(false);
   const [selectedSubjectIndex, setSelectedSubjectIndex] = useState(null);
-  const [subjectError, setSubjectError] = useState(false);
   const [lang, setLang] = useState("en");
   const [mapEmbedSrc, setMapEmbedSrc] = useState(DEFAULT_MAP_EMBED_SRC);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null); // "success" | "error" | null
+  const [errors, setErrors] = useState(emptyErrors);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -106,7 +138,7 @@ export default function MapPage() {
   });
   const dropdownRef = useRef(null);
 
-  // Language sync from localStorage site-language
+  // Language sync
   useEffect(() => {
     const syncLanguage = () => {
       const storedLang = localStorage.getItem("site-language") || "en";
@@ -128,7 +160,7 @@ export default function MapPage() {
     };
   }, []);
 
-  // GET contact details / map config (safe fetch)
+  // Map config
   useEffect(() => {
     let active = true;
 
@@ -144,10 +176,8 @@ export default function MapPage() {
         if (!contentType.includes("application/json")) return;
 
         const data = await res.json();
-
         if (!active || !data?.success || !data?.data) return;
 
-        // Optional: if your API later stores mapEmbedSrc, use it
         if (data.data.mapEmbedSrc) {
           setMapEmbedSrc(data.data.mapEmbedSrc);
         } else if (data.data.shared?.mapEmbedSrc) {
@@ -159,13 +189,12 @@ export default function MapPage() {
     }
 
     fetchContactConfig();
-
     return () => {
       active = false;
     };
   }, []);
 
-  // Close dropdown outside / Escape
+  // Close dropdown
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -193,52 +222,85 @@ export default function MapPage() {
       ? currentT.subjectOptions[selectedSubjectIndex]
       : "";
 
+  const clearFieldError = (name) => {
+    setErrors((prev) => (prev[name] ? { ...prev, [name]: "" } : prev));
+  };
+
   const handleInputChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    clearFieldError(name);
     if (submitStatus) setSubmitStatus(null);
   };
 
   const handleSelectSubject = (index) => {
     setSelectedSubjectIndex(index);
-    setSubjectError(false);
+    clearFieldError("subject");
     setIsSubjectOpen(false);
     if (submitStatus) setSubmitStatus(null);
   };
 
-  // POST to existing /api/contact (do not change that route)
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const validateForm = () => {
+    const next = emptyErrors();
+    const tErr = currentT.errors;
 
-    if (selectedSubjectIndex === null) {
-      setSubjectError(true);
-      return;
+    if (!formData.fullName.trim()) next.fullName = tErr.fullName;
+
+    if (!formData.email.trim() || !EMAIL_RE.test(formData.email.trim())) {
+      next.email = tErr.email;
     }
 
-    setSubjectError(false);
+    if (!formData.phone.trim() || !PHONE_RE.test(formData.phone.trim())) {
+      next.phone = tErr.phone;
+    }
+
+    if (selectedSubjectIndex === null) next.subject = tErr.subject;
+
+    if (!formData.message.trim()) next.message = tErr.message;
+
+    setErrors(next);
+    return !Object.values(next).some(Boolean);
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+
+    if (!validateForm()) return;
+
     setIsSubmitting(true);
     setSubmitStatus(null);
 
-    const subject =
+    const selectedService =
       TRANSLATIONS.en.subjectOptions[selectedSubjectIndex] ||
       currentT.subjectOptions[selectedSubjectIndex];
 
     const payload = {
-      name: formData.fullName.trim(),
       fullName: formData.fullName.trim(),
+      name: formData.fullName.trim(),
       email: formData.email.trim(),
       phone: formData.phone.trim(),
-      subject,
+      service: selectedService,
+      serviceRequired: selectedService,
+      subject: selectedService,
       message: formData.message.trim(),
       language: lang,
     };
 
     try {
-      const res = await fetch("/api/contact", {
+      let res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
+      if (!res.ok) {
+        res = await fetch("/api/homepage/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
 
       const contentType = res.headers.get("content-type") || "";
       let result = null;
@@ -254,6 +316,7 @@ export default function MapPage() {
       setSubmitStatus("success");
       setFormData({ fullName: "", email: "", phone: "", message: "" });
       setSelectedSubjectIndex(null);
+      setErrors(emptyErrors());
     } catch (error) {
       console.error("Contact form submit error:", error);
       setSubmitStatus("error");
@@ -261,6 +324,11 @@ export default function MapPage() {
       setIsSubmitting(false);
     }
   };
+
+  const fieldBorder = (hasError) =>
+    hasError
+      ? "border-red-400 focus:border-red-500"
+      : "border-[#0C1E21]/15 hover:border-[#1E8A8A]/40 focus:border-[#1E8A8A]";
 
   return (
     <section
@@ -332,13 +400,20 @@ export default function MapPage() {
                     id="fullName"
                     name="fullName"
                     type="text"
-                    required
                     autoComplete="name"
                     value={formData.fullName}
                     onChange={handleInputChange}
                     placeholder={currentT.fullNamePlaceholder}
-                    className="h-11 w-full border-b border-dashed border-[#0C1E21]/15 bg-transparent text-sm text-[#102326] transition-all duration-300 placeholder:text-[#102326]/40 hover:border-[#1E8A8A]/40 focus:border-[#1E8A8A] focus:outline-none sm:text-[15px]"
+                    disabled={isSubmitting}
+                    className={`h-11 w-full border-b border-dashed bg-transparent text-sm text-[#102326] transition-all duration-300 placeholder:text-[#102326]/40 focus:outline-none disabled:opacity-60 sm:text-[15px] ${fieldBorder(
+                      !!errors.fullName,
+                    )}`}
                   />
+                  {errors.fullName && (
+                    <p className="mt-1.5 text-xs font-medium text-red-500">
+                      {errors.fullName}
+                    </p>
+                  )}
                 </div>
 
                 {/* Email */}
@@ -355,13 +430,20 @@ export default function MapPage() {
                     id="email"
                     name="email"
                     type="email"
-                    required
                     autoComplete="email"
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder={currentT.emailPlaceholder}
-                    className="h-11 w-full border-b border-dashed border-[#0C1E21]/15 bg-transparent text-sm text-[#102326] transition-all duration-300 placeholder:text-[#102326]/40 hover:border-[#1E8A8A]/40 focus:border-[#1E8A8A] focus:outline-none sm:text-[15px]"
+                    disabled={isSubmitting}
+                    className={`h-11 w-full border-b border-dashed bg-transparent text-sm text-[#102326] transition-all duration-300 placeholder:text-[#102326]/40 focus:outline-none disabled:opacity-60 sm:text-[15px] ${fieldBorder(
+                      !!errors.email,
+                    )}`}
                   />
+                  {errors.email && (
+                    <p className="mt-1.5 text-xs font-medium text-red-500">
+                      {errors.email}
+                    </p>
+                  )}
                 </div>
 
                 {/* Phone */}
@@ -378,13 +460,20 @@ export default function MapPage() {
                     id="phone"
                     name="phone"
                     type="tel"
-                    required
                     autoComplete="tel"
                     value={formData.phone}
                     onChange={handleInputChange}
                     placeholder={currentT.phonePlaceholder}
-                    className="h-11 w-full border-b border-dashed border-[#0C1E21]/15 bg-transparent text-sm text-[#102326] transition-all duration-300 placeholder:text-[#102326]/40 hover:border-[#1E8A8A]/40 focus:border-[#1E8A8A] focus:outline-none sm:text-[15px]"
+                    disabled={isSubmitting}
+                    className={`h-11 w-full border-b border-dashed bg-transparent text-sm text-[#102326] transition-all duration-300 placeholder:text-[#102326]/40 focus:outline-none disabled:opacity-60 sm:text-[15px] ${fieldBorder(
+                      !!errors.phone,
+                    )}`}
                   />
+                  {errors.phone && (
+                    <p className="mt-1.5 text-xs font-medium text-red-500">
+                      {errors.phone}
+                    </p>
+                  )}
                 </div>
 
                 {/* Subject */}
@@ -404,12 +493,11 @@ export default function MapPage() {
                     aria-labelledby="subject-label"
                     aria-haspopup="listbox"
                     aria-expanded={isSubjectOpen}
+                    disabled={isSubmitting}
                     onClick={() => setIsSubjectOpen((prev) => !prev)}
-                    className={`flex h-11 w-full cursor-pointer items-center justify-between border-b border-dashed bg-transparent text-left text-sm transition-all duration-300 focus:outline-none sm:text-[15px] ${
-                      subjectError
-                        ? "border-red-400"
-                        : "border-[#0C1E21]/15 hover:border-[#1E8A8A]/40 focus:border-[#1E8A8A]"
-                    }`}
+                    className={`flex h-11 w-full cursor-pointer items-center justify-between border-b border-dashed bg-transparent text-left text-sm transition-all duration-300 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-[15px] ${fieldBorder(
+                      !!errors.subject,
+                    )}`}
                   >
                     <span
                       className={
@@ -454,9 +542,9 @@ export default function MapPage() {
                     </div>
                   )}
 
-                  {subjectError && (
+                  {errors.subject && (
                     <p className="mt-1.5 text-xs font-medium text-red-500">
-                      {currentT.selectOptionError}
+                      {errors.subject}
                     </p>
                   )}
                 </div>
@@ -474,17 +562,24 @@ export default function MapPage() {
                   <textarea
                     id="message"
                     name="message"
-                    required
                     rows={3}
                     value={formData.message}
                     onChange={handleInputChange}
                     placeholder={currentT.messagePlaceholder}
-                    className="w-full resize-none border-b border-dashed border-[#0C1E21]/15 bg-transparent pt-1.5 text-sm leading-6 text-[#102326] transition-all duration-300 placeholder:text-[#102326]/40 hover:border-[#1E8A8A]/40 focus:border-[#1E8A8A] focus:outline-none sm:text-[15px]"
+                    disabled={isSubmitting}
+                    className={`w-full resize-none border-b border-dashed bg-transparent pt-1.5 text-sm leading-6 text-[#102326] transition-all duration-300 placeholder:text-[#102326]/40 focus:outline-none disabled:opacity-60 sm:text-[15px] ${fieldBorder(
+                      !!errors.message,
+                    )}`}
                   />
+                  {errors.message && (
+                    <p className="mt-1.5 text-xs font-medium text-red-500">
+                      {errors.message}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Inline status (no modal) */}
+              {/* Inline status */}
               {submitStatus === "success" && (
                 <div className="mt-4 flex items-center gap-2 text-sm font-medium text-[#1E8A8A]">
                   <CheckCircle2 size={16} />
@@ -497,7 +592,7 @@ export default function MapPage() {
                 </p>
               )}
 
-              {/* Submit */}
+              {/* Submit — single spinner only */}
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -508,33 +603,23 @@ export default function MapPage() {
                   isRtl ? "pr-5 pl-1 sm:pr-6" : "pr-1 pl-5 sm:pl-6"
                 }`}
               >
-                <span className="overflow-hidden leading-none">
-                  <span className="flex items-center gap-2 transition-transform duration-300 [text-shadow:0_30px_0_currentColor] group-hover:-translate-y-7.5">
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        {currentT.submittingBtn}
-                      </>
-                    ) : (
-                      currentT.submitBtn
-                    )}
-                  </span>
+                <span className="flex items-center gap-2 leading-none">
+                  {isSubmitting && (
+                    <Loader2 size={16} className="animate-spin" />
+                  )}
+                  {isSubmitting ? currentT.submittingBtn : currentT.submitBtn}
                 </span>
 
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0C1E21]">
-                  {isSubmitting ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <ArrowUpRight
-                      size={16}
-                      aria-hidden="true"
-                      className={`transition-transform duration-300 group-hover:rotate-45 sm:size-[18px] ${
-                        isRtl
-                          ? "group-hover:-translate-x-0.5"
-                          : "group-hover:translate-x-0.5"
-                      }`}
-                    />
-                  )}
+                  <ArrowUpRight
+                    size={16}
+                    aria-hidden="true"
+                    className={`transition-transform duration-300 sm:size-[18px] ${
+                      isSubmitting
+                        ? "opacity-50"
+                        : "group-hover:translate-x-0.5 group-hover:rotate-45"
+                    } ${isRtl && !isSubmitting ? "group-hover:-translate-x-0.5 group-hover:translate-x-0" : ""}`}
+                  />
                 </span>
               </button>
             </form>

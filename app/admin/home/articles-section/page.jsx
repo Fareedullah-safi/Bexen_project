@@ -10,6 +10,8 @@ import {
   ChevronUp,
   ImagePlus,
   Link as LinkIcon,
+  Loader2,
+  LoaderCircle,
   Plus,
   Save,
   Tag,
@@ -20,7 +22,6 @@ import {
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import Swal from "sweetalert2";
 
 const API = "/api/homepage/articles-section";
 
@@ -76,7 +77,36 @@ const emptyTitles = () => ({
   fa: { sectionTitle: "", highlightedTitle: "" },
 });
 
-// Prepare an article returned by the API.
+// Allow EN digits + Pashto/Dari digits (۲۴, ۱۸, ۱۶…) → validate 1–31
+function parseLocalizedNumber(value) {
+  if (!value) return NaN;
+  const str = String(value).trim();
+  const map = {
+    "۰": "0",
+    "۱": "1",
+    "۲": "2",
+    "۳": "3",
+    "۴": "4",
+    "۵": "5",
+    "۶": "6",
+    "۷": "7",
+    "۸": "8",
+    "۹": "9",
+    "٠": "0",
+    "١": "1",
+    "٢": "2",
+    "٣": "3",
+    "٤": "4",
+    "٥": "5",
+    "٦": "6",
+    "٧": "7",
+    "٨": "8",
+    "٩": "9",
+  };
+  const converted = str.replace(/[۰-۹٠-٩]/g, (m) => map[m]);
+  return Number(converted);
+}
+
 function normalizeArticle(item) {
   return {
     _id: item._id,
@@ -94,7 +124,6 @@ function normalizeArticle(item) {
 function normalizeTitles(value = {}) {
   const defaults = emptyTitles();
 
-  // Also supports the old flat heading format.
   if (value.sectionTitle || value.highlightedTitle) {
     defaults.en.sectionTitle = value.sectionTitle || defaults.en.sectionTitle;
     defaults.en.highlightedTitle =
@@ -109,7 +138,6 @@ function normalizeTitles(value = {}) {
   };
 }
 
-// Check that the link is a local path or a valid HTTP/HTTPS URL.
 function validateLink(value) {
   const link = String(value || "").trim();
 
@@ -139,6 +167,7 @@ export default function BlogSectionAdmin() {
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingAll, setSavingAll] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
@@ -146,10 +175,8 @@ export default function BlogSectionAdmin() {
   const widgetRef = useRef(null);
   const uploadTarget = useRef(null);
 
-  // RTL for Pashto/Dari; LTR for English.
   const inputDirection = language === "en" ? "ltr" : "rtl";
 
-  // Load all translations once. Switching languages does not reload the page.
   useEffect(() => {
     async function loadArticles() {
       try {
@@ -160,7 +187,6 @@ export default function BlogSectionAdmin() {
         }
 
         const data = response.data.data || {};
-
         setArticles((data.posts || []).map(normalizeArticle));
         setTitles(normalizeTitles(data.Titles || {}));
       } catch (error) {
@@ -177,7 +203,6 @@ export default function BlogSectionAdmin() {
     loadArticles();
   }, []);
 
-  // Keep the ball and this component's language selection synchronized.
   function changeLanguage(value) {
     const code =
       typeof value === "string"
@@ -199,7 +224,6 @@ export default function BlogSectionAdmin() {
     );
   }
 
-  // Update the new article's shared fields or selected translation.
   function handleArticleChange(event) {
     const { name, value } = event.target;
 
@@ -220,7 +244,6 @@ export default function BlogSectionAdmin() {
     }));
   }
 
-  // Update section headings for the selected language.
   function handleTitleChange(event) {
     const { name, value } = event.target;
 
@@ -230,7 +253,6 @@ export default function BlogSectionAdmin() {
     }));
   }
 
-  // Update an existing article.
   function handleExistingChange(id, name, value) {
     setArticles((current) =>
       current.map((item) => {
@@ -254,7 +276,6 @@ export default function BlogSectionAdmin() {
     );
   }
 
-  // Upload or replace an article image using Cloudinary.
   function uploadImage(articleId = null) {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
@@ -311,7 +332,6 @@ export default function BlogSectionAdmin() {
     widgetRef.current.open();
   }
 
-  // Validate both headings in all three languages.
   function validateTitles() {
     for (const item of LANGUAGES) {
       const heading = titles[item.code];
@@ -334,7 +354,6 @@ export default function BlogSectionAdmin() {
     return null;
   }
 
-  // Validate all fields in all three translations.
   function validateArticle(item) {
     if (!item.image) {
       return { language, message: "Please upload an article image." };
@@ -342,12 +361,13 @@ export default function BlogSectionAdmin() {
 
     for (const lang of LANGUAGES) {
       const fields = item.translations[lang.code];
+      const parsedDay = parseLocalizedNumber(fields.day);
 
       if (
-        !fields.day.trim() ||
-        !Number.isInteger(Number(fields.day)) ||
-        Number(fields.day) < 1 ||
-        Number(fields.day) > 31
+        !String(fields.day || "").trim() ||
+        !Number.isInteger(parsedDay) ||
+        parsedDay < 1 ||
+        parsedDay > 31
       ) {
         return {
           language: lang.code,
@@ -372,7 +392,6 @@ export default function BlogSectionAdmin() {
     return null;
   }
 
-  // Build the data shape expected by the multilingual API.
   function buildPayload(item) {
     const translations = {};
 
@@ -399,24 +418,20 @@ export default function BlogSectionAdmin() {
     toast.error(error.message);
   }
 
-  // Save all section headings.
+  // —— Save headings only ——
   async function handleSaveTitles() {
     const error = validateTitles();
-
     if (error) {
       showValidationError(error);
       return;
     }
 
     setSaving(true);
-
     try {
       const response = await axios.put(API, { Titles: titles });
-
       if (!response.data?.success) {
         throw new Error(response.data?.message || "Failed to save headings.");
       }
-
       toast.success("Section headings saved.");
     } catch (error) {
       toast.error(
@@ -429,7 +444,7 @@ export default function BlogSectionAdmin() {
     }
   }
 
-  // Add a new article.
+  // —— Add new article ——
   async function handleAddArticle() {
     const articleError = validateArticle(article);
     if (articleError) return showValidationError(articleError);
@@ -438,7 +453,6 @@ export default function BlogSectionAdmin() {
     if (titleError) return showValidationError(titleError);
 
     setSaving(true);
-
     try {
       const response = await axios.post(API, {
         article: buildPayload(article),
@@ -468,13 +482,12 @@ export default function BlogSectionAdmin() {
     }
   }
 
-  // Update an existing article.
+  // —— Update one article ——
   async function handleUpdateArticle(item) {
     const error = validateArticle(item);
     if (error) return showValidationError(error);
 
     setEditingId(item._id);
-
     try {
       const response = await axios.put(API, {
         _id: item._id,
@@ -497,30 +510,55 @@ export default function BlogSectionAdmin() {
     }
   }
 
-  // Delete an article after confirmation.
+  // —— ONE-CLICK: Save ALL (titles + every existing article) ——
+  async function handleSaveAll() {
+    if (savingAll) return;
+
+    const titleError = validateTitles();
+    if (titleError) return showValidationError(titleError);
+
+    for (const item of articles) {
+      const err = validateArticle(item);
+      if (err) return showValidationError(err);
+    }
+
+    setSavingAll(true);
+
+    try {
+      // 1) Save headings
+      const titlesRes = await axios.put(API, { Titles: titles });
+      if (!titlesRes.data?.success) {
+        throw new Error(titlesRes.data?.message || "Failed to save headings.");
+      }
+
+      // 2) Save every article
+      for (const item of articles) {
+        const res = await axios.put(API, {
+          _id: item._id,
+          article: buildPayload(item),
+        });
+        if (!res.data?.success) {
+          throw new Error(
+            res.data?.message || `Failed to update article: ${item._id}`,
+          );
+        }
+      }
+
+      toast.success("All changes saved successfully.");
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to save all changes.",
+      );
+    } finally {
+      setSavingAll(false);
+    }
+  }
+
+  // —— Delete immediately (no modal) ——
   async function handleDeleteArticle(item) {
     if (deletingId) return;
-
-    const result = await Swal.fire({
-      title: "Delete this article?",
-      text: "This article will be permanently deleted.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Yes, delete it",
-      cancelButtonText: "Keep article",
-      reverseButtons: true,
-      buttonsStyling: false,
-      customClass: {
-        popup: "rounded-2xl p-6",
-        confirmButton:
-          "rounded-lg bg-red-600 px-5 py-3 text-sm font-semibold text-white",
-        cancelButton:
-          "rounded-lg border border-gray-300 px-5 py-3 text-sm font-semibold",
-        actions: "gap-3",
-      },
-    });
-
-    if (!result.isConfirmed) return;
 
     setDeletingId(item._id);
 
@@ -536,7 +574,7 @@ export default function BlogSectionAdmin() {
       setArticles((current) =>
         current.filter((entry) => entry._id !== item._id),
       );
-      setExpandedId(null);
+      if (expandedId === item._id) setExpandedId(null);
       toast.success("Article deleted successfully.");
     } catch (error) {
       toast.error(
@@ -558,9 +596,10 @@ export default function BlogSectionAdmin() {
   }
 
   const currentTranslation = article.translations[language];
+  const isBusy = saving || savingAll || !!editingId || !!deletingId;
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#f7f9fc] text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
+    <div className="relative min-h-screen space-y-5 bg-[#f7f9fc] pb-28 text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
       <Script
         src="https://upload-widget.cloudinary.com/global/all.js"
         strategy="afterInteractive"
@@ -568,7 +607,7 @@ export default function BlogSectionAdmin() {
         onError={() => toast.error("Could not load Cloudinary.")}
       />
 
-      {/* Header and language selector */}
+      {/* Header + language */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-[#e7f5f5] p-3 text-[#1e8a8a] dark:bg-[#162c32] dark:text-[#35b5b5]">
@@ -619,10 +658,14 @@ export default function BlogSectionAdmin() {
           <button
             type="button"
             onClick={handleSaveTitles}
-            disabled={saving}
+            disabled={isBusy}
             className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
-            <Save size={16} />
+            {saving ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Save size={16} />
+            )}
             Save Headings
           </button>
         </div>
@@ -661,7 +704,7 @@ export default function BlogSectionAdmin() {
         <button
           type="button"
           onClick={() => uploadImage()}
-          disabled={!cloudinaryReady}
+          disabled={!cloudinaryReady || isBusy}
           className="flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] disabled:opacity-60"
         >
           <ImagePlus size={16} />
@@ -678,7 +721,7 @@ export default function BlogSectionAdmin() {
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           {[
-            ["day", "Day", "24"],
+            ["day", "Day", "24 / ۲۴"],
             ["category", "Category", "BUSINESS"],
             ["author", "Author", "Admin"],
             ["title", "Article Title", "Enter article title"],
@@ -699,9 +742,7 @@ export default function BlogSectionAdmin() {
               <input
                 dir={inputDirection}
                 name={name}
-                type={name === "day" ? "number" : "text"}
-                min={name === "day" ? 1 : undefined}
-                max={name === "day" ? 31 : undefined}
+                type="text"
                 value={currentTranslation[name]}
                 onChange={handleArticleChange}
                 placeholder={placeholder}
@@ -749,15 +790,20 @@ export default function BlogSectionAdmin() {
 
         <p className="mt-3 text-xs text-gray-500">
           Complete English, Pashto, and Dari using the language selector above.
+          Day accepts 1–31 or ۲۴ / ۱۸ / ۱۶.
         </p>
 
         <button
           type="button"
           onClick={handleAddArticle}
-          disabled={saving}
+          disabled={isBusy}
           className="mt-5 flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
         >
-          <Plus size={17} />
+          {saving ? (
+            <Loader2 size={17} className="animate-spin" />
+          ) : (
+            <Plus size={17} />
+          )}
           {saving ? "Saving..." : "Add Article"}
         </button>
       </section>
@@ -801,7 +847,8 @@ export default function BlogSectionAdmin() {
                         {fields.title || "Untitled article"}
                       </p>
                       <p className="mt-1 text-xs text-gray-500">
-                        {fields.category || "No category"} · {fields.author}
+                        {fields.category || "No category"} · {fields.author} ·{" "}
+                        {fields.day} {fields.month}
                       </p>
                     </button>
 
@@ -820,11 +867,15 @@ export default function BlogSectionAdmin() {
                     <button
                       type="button"
                       onClick={() => handleDeleteArticle(item)}
-                      disabled={deletingId === item._id}
+                      disabled={isBusy}
                       aria-label="Delete article"
                       className="p-2 text-red-500 disabled:opacity-50"
                     >
-                      <Trash2 size={17} />
+                      {deletingId === item._id ? (
+                        <Loader2 size={17} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={17} />
+                      )}
                     </button>
                   </div>
 
@@ -834,7 +885,7 @@ export default function BlogSectionAdmin() {
                         <button
                           type="button"
                           onClick={() => uploadImage(item._id)}
-                          disabled={!cloudinaryReady}
+                          disabled={!cloudinaryReady || isBusy}
                           className="flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] disabled:opacity-60"
                         >
                           <ImagePlus size={16} />
@@ -883,7 +934,7 @@ export default function BlogSectionAdmin() {
                             ) : (
                               <input
                                 dir={inputDirection}
-                                type={field === "day" ? "number" : "text"}
+                                type="text"
                                 value={fields[field]}
                                 onChange={(event) =>
                                   handleExistingChange(
@@ -921,10 +972,14 @@ export default function BlogSectionAdmin() {
                         <button
                           type="button"
                           onClick={() => handleUpdateArticle(item)}
-                          disabled={editingId === item._id}
+                          disabled={isBusy}
                           className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                         >
-                          <Save size={17} />
+                          {editingId === item._id ? (
+                            <Loader2 size={17} className="animate-spin" />
+                          ) : (
+                            <Save size={17} />
+                          )}
                           {editingId === item._id
                             ? "Saving..."
                             : "Save Article"}
@@ -938,6 +993,36 @@ export default function BlogSectionAdmin() {
           </div>
         )}
       </section>
+
+      {/* =========================
+          STICKY SAVE-ALL BAR
+         ========================= */}
+      {/* Save all changes */}
+      <footer className="sticky bottom-4 z-10 flex flex-col justify-between gap-4 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center dark:border-white/10 dark:bg-[#111B27]/95">
+        <div>
+          <p className="text-sm font-semibold">Ready to save your changes?</p>
+
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            One click updates headings + all {articles.length} article
+            {articles.length === 1 ? "" : "s"} in every language.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSaveAll}
+          disabled={isBusy}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#1e8a8a]/25 transition hover:bg-[#187575] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {savingAll ? (
+            <LoaderCircle size={18} className="animate-spin" />
+          ) : (
+            <Save size={18} />
+          )}
+
+          {savingAll ? "Saving..." : "Save Changes"}
+        </button>
+      </footer>
     </div>
   );
 }
