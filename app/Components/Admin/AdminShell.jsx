@@ -30,6 +30,7 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { RiPagesFill } from "react-icons/ri";
 import { TbLayoutNavbar } from "react-icons/tb";
 
 /* ============ MENU LINKS ============ */
@@ -97,6 +98,11 @@ const navigation = [
         name: "Footer and Profile",
         href: "/admin/footerandprofile",
         icon: Phone,
+      },
+      {
+        name: "Add Pages",
+        href: "/admin/pages",
+        icon: RiPagesFill,
       },
     ],
   },

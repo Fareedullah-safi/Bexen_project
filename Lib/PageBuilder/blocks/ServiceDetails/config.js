@@ -1,0 +1,36 @@
+export default {
+  name: "Service Details",
+  description: "Hero image, text paragraphs, and sidebar links.",
+  icon: "📋",
+  defaultData: {
+    heroImage: { url: "", publicId: "" },
+    services: [],
+    en: {
+      mainTitle: "",
+      highlightedTitle: "",
+      description1: "",
+      description2: "",
+      description3: "",
+      sidebarTag: "SERVICES",
+      sidebarTitle: "More services",
+    },
+    ps: {
+      mainTitle: "",
+      highlightedTitle: "",
+      description1: "",
+      description2: "",
+      description3: "",
+      sidebarTag: "خدمات",
+      sidebarTitle: "نور خدمات",
+    },
+    fa: {
+      mainTitle: "",
+      highlightedTitle: "",
+      description1: "",
+      description2: "",
+      description3: "",
+      sidebarTag: "خدمات",
+      sidebarTitle: "خدمات بیشتر",
+    },
+  },
+};
