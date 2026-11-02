@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
 // ==========================================
-// 1. GET: Fetch All Admins (Excludes passwords)
+// 1. GET:Fetch All Admins (Excludes passwords)
 // ==========================================
 export async function GET() {
   try {
