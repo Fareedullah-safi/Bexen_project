@@ -4,6 +4,9 @@ import connectMongo from "@/Lib/mongoDB";
 import NavMenu from "@/Models/NavBar/NavBar";
 import { NextResponse } from "next/server";
 
+// PREVENT NEXT.JS FROM CACHING NAVBAR DATA
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     await connectMongo();
@@ -17,11 +20,11 @@ export async function GET() {
 
 export async function POST(req) {
   try {
-      const permission = await requireEditPermission();
-    
-      if (!permission.authorized) {
-        return permission.response;
-      }
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     await connectMongo();
     const body = await req.json();
 

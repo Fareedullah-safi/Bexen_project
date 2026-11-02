@@ -1,11 +1,9 @@
+import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
 import connectMongo from "@/Lib/mongoDB";
 import NavMenu from "@/Models/NavBar/NavBar";
 import Page from "@/Models/Pages/Page";
 import { NextResponse } from "next/server";
-import {
-  requireDeletePermission,
-  requireEditPermission,
-} from "@/Lib/AdminPermission/adminPermissions";
+
 export async function GET() {
   try {
     await connectMongo();
@@ -21,22 +19,29 @@ export async function GET() {
 
 export async function POST(req) {
   try {
+    const permission = await requireEditPermission();
+    if (!permission.authorized) {
+      return permission.response;
+    }
+
     await connectMongo();
     const body = await req.json();
 
-    // 1. Create Page
+    // 1. Create Page Document
     const page = await Page.create(body);
 
-    // 2. Insert into NavMenu schema
+    // 2. Insert into NavMenu Document
     if (body.showInNav) {
       let menu = await NavMenu.findOne();
-      if (!menu) menu = await NavMenu.create({ items: [] });
+      if (!menu) {
+        menu = await NavMenu.create({ items: [] });
+      }
 
       const pageHref = `/${page.slug}`;
-      const childId = `nav_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const newNavId = `nav_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
       const newNavItem = {
-        id: childId,
+        id: newNavId,
         href: pageHref,
         showInFooter: Boolean(page.showInFooter),
         translations: {
@@ -46,10 +51,19 @@ export async function POST(req) {
         },
       };
 
-      if (body.navParent) {
-        // Place as child under selected parent ID
+      const hasParent =
+        body.navParent &&
+        body.navParent !== "none" &&
+        body.navParent !== "null" &&
+        body.navParent.trim() !== "";
+
+      let addedToParent = false;
+
+      if (hasParent) {
+        // Find parent item in items array and append to children
         menu.items = menu.items.map((item) => {
           if (item.id === body.navParent) {
+            addedToParent = true;
             return {
               ...item,
               hasDropdown: true,
@@ -58,8 +72,10 @@ export async function POST(req) {
           }
           return item;
         });
-      } else {
-        // Add as new top-level nav item
+      }
+
+      // If no parent selected OR parent ID not found -> Add as Top-Level Main Item
+      if (!hasParent || !addedToParent) {
         menu.items.push({
           ...newNavItem,
           hasDropdown: false,
@@ -67,7 +83,11 @@ export async function POST(req) {
         });
       }
 
-      await NavMenu.updateOne({}, { $set: { items: menu.items } });
+      // Save updated NavMenu
+      await NavMenu.updateOne(
+        { _id: menu._id },
+        { $set: { items: menu.items } },
+      );
     }
 
     return NextResponse.json({ success: true, page });

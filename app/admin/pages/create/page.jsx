@@ -15,17 +15,17 @@ export default function CreatePage() {
     title: "",
     slug: "",
     showInNav: false,
-    navParent: "",
+    navParent: "none", // Default to top-level main tab
     showInFooter: false,
   });
 
-  // Fetch items from your exact NavMenu schema
+  // Fetch main navbar items
   useEffect(() => {
     async function loadMainNav() {
       try {
         const res = await axios.get("/api/navbar");
-        // Your database stores items in res.data.items
-        const items = res.data?.items || [];
+        const items =
+          res.data?.items || (Array.isArray(res.data) ? res.data : []);
         setMainNav(items);
       } catch {
         toast.error("Could not load main navbar items.");
@@ -48,10 +48,6 @@ export default function CreatePage() {
       return toast.error("Page name and link are required.");
     }
 
-    if (data.showInNav && !data.navParent) {
-      return toast.error("Please select a main nav item.");
-    }
-
     setLoading(true);
     try {
       const checkRes = await axios.get(
@@ -68,9 +64,9 @@ export default function CreatePage() {
         title: data.title.trim(),
         slug: data.slug.trim(),
         showInNav: data.showInNav,
-        navParent: data.showInNav ? data.navParent : "",
+        navParent: data.showInNav ? data.navParent : "none",
         showInFooter: data.showInFooter,
-        status: "draft",
+        status: "published", // Default to published so it shows on site immediately
         blocks: [],
       });
 
@@ -83,7 +79,6 @@ export default function CreatePage() {
     }
   };
 
-  // Label helper specifically matching your schema: item.translations.en.label
   const getNavLabel = (item) => {
     return (
       item?.translations?.en?.label ||
@@ -113,7 +108,7 @@ export default function CreatePage() {
             <input
               value={data.title}
               onChange={(e) => onTitleChange(e.target.value)}
-              placeholder="e.g. Services Detail"
+              placeholder="e.g. Main"
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 outline-none focus:border-[var(--accent)]"
             />
           </div>
@@ -135,7 +130,7 @@ export default function CreatePage() {
                       .replace(/[^a-z0-9-]/g, ""),
                   }))
                 }
-                placeholder="services-detail"
+                placeholder="main"
                 className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 outline-none focus:border-[var(--accent)]"
               />
             </div>
@@ -144,8 +139,8 @@ export default function CreatePage() {
             </p>
           </div>
 
-          {/* Navbar Checkbox & Selector */}
-          <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-4">
+          {/* Navbar Options */}
+          <div className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--background)] p-4">
             <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold">
               <input
                 type="checkbox"
@@ -154,18 +149,18 @@ export default function CreatePage() {
                   setData((prev) => ({
                     ...prev,
                     showInNav: e.target.checked,
-                    navParent: e.target.checked ? prev.navParent : "",
+                    navParent: "none",
                   }))
                 }
                 className="h-4 w-4"
               />
-              Make this page a navbar dropdown item
+              Show in Navbar
             </label>
 
             {data.showInNav && (
               <div className="border-t border-[var(--border)] pt-3">
                 <label className="mb-1 block text-sm font-medium">
-                  Select main nav parent
+                  Navbar Placement
                 </label>
                 <select
                   value={data.navParent}
@@ -174,10 +169,12 @@ export default function CreatePage() {
                   }
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
                 >
-                  <option value="">— Choose main nav item —</option>
+                  <option value="none">
+                    Main Top-Level Tab (Homepage Navbar)
+                  </option>
                   {mainNav.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {getNavLabel(item)}
+                      Dropdown Child under "{getNavLabel(item)}"
                     </option>
                   ))}
                 </select>

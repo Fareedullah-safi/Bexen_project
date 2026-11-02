@@ -105,6 +105,16 @@ export default function FlatEditorPage() {
   };
 
   const handleSave = async (status) => {
+    // VALIDATION: Block publishing if there are no templates/blocks
+    if (
+      status === "published" &&
+      (!formData.blocks || formData.blocks.length === 0)
+    ) {
+      return toast.error(
+        "Cannot publish an empty page. Please add at least one block template.",
+      );
+    }
+
     setSaving(true);
     try {
       await axios.put(`/api/admin/pages/${id}`, { ...formData, status });
@@ -354,7 +364,7 @@ export default function FlatEditorPage() {
           )}
         </div>
 
-        {/* YOUR EXACT FOOTER STYLE + language ball */}
+        {/* STICKY FOOTER */}
         <footer
           className={`sticky bottom-3 z-10 flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-xl sm:flex-row sm:items-center sm:px-6 ${
             isDark
@@ -362,39 +372,33 @@ export default function FlatEditorPage() {
               : "border-[#e4e7ec] bg-white/95"
           }`}
         >
-          <div className="flex items-center gap-3">
-            <AdminLanguageBall
-              language={activeTab}
-              onLanguageChange={setActiveTab}
-            />
-            <p className={`text-xs ${mutedTextClass}`}>
-              Save your changes in the selected language.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row">
+          {/* LEFT SIDE: Reload Button */}
+          <div>
             <button
               type="button"
               onClick={handleReload}
               disabled={saving}
-              className={`flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium ${
+              className={`flex w-full items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium sm:w-auto ${
                 isDark
-                  ? "border-[#263442] text-gray-300"
-                  : "border-[#e4e7ec] text-gray-700"
+                  ? "border-[#263442] text-gray-300 hover:bg-[#16212c]"
+                  : "border-[#e4e7ec] text-gray-700 hover:bg-gray-50"
               }`}
             >
               <RotateCcw size={16} />
               Reload Saved Data
             </button>
+          </div>
 
+          {/* RIGHT SIDE: Save Draft & Publish Live Buttons */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <button
               type="button"
               onClick={() => handleSave("draft")}
               disabled={saving}
               className={`flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium disabled:opacity-60 ${
                 isDark
-                  ? "border-[#263442] text-gray-300"
-                  : "border-[#e4e7ec] text-gray-700"
+                  ? "border-[#263442] text-gray-300 hover:bg-[#16212c]"
+                  : "border-[#e4e7ec] text-gray-700 hover:bg-gray-50"
               }`}
             >
               Save Draft
@@ -421,7 +425,7 @@ export default function FlatEditorPage() {
           </div>
         </footer>
 
-        {/* BLOCK PICKER */}
+        {/* BLOCK PICKER OVERLAY */}
         {showBlockPicker && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"

@@ -1,24 +1,50 @@
-import dbConnect from "@/Lib/mongoDB";
-import NavMenu from "@/Models/NavBar/NavBar";
-import Page from "@/Models/Pages/Page";
-import { NextResponse } from "next/server";
 import {
   requireDeletePermission,
   requireEditPermission,
 } from "@/Lib/AdminPermission/adminPermissions";
+import connectMongo from "@/Lib/mongoDB";
+import NavMenu from "@/Models/NavBar/NavBar";
+import Page from "@/Models/Pages/Page";
+import { NextResponse } from "next/server";
 
-// === GET SINGLE PAGE (For the Flat Editor) ===
+// GET Single Page
 export async function GET(req, { params }) {
   try {
-    await dbConnect();
-    const resolvedParams = await params; // Next.js 15 requirement
-
-    const page = await Page.findById(resolvedParams.id);
-    if (!page)
+    await connectMongo();
+    const { id } = await params;
+    const page = await Page.findById(id);
+    if (!page) {
       return NextResponse.json(
         { success: false, message: "Page not found" },
         { status: 404 },
       );
+    }
+    return NextResponse.json({ success: true, page });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, message: error.message },
+      { status: 500 },
+    );
+  }
+}
+
+// PUT Update Page
+export async function PUT(req, { params }) {
+  try {
+    const permission = await requireEditPermission();
+    if (!permission.authorized) return permission.response;
+
+    await connectMongo();
+    const { id } = await params;
+    const body = await req.json();
+
+    const page = await Page.findByIdAndUpdate(id, body, { new: true });
+    if (!page) {
+      return NextResponse.json(
+        { success: false, message: "Page not found" },
+        { status: 404 },
+      );
+    }
 
     return NextResponse.json({ success: true, page });
   } catch (error) {
@@ -29,60 +55,43 @@ export async function GET(req, { params }) {
   }
 }
 
-// === UPDATE PAGE (Save Draft / Publish) ===
-export async function PUT(req, { params }) {
-  try {
-        const permission = await requireEditPermission();
-    
-        if (!permission.authorized) {
-          return permission.response;
-        }
-    await dbConnect();
-    const resolvedParams = await params;
-
-    const body = await req.json();
-    const updatedPage = await Page.findByIdAndUpdate(resolvedParams.id, body, {
-      new: true,
-    });
-
-    if (!updatedPage)
-      return NextResponse.json(
-        { success: false, message: "Page not found" },
-        { status: 404 },
-      );
-
-    return NextResponse.json({ success: true, page: updatedPage });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, message: error.message },
-      { status: 500 },
-    );
-  }
-}
-
-// === DELETE PAGE ===
+// DELETE Page & Remove from NavMenu
 export async function DELETE(req, { params }) {
   try {
-    await dbConnect();
-    const resolvedParams = await params;
+    const permission = await requireDeletePermission();
+    if (!permission.authorized) return permission.response;
 
-    const page = await Page.findByIdAndDelete(resolvedParams.id);
-    if (!page)
-      return NextResponse.json(
-        { success: false, message: "Page not found" },
-        { status: 404 },
-      );
+    await connectMongo();
+    const { id } = await params;
+    const page = await Page.findByIdAndDelete(id);
 
-    // Scrub dead links from Navbar!
-    if (page.slug) {
-      const href = `/${page.slug}`;
-      // Remove if top-level tab
-      await NavMenu.findOneAndDelete({ href });
-      // Remove if child in a dropdown
-      await NavMenu.updateMany({}, { $pull: { children: { href } } });
+    if (page) {
+      const pageHref = `/${page.slug}`;
+      let menu = await NavMenu.findOne();
+
+      if (menu && menu.items) {
+        // Scrub page from top-level items and children
+        const updatedItems = menu.items
+          .filter((item) => item.href !== pageHref)
+          .map((item) => {
+            const updatedChildren = (item.children || []).filter(
+              (child) => child.href !== pageHref,
+            );
+            return {
+              ...item,
+              hasDropdown: updatedChildren.length > 0,
+              children: updatedChildren,
+            };
+          });
+
+        await NavMenu.updateOne(
+          { _id: menu._id },
+          { $set: { items: updatedItems } },
+        );
+      }
     }
 
-    return NextResponse.json({ success: true, message: "Deleted" });
+    return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
       { success: false, message: error.message },

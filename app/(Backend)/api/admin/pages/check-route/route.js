@@ -2,10 +2,6 @@ import connectMongo from "@/Lib/mongoDB";
 import NavMenu from "@/Models/NavBar/NavBar";
 import Page from "@/Models/Pages/Page";
 import { NextResponse } from "next/server";
-import {
-  requireDeletePermission,
-  requireEditPermission,
-} from "@/Lib/AdminPermission/adminPermissions";
 
 export async function GET(req) {
   try {
