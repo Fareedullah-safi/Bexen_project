@@ -18,7 +18,7 @@ import { toast } from "sonner";
 
 const SCRIPT = "script[data-cloudinary-widget]";
 
-// Safely extract label from any DB structure (translations.lang.label OR label.lang)
+// Safely extract label from any DB structure
 const getServiceLabel = (svc, langKey) => {
   if (!svc) return "";
   if (svc.translations?.[langKey]?.label !== undefined) {
@@ -36,7 +36,7 @@ const getServiceLabel = (svc, langKey) => {
   return "";
 };
 
-// Check missing fields for a given language
+// Check missing fields to provide a gentle status (not aggressive errors)
 const checkMissingFields = (data, langKey) => {
   const content = data[langKey] || {};
   const services = data.services || [];
@@ -62,6 +62,7 @@ const checkMissingFields = (data, langKey) => {
 export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
   const [ready, setReady] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const widget = useRef(null);
 
   const content = data[lang] || {};
@@ -97,11 +98,41 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
     return () => script?.removeEventListener("load", checkReady);
   }, []);
 
+  // Helper: delete image from Cloudinary
+  const destroyCloudinaryImage = async (publicId) => {
+    if (!publicId) return;
+
+    try {
+      await fetch("/api/admin/cloudinary/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicId }),
+      });
+    } catch (err) {
+      console.error("Failed to delete Cloudinary asset:", err);
+    }
+  };
+
   const updateText = (field, value) =>
     onChange({ ...data, [lang]: { ...content, [field]: value } });
 
   const updateImage = (url, publicId) =>
     onChange({ ...data, heroImage: { url, publicId } });
+
+  // REMOVE hero image from UI + Cloudinary
+  const removeHeroImage = async () => {
+    if (deleting) return;
+    setDeleting(true);
+
+    const publicId = heroImage?.publicId;
+    if (publicId) {
+      await destroyCloudinaryImage(publicId);
+    }
+
+    updateImage("", "");
+    setDeleting(false);
+    toast.success("Hero image removed.");
+  };
 
   const addService = () =>
     onChange({
@@ -153,13 +184,21 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
   const removeService = (index) =>
     onChange({ ...data, services: services.filter((_, i) => i !== index) });
 
+  // UPLOAD or REPLACE hero image
   const openWidget = () => {
-    if (uploading) return;
+    if (uploading || deleting) return;
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     if (!cloudName || !uploadPreset)
       return toast.error("Cloudinary not configured.");
+
+    if (!window.cloudinary) {
+      return toast.error("Cloudinary is still loading. Please wait.");
+    }
+
+    // Capture old ID before opening the widget
+    const oldPublicId = heroImage?.publicId || "";
 
     setUploading(true);
     widget.current = window.cloudinary.createUploadWidget(
@@ -171,39 +210,53 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
         maxFileSize: 5_000_000,
         folder: "bexon/pages/services",
       },
-      (err, result) => {
-        if (err) toast.error("Upload failed.");
-        if (result?.event === "success") {
-          updateImage(result.info.secure_url, result.info.public_id);
-          toast.success("Image uploaded!");
+      async (err, result) => {
+        if (err) {
+          toast.error("Upload failed.");
+          setUploading(false);
+          return;
         }
-        if (["close", "abort"].includes(result?.event)) setUploading(false);
+
+        if (result?.event === "success") {
+          const newPublicId = result.info.public_id;
+
+          // Delete OLD image from Cloudinary when replacing
+          if (oldPublicId && oldPublicId !== newPublicId) {
+            await destroyCloudinaryImage(oldPublicId);
+          }
+
+          updateImage(result.info.secure_url, newPublicId);
+          toast.success(oldPublicId ? "Image replaced!" : "Image uploaded!");
+        }
+
+        if (["close", "abort"].includes(result?.event)) {
+          setUploading(false);
+        }
       },
     );
     widget.current.open();
   };
 
-  const getInputClass = (val) =>
-    `w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--accent)] transition-colors ${
-      !val?.trim() ? "border-red-500 bg-red-500/5" : "border-[var(--border)]"
-    }`;
+  // Clean, normal input class (no red error borders)
+  const inputClass =
+    "w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--accent)] transition-colors";
 
   const sectionClass =
     "rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5 space-y-4 mb-4";
 
   return (
     <div>
-      {/* VALIDATION STATUS BANNER */}
+      {/* SOFT STATUS BANNER */}
       <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
         <h3 className="mb-2 text-xs font-bold tracking-wider text-[var(--text-muted)] uppercase">
-          Multi-Language Completeness Status
+          Completion Status
         </h3>
         <div className="flex flex-wrap gap-2 text-xs font-semibold">
           <span
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
               !isHeroMissing
                 ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-red-500/10 text-red-600"
+                : "bg-[var(--border)] text-[var(--text-muted)]"
             }`}
           >
             {!isHeroMissing ? (
@@ -218,7 +271,7 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
               enMissing.length === 0
                 ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-red-500/10 text-red-600"
+                : "bg-[var(--border)] text-[var(--text-muted)]"
             }`}
           >
             {enMissing.length === 0 ? (
@@ -237,7 +290,7 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
               psMissing.length === 0
                 ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-red-500/10 text-red-600"
+                : "bg-[var(--border)] text-[var(--text-muted)]"
             }`}
           >
             {psMissing.length === 0 ? (
@@ -256,7 +309,7 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
               faMissing.length === 0
                 ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-red-500/10 text-red-600"
+                : "bg-[var(--border)] text-[var(--text-muted)]"
             }`}
           >
             {faMissing.length === 0 ? (
@@ -273,9 +326,8 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
         </div>
 
         {currentMissing.length > 0 && (
-          <div className="mt-3 text-xs text-red-500">
-            ⚠️ Missing in current language ({lang.toUpperCase()}):{" "}
-            <span className="font-semibold">{currentMissing.join(", ")}</span>
+          <div className="mt-3 text-xs text-[var(--text-muted)]">
+            Left to fill in {lang.toUpperCase()}: {currentMissing.join(", ")}
           </div>
         )}
       </div>
@@ -284,7 +336,7 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
       <section className={sectionClass}>
         <h2 className="flex items-center gap-2 font-bold">
           <ImagePlus size={18} className="text-[var(--accent)]" /> Hero Image
-          (Shared) <span className="text-red-500">*</span>
+          (Shared)
         </h2>
         <div className="flex min-h-48 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
           {heroImage.url ? (
@@ -294,9 +346,9 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
               className="max-h-56 w-full object-cover"
             />
           ) : (
-            <div className="py-8 text-center text-red-500">
-              <ImagePlus size={32} className="mx-auto mb-2" />
-              <p className="text-sm font-semibold">Hero image is required</p>
+            <div className="py-8 text-center text-[var(--text-muted)]">
+              <ImagePlus size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-semibold">No hero image uploaded</p>
             </div>
           )}
         </div>
@@ -304,23 +356,35 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
           <button
             type="button"
             onClick={openWidget}
-            disabled={!ready || uploading}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+            disabled={!ready || uploading || deleting}
+            className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {uploading ? (
               <LoaderCircle size={16} className="animate-spin" />
             ) : (
               <UploadCloud size={16} />
             )}
-            {heroImage.url ? "Change Image" : "Upload Image"}
+            {uploading
+              ? "Uploading..."
+              : heroImage.url
+                ? "Change Image"
+                : ready
+                  ? "Upload Image"
+                  : "Loading Cloudinary..."}
           </button>
+
           {heroImage.url && (
             <button
               type="button"
-              onClick={() => updateImage("", "")}
-              className="rounded-xl bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-500/20"
+              onClick={removeHeroImage}
+              disabled={deleting || uploading}
+              className="cursor-pointer rounded-xl bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Trash2 size={16} />
+              {deleting ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : (
+                <Trash2 size={16} />
+              )}
             </button>
           )}
         </div>
@@ -335,38 +399,28 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-sm font-medium">
-              Main Title <span className="text-red-500">*</span>
+              Main Title
             </label>
             <input
               dir={isRtl ? "rtl" : "ltr"}
               value={content.mainTitle || ""}
               onChange={(e) => updateText("mainTitle", e.target.value)}
-              className={getInputClass(content.mainTitle)}
+              className={inputClass}
               placeholder="e.g. Transforming Customer:"
             />
-            {!content.mainTitle?.trim() && (
-              <p className="mt-1 text-xs text-red-500">
-                Main Title is required in {lang.toUpperCase()}
-              </p>
-            )}
           </div>
 
           <div>
             <label className="mb-1.5 block text-sm font-medium">
-              Highlighted Title <span className="text-red-500">*</span>
+              Highlighted Title
             </label>
             <input
               dir={isRtl ? "rtl" : "ltr"}
               value={content.highlightedTitle || ""}
               onChange={(e) => updateText("highlightedTitle", e.target.value)}
-              className={getInputClass(content.highlightedTitle)}
+              className={inputClass}
               placeholder="e.g. Tailored Solutions..."
             />
-            {!content.highlightedTitle?.trim() && (
-              <p className="mt-1 text-xs text-red-500">
-                Highlighted Title is required in {lang.toUpperCase()}
-              </p>
-            )}
           </div>
         </div>
 
@@ -375,7 +429,7 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
           return (
             <div key={num}>
               <label className="mb-1.5 block text-sm font-medium">
-                Paragraph {num} <span className="text-red-500">*</span>
+                Paragraph {num}
               </label>
               <textarea
                 rows="3"
@@ -384,13 +438,8 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
                 onChange={(e) =>
                   updateText(`description${num}`, e.target.value)
                 }
-                className={getInputClass(val)}
+                className={inputClass}
               />
-              {!val?.trim() && (
-                <p className="mt-1 text-xs text-red-500">
-                  Paragraph {num} is required in {lang.toUpperCase()}
-                </p>
-              )}
             </div>
           );
         })}
@@ -405,36 +454,26 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
         <div className="mb-6 grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-sm font-medium">
-              Sidebar Tag <span className="text-red-500">*</span>
+              Sidebar Tag
             </label>
             <input
               dir={isRtl ? "rtl" : "ltr"}
               value={content.sidebarTag || ""}
               onChange={(e) => updateText("sidebarTag", e.target.value)}
-              className={getInputClass(content.sidebarTag)}
+              className={inputClass}
             />
-            {!content.sidebarTag?.trim() && (
-              <p className="mt-1 text-xs text-red-500">
-                Sidebar Tag is required in {lang.toUpperCase()}
-              </p>
-            )}
           </div>
 
           <div>
             <label className="mb-1.5 block text-sm font-medium">
-              Sidebar Title <span className="text-red-500">*</span>
+              Sidebar Title
             </label>
             <input
               dir={isRtl ? "rtl" : "ltr"}
               value={content.sidebarTitle || ""}
               onChange={(e) => updateText("sidebarTitle", e.target.value)}
-              className={getInputClass(content.sidebarTitle)}
+              className={inputClass}
             />
-            {!content.sidebarTitle?.trim() && (
-              <p className="mt-1 text-xs text-red-500">
-                Sidebar Title is required in {lang.toUpperCase()}
-              </p>
-            )}
           </div>
         </div>
 
@@ -443,7 +482,7 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
           <button
             type="button"
             onClick={addService}
-            className="flex items-center gap-1 rounded-lg bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent)]/20"
+            className="flex cursor-pointer items-center gap-1 rounded-lg bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent)]/20"
           >
             <Plus size={14} /> Add Link
           </button>
@@ -457,8 +496,6 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
           )}
           {services.map((svc, i) => {
             const labelValue = getServiceLabel(svc, lang);
-            const isLabelMissing = !labelValue?.trim();
-            const isHrefMissing = !svc.href?.trim();
 
             return (
               <div
@@ -467,8 +504,7 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
               >
                 <div className="flex-1">
                   <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
-                    <Type size={12} /> Label ({lang.toUpperCase()}){" "}
-                    <span className="text-red-500">*</span>
+                    <Type size={12} /> Label ({lang.toUpperCase()})
                   </label>
                   <input
                     dir={isRtl ? "rtl" : "ltr"}
@@ -476,19 +512,13 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
                     onChange={(e) =>
                       updateService(i, "label", e.target.value, true)
                     }
-                    className={getInputClass(labelValue)}
+                    className={inputClass}
                   />
-                  {isLabelMissing && (
-                    <p className="mt-1 text-xs text-red-500">
-                      Label required in {lang.toUpperCase()}
-                    </p>
-                  )}
                 </div>
 
                 <div className="flex-1">
                   <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
-                    <LinkIcon size={12} /> URL{" "}
-                    <span className="text-red-500">*</span>
+                    <LinkIcon size={12} /> URL
                   </label>
                   <input
                     dir="ltr"
@@ -496,17 +526,14 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
                     onChange={(e) =>
                       updateService(i, "href", e.target.value, false)
                     }
-                    className={getInputClass(svc.href)}
+                    className={inputClass}
                   />
-                  {isHrefMissing && (
-                    <p className="mt-1 text-xs text-red-500">URL is required</p>
-                  )}
                 </div>
 
                 <button
                   type="button"
                   onClick={() => removeService(i)}
-                  className="mt-6 rounded-lg p-2 text-red-500 hover:bg-red-500/10 sm:mt-7"
+                  className="mt-6 cursor-pointer rounded-lg p-2 text-red-500 hover:bg-red-500/10 sm:mt-7"
                 >
                   <Trash2 size={18} />
                 </button>

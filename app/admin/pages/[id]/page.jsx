@@ -27,6 +27,42 @@ const languages = [
   { code: "ps", label: "پښتو (Pashto)" },
 ];
 
+// Safe clone helper that NEVER throws JSON SyntaxError
+const cloneData = (data) => {
+  if (!data) return {};
+  try {
+    if (typeof structuredClone === "function") {
+      return structuredClone(data);
+    }
+    return JSON.parse(JSON.stringify(data));
+  } catch (err) {
+    console.error("Failed to deep clone block defaultData:", err);
+    return {};
+  }
+};
+
+// Helper: Deeply extract EVERY publicId from ANY block data structure
+const extractPublicIds = (obj, acc = []) => {
+  if (!obj || typeof obj !== "object") return acc;
+
+  if (Array.isArray(obj)) {
+    for (const item of obj) extractPublicIds(item, acc);
+  } else {
+    for (const [key, value] of Object.entries(obj)) {
+      if (
+        (key === "publicId" || key === "public_id") &&
+        typeof value === "string" &&
+        value.trim()
+      ) {
+        acc.push(value.trim());
+      } else if (typeof value === "object" && value !== null) {
+        extractPublicIds(value, acc);
+      }
+    }
+  }
+  return acc;
+};
+
 export default function FlatEditorPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -61,42 +97,88 @@ export default function FlatEditorPage() {
 
     axios
       .get(`/api/admin/pages/${id}`)
-      .then((res) => setFormData(res.data.page || res.data))
+      .then((res) => {
+        const rawPage = res.data.page || res.data;
+        setFormData({
+          ...rawPage,
+          blocks: rawPage?.blocks || [],
+        });
+      })
       .catch(() => {
-        toast.error("Failed to load");
+        toast.error("Failed to load page");
         router.push("/admin/pages");
       })
       .finally(() => setLoading(false));
   }, [id, router]);
 
+  // Bulletproof addBlock handler
   const addBlock = (type) => {
-    const block = BLOCK_REGISTRY[type];
+    const block = BLOCK_REGISTRY?.[type];
+
+    if (!block) {
+      toast.error(`Block type "${type}" is not registered.`);
+      return;
+    }
+
+    const currentBlocks = formData?.blocks || [];
+    const defaultData = block.defaultData ?? {};
+
     const newBlock = {
-      blockId: crypto.randomUUID(),
+      blockId:
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `block_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
       type,
-      order: formData.blocks.length,
-      data: JSON.parse(JSON.stringify(block.defaultData)),
+      order: currentBlocks.length,
+      data: cloneData(defaultData),
     };
-    setFormData({ ...formData, blocks: [...formData.blocks, newBlock] });
+
+    setFormData((prev) => ({
+      ...prev,
+      blocks: [...(prev?.blocks || []), newBlock],
+    }));
     setShowBlockPicker(false);
   };
 
   const updateBlock = (blockId, newData) =>
-    setFormData({
-      ...formData,
-      blocks: formData.blocks.map((b) =>
+    setFormData((prev) => ({
+      ...prev,
+      blocks: (prev?.blocks || []).map((b) =>
         b.blockId === blockId ? { ...b, data: newData } : b,
       ),
-    });
+    }));
 
-  const removeBlock = (blockId) =>
-    setFormData({
-      ...formData,
-      blocks: formData.blocks.filter((b) => b.blockId !== blockId),
-    });
+  // REMOVE BLOCK & AUTOMATICALLY DESTROY ITS IMAGES ON CLOUDINARY
+  const removeBlock = async (blockId) => {
+    const blockToRemove = (formData?.blocks || []).find(
+      (b) => b.blockId === blockId,
+    );
+
+    // 1. Destroy all Cloudinary images inside this block template
+    if (blockToRemove) {
+      const publicIds = [...new Set(extractPublicIds(blockToRemove.data))];
+
+      for (const publicId of publicIds) {
+        try {
+          await axios.post("/api/admin/cloudinary/delete", { publicId });
+          console.log("Destroyed Cloudinary image on block delete:", publicId);
+        } catch (err) {
+          console.error("Failed to delete Cloudinary image:", err);
+        }
+      }
+    }
+
+    // 2. Remove block template from state
+    setFormData((prev) => ({
+      ...prev,
+      blocks: (prev?.blocks || []).filter((b) => b.blockId !== blockId),
+    }));
+
+    toast.success("Block template & Cloudinary images removed!");
+  };
 
   const moveBlock = (idx, dir) => {
-    const blocks = [...formData.blocks];
+    const blocks = [...(formData?.blocks || [])];
     const target = idx + dir;
     if (target < 0 || target >= blocks.length) return;
     [blocks[idx], blocks[target]] = [blocks[target], blocks[idx]];
@@ -105,11 +187,10 @@ export default function FlatEditorPage() {
   };
 
   const handleSave = async (status) => {
+    const blocksList = formData?.blocks || [];
+
     // VALIDATION: Block publishing if there are no templates/blocks
-    if (
-      status === "published" &&
-      (!formData.blocks || formData.blocks.length === 0)
-    ) {
+    if (status === "published" && blocksList.length === 0) {
       return toast.error(
         "Cannot publish an empty page. Please add at least one block template.",
       );
@@ -133,7 +214,11 @@ export default function FlatEditorPage() {
     setLoading(true);
     try {
       const res = await axios.get(`/api/admin/pages/${id}`);
-      setFormData(res.data.page || res.data);
+      const rawPage = res.data.page || res.data;
+      setFormData({
+        ...rawPage,
+        blocks: rawPage?.blocks || [],
+      });
       toast.success("Reloaded saved data");
     } catch {
       toast.error("Failed to reload");
@@ -151,6 +236,8 @@ export default function FlatEditorPage() {
   }
 
   if (!formData) return null;
+
+  const blocks = formData.blocks || [];
 
   const pageClass = isDark
     ? "bg-[#0b1117] text-[#f2f4f7]"
@@ -247,7 +334,7 @@ export default function FlatEditorPage() {
 
         {/* BLOCKS */}
         <div className="space-y-6 pb-28">
-          {formData.blocks.length === 0 ? (
+          {blocks.length === 0 ? (
             <div
               className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed py-16 text-center ${
                 isDark
@@ -270,14 +357,14 @@ export default function FlatEditorPage() {
               </button>
             </div>
           ) : (
-            formData.blocks.map((block, index) => {
-              const BlockDef = BLOCK_REGISTRY[block.type];
+            blocks.map((block, index) => {
+              const BlockDef = BLOCK_REGISTRY?.[block.type];
               if (!BlockDef) return null;
               const AdminForm = BlockDef.AdminForm;
 
               return (
                 <section
-                  key={block.blockId}
+                  key={block.blockId || index}
                   className={`overflow-hidden rounded-2xl border shadow-xl ${cardClass}`}
                 >
                   <div
@@ -315,7 +402,7 @@ export default function FlatEditorPage() {
                       </button>
                       <button
                         onClick={() => moveBlock(index, 1)}
-                        disabled={index === formData.blocks.length - 1}
+                        disabled={index === blocks.length - 1}
                         className={`rounded-lg p-2 transition disabled:opacity-30 ${
                           isDark ? "hover:bg-[#263442]" : "hover:bg-gray-100"
                         }`}
@@ -337,20 +424,27 @@ export default function FlatEditorPage() {
                   </div>
 
                   <div className="p-5 sm:p-7">
-                    <AdminForm
-                      data={block.data}
-                      lang={activeTab}
-                      onChange={(newData) =>
-                        updateBlock(block.blockId, newData)
-                      }
-                    />
+                    {AdminForm ? (
+                      <AdminForm
+                        data={block.data || {}}
+                        lang={activeTab}
+                        onChange={(newData) =>
+                          updateBlock(block.blockId, newData)
+                        }
+                      />
+                    ) : (
+                      <div className="text-xs text-amber-400">
+                        Admin editor component missing for block type:{" "}
+                        {block.type}
+                      </div>
+                    )}
                   </div>
                 </section>
               );
             })
           )}
 
-          {formData.blocks.length > 0 && (
+          {blocks.length > 0 && (
             <button
               onClick={() => setShowBlockPicker(true)}
               className={`flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-5 text-sm font-bold transition-all hover:border-[#1E8A8A] hover:bg-[#1E8A8A]/5 hover:text-[#1E8A8A] ${
@@ -455,7 +549,7 @@ export default function FlatEditorPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {BLOCKS_LIST.map((b) => (
+                {(BLOCKS_LIST || []).map((b) => (
                   <button
                     key={b.type}
                     onClick={() => addBlock(b.type)}

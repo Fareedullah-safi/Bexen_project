@@ -15,6 +15,7 @@ export default function BannerAdminForm({ data, onChange }) {
   const [dark, setDark] = useState(true);
   const [ready, setReady] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const widget = useRef(null);
   const opening = useRef(false);
 
@@ -74,6 +75,33 @@ export default function BannerAdminForm({ data, onChange }) {
     });
   };
 
+  const deleteFromCloudinary = async (publicId) => {
+    if (!publicId) return;
+    try {
+      await fetch("/api/admin/cloudinary/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicId }),
+      });
+    } catch (err) {
+      console.error("Failed to delete from Cloudinary:", err);
+    }
+  };
+
+  // REMOVE BANNER IMAGE AND DELETE FROM CLOUDINARY
+  const removeImage = async () => {
+    const publicId = image?.publicId;
+
+    if (publicId) {
+      setDeleting(true);
+      await deleteFromCloudinary(publicId);
+      setDeleting(false);
+    }
+
+    saveImage("", "");
+    toast.success("Banner removed from Cloudinary.");
+  };
+
   function openWidget() {
     if (opening.current || uploading) return;
 
@@ -84,6 +112,9 @@ export default function BannerAdminForm({ data, onChange }) {
       toast.error("Check your Cloudinary configuration.");
       return;
     }
+
+    // keep old id so we can delete it after replace
+    const oldPublicId = image?.publicId || "";
 
     opening.current = true;
     setUploading(true);
@@ -114,7 +145,7 @@ export default function BannerAdminForm({ data, onChange }) {
             },
           },
         },
-        (error, result) => {
+        async (error, result) => {
           if (error) toast.error(error.message || "Image upload failed.");
 
           if (result?.event === "success") {
@@ -123,8 +154,16 @@ export default function BannerAdminForm({ data, onChange }) {
               toast.error("Invalid image returned by Cloudinary.");
               return;
             }
+
+            // replace: delete old image from Cloudinary
+            if (oldPublicId && oldPublicId !== publicId) {
+              await deleteFromCloudinary(oldPublicId);
+            }
+
             saveImage(url, publicId);
-            toast.success("Banner uploaded.");
+            toast.success(
+              oldPublicId ? "Banner replaced." : "Banner uploaded.",
+            );
           }
 
           if (["close", "abort"].includes(result?.event)) {
@@ -189,8 +228,8 @@ export default function BannerAdminForm({ data, onChange }) {
       <button
         type="button"
         onClick={openWidget}
-        disabled={!ready || uploading}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#187777] disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={!ready || uploading || deleting}
+        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#187777] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {uploading ? (
           <LoaderCircle size={18} className="animate-spin" />
@@ -209,13 +248,11 @@ export default function BannerAdminForm({ data, onChange }) {
       {image?.url && (
         <button
           type="button"
-          onClick={() => {
-            saveImage("", "");
-            toast.success("Banner removed.");
-          }}
-          className="w-full rounded-xl border border-red-500/30 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/10"
+          onClick={removeImage}
+          disabled={deleting}
+          className="w-full cursor-pointer rounded-xl border border-red-500/30 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/10 disabled:opacity-50"
         >
-          Remove image
+          {deleting ? "Deleting from Cloudinary..." : "Remove image"}
         </button>
       )}
 

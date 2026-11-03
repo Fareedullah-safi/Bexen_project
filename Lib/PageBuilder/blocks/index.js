@@ -8,6 +8,12 @@ import  ServicesDetailsFrontend from "./ServiceDetails/FrontendView";
 import ServicesDetailsBackend from "./ServiceDetails/AdminForm"
 import ServicesDetailsConfig from "./ServiceDetails/config"
 
+// Sliders
+
+import SlidersFrontend from "./slider/FrontendView"
+import SlidersBackend from "./slider/AdminForm"
+import SlidersConfig from "./slider/config"
+
 export const BLOCK_REGISTRY = {
   banner: {
     ...BannerConfig,
@@ -18,6 +24,11 @@ export const BLOCK_REGISTRY = {
     ...ServicesDetailsConfig,
     AdminForm:  ServicesDetailsBackend,
     FrontendView:  ServicesDetailsFrontend,
+  },
+  Sliders: {
+    ...SlidersConfig,
+    AdminForm:  SlidersBackend,
+    FrontendView:  SlidersFrontend,
   },
   
 };

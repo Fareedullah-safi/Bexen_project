@@ -9,29 +9,45 @@ import Page from "@/Models/Pages/Page";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
-// Helper: Delete images from Cloudinary
-async function deleteBlockImages(blocks = []) {
-  for (const block of blocks) {
-    const data = block.data || {};
-    // Gather all image publicIds from blocks
-    const publicIds = [
-      data.heroImage?.publicId,
-      data.en?.publicId,
-      data.ps?.publicId,
-      data.fa?.publicId,
-    ].filter(Boolean);
+// Helper: Deeply extract EVERY publicId from ANY block structure
+function getAllPublicIds(obj, acc = []) {
+  if (!obj || typeof obj !== "object") return acc;
 
-    for (const publicId of publicIds) {
-      try {
-        await cloudinary.uploader.destroy(publicId);
-      } catch (err) {
-        console.error("Cloudinary delete error:", err.message);
+  if (Array.isArray(obj)) {
+    for (const item of obj) getAllPublicIds(item, acc);
+  } else {
+    for (const [key, value] of Object.entries(obj)) {
+      if (
+        (key === "publicId" || key === "public_id") &&
+        typeof value === "string" &&
+        value.trim()
+      ) {
+        acc.push(value.trim());
+      } else if (typeof value === "object" && value !== null) {
+        getAllPublicIds(value, acc);
       }
+    }
+  }
+  return acc;
+}
+
+// Destroy all images on Cloudinary
+async function deleteBlockImages(blocks = []) {
+  const publicIds = [...new Set(getAllPublicIds(blocks))];
+
+  for (const publicId of publicIds) {
+    try {
+      await cloudinary.uploader.destroy(publicId, { invalidate: true });
+      console.log(`Cloudinary destroyed: ${publicId}`);
+    } catch (err) {
+      console.error(
+        `Failed to destroy Cloudinary image (${publicId}):`,
+        err.message,
+      );
     }
   }
 }
 
-// 1. GET Single Page
 export async function GET(req, { params }) {
   try {
     await connectMongo();
@@ -47,7 +63,6 @@ export async function GET(req, { params }) {
   }
 }
 
-// 2. PUT Update Page
 export async function PUT(req, { params }) {
   try {
     const permission = await requireEditPermission();
@@ -69,7 +84,6 @@ export async function PUT(req, { params }) {
   }
 }
 
-// 3. DELETE Page, Images & Navbar Link
 export async function DELETE(req, { params }) {
   try {
     const permission = await requireDeletePermission();
@@ -78,14 +92,13 @@ export async function DELETE(req, { params }) {
     await connectMongo();
     const { id } = await params;
 
-    // Delete page document
     const page = await Page.findByIdAndDelete(id);
 
     if (page) {
-      // Step A: Delete Cloudinary images
+      // 1. Destroy ALL images on Cloudinary across all blocks
       await deleteBlockImages(page.blocks);
 
-      // Step B: Remove link from Navbar
+      // 2. Remove page link from NavMenu
       const pageHref = `/${page.slug}`;
       const menu = await NavMenu.findOne();
 
@@ -108,7 +121,6 @@ export async function DELETE(req, { params }) {
         );
       }
 
-      // Step C: Refresh homepage header
       revalidatePath("/", "layout");
     }
 
