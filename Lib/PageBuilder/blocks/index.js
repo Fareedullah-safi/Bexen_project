@@ -4,26 +4,31 @@ import BannerFrontendView from "./Banner/FrontendView";
 
 // service  details
 
-import ServicesDetailsBackend from "./ServiceDetails/AdminForm";
+import ServicesDetailsAdminForm from "./ServiceDetails/AdminForm";
 import ServicesDetailsConfig from "./ServiceDetails/config";
 import ServicesDetailsFrontend from "./ServiceDetails/FrontendView";
 
 // Sliders
 
-import SlidersBackend from "./slider/AdminForm";
+import SlidersAdminForm from "./slider/AdminForm";
 import SlidersConfig from "./slider/config";
 import SlidersFrontend from "./slider/FrontendView";
 
 //features
 
-import FeaturesBackend from "./Features/AdminForm";
+import FeaturesAdminForm from "./Features/AdminForm";
 import FeaturesConfig from "./Features/config";
 import FeaturesFrontend from "./Features/FrontendView";
 
 // BrandLogos
-import BrandLogosBackend from "./BrandLogos/AdminForm";
+import BrandLogosAdminForm from "./BrandLogos/AdminForm";
 import BrandLogosFrontend from "./BrandLogos/BrandLogosView";
 import BrandLogosConfig from "./BrandLogos/config";
+
+// About-us
+import AboutUsAdminForm from "./AboutUs/AdminForm";
+import AboutUsConfig from "./AboutUs/config";
+import AboutUsFrontendView from "./AboutUs/FrontendView";
 
 export const BLOCK_REGISTRY = {
   banner: {
@@ -33,23 +38,28 @@ export const BLOCK_REGISTRY = {
   },
   Services_Details: {
     ...ServicesDetailsConfig,
-    AdminForm: ServicesDetailsBackend,
+    AdminForm: ServicesDetailsAdminForm,
     FrontendView: ServicesDetailsFrontend,
   },
   Sliders: {
     ...SlidersConfig,
-    AdminForm: SlidersBackend,
+    AdminForm: SlidersAdminForm,
     FrontendView: SlidersFrontend,
   },
   Features: {
     ...FeaturesConfig,
-    AdminForm: FeaturesBackend,
+    AdminForm: FeaturesAdminForm,
     FrontendView: FeaturesFrontend,
   },
   BrandLogos: {
     ...BrandLogosConfig,
-    AdminForm: BrandLogosBackend,
+    AdminForm: BrandLogosAdminForm,
     FrontendView: BrandLogosFrontend,
+  },
+  AboutUs: {
+    ...AboutUsConfig,
+    AdminForm: AboutUsAdminForm,
+    FrontendView: AboutUsFrontendView,
   },
 };
 
