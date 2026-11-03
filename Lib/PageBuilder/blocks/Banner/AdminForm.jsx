@@ -114,7 +114,7 @@ export default function BannerAdminForm({ data, onChange }) {
     }
 
     // keep old id so we can delete it after replace
-    const oldPublicId = image?.publicId || "";
+    const oldPublicId = image?.publicId;
 
     opening.current = true;
     setUploading(true);
@@ -156,8 +156,10 @@ export default function BannerAdminForm({ data, onChange }) {
             }
 
             // replace: delete old image from Cloudinary
-            if (oldPublicId && oldPublicId !== publicId) {
-              await deleteFromCloudinary(oldPublicId);
+            if (oldPublicId !== "") {
+              if (oldPublicId && oldPublicId !== publicId) {
+                await deleteFromCloudinary(oldPublicId);
+              }
             }
 
             saveImage(url, publicId);
