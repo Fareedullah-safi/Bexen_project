@@ -76,12 +76,28 @@ export default function SliderAdminForm({ data, onChange }) {
 
     window.cloudinary.openUploadWidget(
       {
-        cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dch0v8syg",
-        uploadPreset:
-          process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "cms_preset",
-        sources: ["local", "url", "camera"],
+        cloudName,
+        uploadPreset,
+        sources: ["local", "url"],
         multiple: false,
+        maxFiles: 1,
+        maxFileSize: 5_000_000,
+        clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+        resourceType: "image",
         folder: "bexon/pages/sliders",
+        cropping: false,
+        styles: {
+          palette: {
+            window: dark ? "#111a23" : "#ffffff",
+            windowBorder: dark ? "#263442" : "#e4e7ec",
+            tabIcon: "#1e8a8a",
+            action: "#1e8a8a",
+            link: "#1e8a8a",
+            textDark: dark ? "#f2f4f7" : "#101828",
+            textLight: dark ? "#98a2b3" : "#667085",
+            sourceBg: dark ? "#16212c" : "#f7f9fc",
+          },
+        },
       },
       (error, result) => {
         if (error) {
