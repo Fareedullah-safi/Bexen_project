@@ -4,7 +4,6 @@ import {
   AlertCircle,
   CheckCircle2,
   ImagePlus,
-  Layout,
   LinkIcon,
   LoaderCircle,
   Plus,
@@ -18,48 +17,84 @@ import { toast } from "sonner";
 
 const SCRIPT = "script[data-cloudinary-widget]";
 
-// Safely extract label from any DB structure
-const getServiceLabel = (svc, langKey) => {
+// ONE list used for inputs + validation
+const TEXT_FIELDS = [
+  {
+    id: "mainTitle",
+    label: "Main Title",
+    placeholder: "e.g. Transforming Customer:",
+  },
+  {
+    id: "highlightedTitle",
+    label: "Highlighted Title",
+    placeholder: "e.g. Tailored Solutions...",
+  },
+  { id: "description1", label: "Paragraph 1", type: "textarea" },
+  { id: "description2", label: "Paragraph 2", type: "textarea" },
+  { id: "description3", label: "Paragraph 3", type: "textarea" },
+  { id: "sidebarTag", label: "Sidebar Tag" },
+  { id: "sidebarTitle", label: "Sidebar Title" },
+];
+
+export const getServiceLabel = (svc, langKey) => {
   if (!svc) return "";
-  if (svc.translations?.[langKey]?.label !== undefined) {
+  if (svc.translations?.[langKey]?.label !== undefined)
     return svc.translations[langKey].label;
-  }
-  if (typeof svc.translations?.[langKey] === "string") {
+  if (typeof svc.translations?.[langKey] === "string")
     return svc.translations[langKey];
-  }
-  if (svc.label?.[langKey] !== undefined) {
-    return svc.label[langKey];
-  }
-  if (typeof svc.label === "string") {
-    return svc.label;
-  }
+  if (svc.label?.[langKey] !== undefined) return svc.label[langKey];
+  if (typeof svc.label === "string") return svc.label;
   return "";
 };
 
-// Check missing fields to provide a gentle status (not aggressive errors)
-const checkMissingFields = (data, langKey) => {
-  const content = data[langKey] || {};
-  const services = data.services || [];
+// Check missing fields for a language
+export const checkMissingFields = (data = {}, langKey = "en") => {
+  const content = data?.[langKey] || {};
+  const services = data?.services || [];
   const missing = [];
 
-  if (!content.mainTitle?.trim()) missing.push("Main Title");
-  if (!content.highlightedTitle?.trim()) missing.push("Highlighted Title");
-  if (!content.description1?.trim()) missing.push("Paragraph 1");
-  if (!content.description2?.trim()) missing.push("Paragraph 2");
-  if (!content.description3?.trim()) missing.push("Paragraph 3");
-  if (!content.sidebarTag?.trim()) missing.push("Sidebar Tag");
-  if (!content.sidebarTitle?.trim()) missing.push("Sidebar Title");
+  TEXT_FIELDS.forEach((field) => {
+    if (!String(content[field.id] || "").trim()) {
+      missing.push(field.label);
+    }
+  });
 
   services.forEach((svc, index) => {
-    const lbl = getServiceLabel(svc, langKey);
-    if (!lbl?.trim()) missing.push(`Link ${index + 1} Label`);
+    if (!getServiceLabel(svc, langKey)?.trim())
+      missing.push(`Link ${index + 1} Label`);
     if (!svc.href?.trim()) missing.push(`Link ${index + 1} URL`);
   });
 
   return missing;
 };
 
-export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
+// Complete Validation Function
+export function validateServiceDetails(data = {}) {
+  const missingHero = !data?.heroImage?.url?.trim();
+  const enMissing = checkMissingFields(data, "en");
+  const psMissing = checkMissingFields(data, "ps");
+  const faMissing = checkMissingFields(data, "fa");
+
+  return {
+    isValid:
+      !missingHero &&
+      enMissing.length === 0 &&
+      psMissing.length === 0 &&
+      faMissing.length === 0,
+    missingHero,
+    enMissing,
+    psMissing,
+    faMissing,
+  };
+}
+
+export default function ServiceDetailsAdminForm({
+  data = {},
+  lang = "en",
+  onChange = () => {},
+  showErrors = false,
+}) {
+  const [dark, setDark] = useState(true);
   const [ready, setReady] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -70,20 +105,33 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
   const heroImage = data.heroImage || {};
   const isRtl = lang === "ps" || lang === "fa";
 
-  // Check missing fields for active tab & all languages
   const currentMissing = checkMissingFields(data, lang);
   const enMissing = checkMissingFields(data, "en");
   const psMissing = checkMissingFields(data, "ps");
   const faMissing = checkMissingFields(data, "fa");
-  const isHeroMissing = !heroImage?.url;
+  const isHeroMissing = !heroImage?.url?.trim();
+
+  const isErr = (val) => showErrors && !String(val || "").trim();
+
+  useEffect(() => {
+    const updateTheme = () =>
+      setDark(document.documentElement.classList.contains("dark"));
+    updateTheme();
+    const obs = new MutationObserver(updateTheme);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
     let script = document.querySelector(SCRIPT);
     const checkReady = () => {
-      if (window.cloudinary) setReady(true);
+      if (window.cloudinary?.createUploadWidget) setReady(true);
     };
 
-    if (window.cloudinary) {
+    if (window.cloudinary?.createUploadWidget) {
       setReady(true);
     } else {
       if (!script) {
@@ -98,43 +146,43 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
     return () => script?.removeEventListener("load", checkReady);
   }, []);
 
-  // Helper: delete image from Cloudinary
   const destroyCloudinaryImage = async (publicId) => {
     if (!publicId) return;
-
     try {
       await fetch("/api/admin/cloudinary/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ publicId }),
       });
-    } catch (err) {
-      console.error("Failed to delete Cloudinary asset:", err);
+    } catch (e) {
+      console.error("Failed to delete image from Cloudinary:", e);
     }
   };
 
-  const updateText = (field, value) =>
-    onChange({ ...data, [lang]: { ...content, [field]: value } });
+  const updateText = (field, value) => {
+    onChange({
+      ...data,
+      [lang]: { ...content, [field]: value },
+    });
+  };
 
-  const updateImage = (url, publicId) =>
-    onChange({ ...data, heroImage: { url, publicId } });
+  const updateImage = (url, publicId) => {
+    onChange({
+      ...data,
+      heroImage: { url, publicId },
+    });
+  };
 
-  // REMOVE hero image from UI + Cloudinary
   const removeHeroImage = async () => {
     if (deleting) return;
     setDeleting(true);
-
-    const publicId = heroImage?.publicId;
-    if (publicId) {
-      await destroyCloudinaryImage(publicId);
-    }
-
+    if (heroImage?.publicId) await destroyCloudinaryImage(heroImage.publicId);
     updateImage("", "");
     setDeleting(false);
     toast.success("Hero image removed.");
   };
 
-  const addService = () =>
+  const addService = () => {
     onChange({
       ...data,
       services: [
@@ -151,6 +199,7 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
         },
       ],
     });
+  };
 
   const updateService = (index, field, value, isTranslation = false) => {
     const newServices = [...services];
@@ -159,20 +208,12 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
     if (isTranslation) {
       const transObj = target.translations || {};
       const langObj = transObj[lang] || {};
-
       target.translations = {
         ...transObj,
-        [lang]: {
-          ...langObj,
-          label: value,
-        },
+        [lang]: { ...langObj, label: value },
       };
-
       const labelObj = typeof target.label === "object" ? target.label : {};
-      target.label = {
-        ...labelObj,
-        [lang]: value,
-      };
+      target.label = { ...labelObj, [lang]: value };
     } else {
       target[field] = value;
     }
@@ -181,89 +222,107 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
     onChange({ ...data, services: newServices });
   };
 
-  const removeService = (index) =>
-    onChange({ ...data, services: services.filter((_, i) => i !== index) });
+  const removeService = (index) => {
+    onChange({
+      ...data,
+      services: services.filter((_, i) => i !== index),
+    });
+  };
 
-  // UPLOAD or REPLACE hero image
   const openWidget = () => {
     if (uploading || deleting) return;
+
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-    if (!cloudName || !uploadPreset)
-      return toast.error("Cloudinary not configured.");
-
-    if (!window.cloudinary) {
-      return toast.error("Cloudinary is still loading. Please wait.");
+    if (!cloudName || !uploadPreset) {
+      return toast.error("Check your Cloudinary environment variables.");
+    }
+    if (!window.cloudinary?.createUploadWidget) {
+      return toast.error("Cloudinary widget is still loading. Please wait.");
     }
 
-    // Capture old ID before opening the widget
     const oldPublicId = heroImage?.publicId || "";
-
     setUploading(true);
-    widget.current = window.cloudinary.createUploadWidget(
-      {
-        cloudName,
-        uploadPreset,
-        sources: ["local", "url"],
-        multiple: false,
-        maxFiles: 1,
-        maxFileSize: 5_000_000,
-        clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
-        resourceType: "image",
-        folder: "bexon/pages/services",
-        cropping: false,
-        styles: {
-          palette: {
-            window: dark ? "#111a23" : "#ffffff",
-            windowBorder: dark ? "#263442" : "#e4e7ec",
-            tabIcon: "#1e8a8a",
-            action: "#1e8a8a",
-            link: "#1e8a8a",
-            textDark: dark ? "#f2f4f7" : "#101828",
-            textLight: dark ? "#98a2b3" : "#667085",
-            sourceBg: dark ? "#16212c" : "#f7f9fc",
+
+    try {
+      widget.current = window.cloudinary.createUploadWidget(
+        {
+          cloudName,
+          uploadPreset,
+          sources: ["local", "url"],
+          multiple: false,
+          maxFiles: 1,
+          maxFileSize: 5_000_000,
+          clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+          resourceType: "image",
+          folder: "bexon/pages/services",
+          cropping: false,
+          styles: {
+            palette: {
+              window: dark ? "#111a23" : "#ffffff",
+              windowBorder: dark ? "#263442" : "#e4e7ec",
+              tabIcon: "#1e8a8a",
+              action: "#1e8a8a",
+              link: "#1e8a8a",
+              textDark: dark ? "#f2f4f7" : "#101828",
+              textLight: dark ? "#98a2b3" : "#667085",
+              sourceBg: dark ? "#16212c" : "#f7f9fc",
+            },
           },
         },
-      },
-      async (err, result) => {
-        if (err) {
-          toast.error("Upload failed.");
-          setUploading(false);
-          return;
-        }
-
-        if (result?.event === "success") {
-          const newPublicId = result.info.public_id;
-
-          // Delete OLD image from Cloudinary when replacing
-          if (oldPublicId && oldPublicId !== newPublicId) {
-            await destroyCloudinaryImage(oldPublicId);
+        async (error, result) => {
+          if (error) {
+            toast.error(error.message || "Image upload failed.");
+            setUploading(false);
+            return;
           }
 
-          updateImage(result.info.secure_url, newPublicId);
-          toast.success(oldPublicId ? "Image replaced!" : "Image uploaded!");
-        }
+          if (result?.event === "success") {
+            const newPublicId = result.info.public_id;
+            const newUrl = result.info.secure_url;
 
-        if (["close", "abort"].includes(result?.event)) {
-          setUploading(false);
-        }
-      },
-    );
-    widget.current.open();
+            if (oldPublicId && oldPublicId !== newPublicId) {
+              await destroyCloudinaryImage(oldPublicId);
+            }
+
+            updateImage(newUrl, newPublicId);
+            toast.success(oldPublicId ? "Image replaced!" : "Image uploaded!");
+          }
+
+          if (["close", "abort"].includes(result?.event)) {
+            setUploading(false);
+          }
+        },
+      );
+
+      widget.current.open();
+    } catch {
+      toast.error("Could not open Cloudinary widget.");
+      setUploading(false);
+    }
   };
 
-  // Clean, normal input class (no red error borders)
-  const inputClass =
-    "w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-sm outline-none focus:border-[var(--accent)] transition-colors";
+  const getInputClass = (hasError) =>
+    `w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--accent)] ${
+      hasError
+        ? "border-red-500 bg-red-500/10 focus:border-red-500"
+        : "border-[var(--border)]"
+    }`;
 
   const sectionClass =
-    "rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5 space-y-4 mb-4";
+    "mb-4 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5";
 
   return (
     <div>
-      {/* SOFT STATUS BANNER */}
-      <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+      {/* STATUS BANNER */}
+      <div
+        className={`mb-4 rounded-2xl border p-4 transition-colors ${
+          showErrors && (isHeroMissing || currentMissing.length > 0)
+            ? "border-red-500/40 bg-red-500/10"
+            : "border-[var(--border)] bg-[var(--surface)]"
+        }`}
+      >
         <h3 className="mb-2 text-xs font-bold tracking-wider text-[var(--text-muted)] uppercase">
           Completion Status
         </h3>
@@ -272,7 +331,9 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
               !isHeroMissing
                 ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-[var(--border)] text-[var(--text-muted)]"
+                : showErrors
+                  ? "bg-red-500/20 text-red-500"
+                  : "bg-[var(--border)] text-[var(--text-muted)]"
             }`}
           >
             {!isHeroMissing ? (
@@ -283,68 +344,38 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
             Hero Image
           </span>
 
-          <span
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
-              enMissing.length === 0
-                ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-[var(--border)] text-[var(--text-muted)]"
-            }`}
-          >
-            {enMissing.length === 0 ? (
-              <CheckCircle2 size={14} />
-            ) : (
-              <AlertCircle size={14} />
-            )}
-            EN (
-            {enMissing.length === 0
-              ? "Complete"
-              : `${enMissing.length} missing`}
-            )
-          </span>
-
-          <span
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
-              psMissing.length === 0
-                ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-[var(--border)] text-[var(--text-muted)]"
-            }`}
-          >
-            {psMissing.length === 0 ? (
-              <CheckCircle2 size={14} />
-            ) : (
-              <AlertCircle size={14} />
-            )}
-            PS (
-            {psMissing.length === 0
-              ? "Complete"
-              : `${psMissing.length} missing`}
-            )
-          </span>
-
-          <span
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
-              faMissing.length === 0
-                ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-[var(--border)] text-[var(--text-muted)]"
-            }`}
-          >
-            {faMissing.length === 0 ? (
-              <CheckCircle2 size={14} />
-            ) : (
-              <AlertCircle size={14} />
-            )}
-            FA (
-            {faMissing.length === 0
-              ? "Complete"
-              : `${faMissing.length} missing`}
-            )
-          </span>
+          {[
+            ["EN", enMissing],
+            ["PS", psMissing],
+            ["FA", faMissing],
+          ].map(([code, missing]) => (
+            <span
+              key={code}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
+                missing.length === 0
+                  ? "bg-emerald-500/10 text-emerald-600"
+                  : showErrors
+                    ? "bg-red-500/20 text-red-500"
+                    : "bg-[var(--border)] text-[var(--text-muted)]"
+              }`}
+            >
+              {missing.length === 0 ? (
+                <CheckCircle2 size={14} />
+              ) : (
+                <AlertCircle size={14} />
+              )}
+              {code} (
+              {missing.length === 0 ? "Complete" : `${missing.length} missing`})
+            </span>
+          ))}
         </div>
 
-        {currentMissing.length > 0 && (
-          <div className="mt-3 text-xs text-[var(--text-muted)]">
-            Left to fill in {lang.toUpperCase()}: {currentMissing.join(", ")}
-          </div>
+        {showErrors && (isHeroMissing || currentMissing.length > 0) && (
+          <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-red-500">
+            <AlertCircle size={14} />
+            Please fill all highlighted required fields in EN, PS, FA and upload
+            a hero image before publishing.
+          </p>
         )}
       </div>
 
@@ -354,20 +385,34 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
           <ImagePlus size={18} className="text-[var(--accent)]" /> Hero Image
           (Shared)
         </h2>
-        <div className="flex min-h-48 items-center justify-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+
+        <div
+          className={`flex min-h-48 items-center justify-center overflow-hidden rounded-xl border bg-[var(--surface)] ${
+            showErrors && isHeroMissing
+              ? "border-red-500 bg-red-500/5"
+              : "border-[var(--border)]"
+          }`}
+        >
           {heroImage.url ? (
             <img
               src={heroImage.url}
-              alt="Hero"
+              alt="Hero Preview"
               className="max-h-56 w-full object-cover"
             />
           ) : (
-            <div className="py-8 text-center text-[var(--text-muted)]">
+            <div
+              className={`py-8 text-center ${showErrors && isHeroMissing ? "text-red-500" : "text-[var(--text-muted)]"}`}
+            >
               <ImagePlus size={32} className="mx-auto mb-2 opacity-50" />
-              <p className="text-sm font-semibold">No hero image uploaded</p>
+              <p className="text-sm font-semibold">
+                {showErrors && isHeroMissing
+                  ? "Hero image is required"
+                  : "No hero image uploaded"}
+              </p>
             </div>
           )}
         </div>
+
         <div className="flex gap-2">
           <button
             type="button"
@@ -383,7 +428,7 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
             {uploading
               ? "Uploading..."
               : heroImage.url
-                ? "Change Image"
+                ? "Replace Image"
                 : ready
                   ? "Upload Image"
                   : "Loading Cloudinary..."}
@@ -394,7 +439,7 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
               type="button"
               onClick={removeHeroImage}
               disabled={deleting || uploading}
-              className="cursor-pointer rounded-xl bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex cursor-pointer items-center gap-1 rounded-xl bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {deleting ? (
                 <LoaderCircle size={16} className="animate-spin" />
@@ -406,94 +451,44 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
         </div>
       </section>
 
-      {/* TEXT CONTENT */}
+      {/* ALL TEXT INPUTS IN ONE JSX */}
       <section className={sectionClass}>
         <h2 className="flex items-center gap-2 font-bold">
-          <Text size={18} className="text-[var(--accent)]" /> Content (
-          {lang.toUpperCase()})
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">
-              Main Title
-            </label>
-            <input
-              dir={isRtl ? "rtl" : "ltr"}
-              value={content.mainTitle || ""}
-              onChange={(e) => updateText("mainTitle", e.target.value)}
-              className={inputClass}
-              placeholder="e.g. Transforming Customer:"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">
-              Highlighted Title
-            </label>
-            <input
-              dir={isRtl ? "rtl" : "ltr"}
-              value={content.highlightedTitle || ""}
-              onChange={(e) => updateText("highlightedTitle", e.target.value)}
-              className={inputClass}
-              placeholder="e.g. Tailored Solutions..."
-            />
-          </div>
-        </div>
-
-        {[1, 2, 3].map((num) => {
-          const val = content[`description${num}`];
-          return (
-            <div key={num}>
-              <label className="mb-1.5 block text-sm font-medium">
-                Paragraph {num}
-              </label>
-              <textarea
-                rows="3"
-                dir={isRtl ? "rtl" : "ltr"}
-                value={val || ""}
-                onChange={(e) =>
-                  updateText(`description${num}`, e.target.value)
-                }
-                className={inputClass}
-              />
-            </div>
-          );
-        })}
-      </section>
-
-      {/* SIDEBAR & SERVICES */}
-      <section className={sectionClass}>
-        <h2 className="flex items-center gap-2 font-bold">
-          <Layout size={18} className="text-[var(--accent)]" /> Sidebar & Links
+          <Text size={18} className="text-[var(--accent)]" /> Content & Sidebar
           ({lang.toUpperCase()})
         </h2>
-        <div className="mb-6 grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">
-              Sidebar Tag
-            </label>
-            <input
-              dir={isRtl ? "rtl" : "ltr"}
-              value={content.sidebarTag || ""}
-              onChange={(e) => updateText("sidebarTag", e.target.value)}
-              className={inputClass}
-            />
-          </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">
-              Sidebar Title
-            </label>
-            <input
-              dir={isRtl ? "rtl" : "ltr"}
-              value={content.sidebarTitle || ""}
-              onChange={(e) => updateText("sidebarTitle", e.target.value)}
-              className={inputClass}
-            />
-          </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {TEXT_FIELDS.map((field) => {
+            const val = content[field.id] || "";
+            const isTextarea = field.type === "textarea";
+            const InputTag = isTextarea ? "textarea" : "input";
+
+            return (
+              <div key={field.id} className={isTextarea ? "sm:col-span-2" : ""}>
+                <label className="mb-1.5 block text-sm font-medium">
+                  {field.label}
+                </label>
+                <InputTag
+                  rows={isTextarea ? 3 : undefined}
+                  dir={isRtl ? "rtl" : "ltr"}
+                  value={val}
+                  onChange={(e) => updateText(field.id, e.target.value)}
+                  className={getInputClass(isErr(val))}
+                  placeholder={field.placeholder || ""}
+                />
+                {isErr(val) && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {field.label} is required in {lang.toUpperCase()}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        <div className="mb-2 flex items-center justify-between border-t border-[var(--border)] pt-4">
+        {/* SERVICE LINKS */}
+        <div className="mt-4 mb-2 flex items-center justify-between border-t border-[var(--border)] pt-4">
           <h3 className="text-sm font-bold">More Services Links</h3>
           <button
             type="button"
@@ -507,9 +502,10 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
         <div className="space-y-3">
           {services.length === 0 && (
             <p className="py-2 text-center text-xs text-[var(--text-muted)]">
-              No links added.
+              No links added. Click "Add Link" to create one.
             </p>
           )}
+
           {services.map((svc, i) => {
             const labelValue = getServiceLabel(svc, lang);
 
@@ -528,8 +524,13 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
                     onChange={(e) =>
                       updateService(i, "label", e.target.value, true)
                     }
-                    className={inputClass}
+                    className={getInputClass(isErr(labelValue))}
                   />
+                  {isErr(labelValue) && (
+                    <p className="mt-1 text-xs text-red-500">
+                      Label required in {lang.toUpperCase()}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex-1">
@@ -542,8 +543,11 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
                     onChange={(e) =>
                       updateService(i, "href", e.target.value, false)
                     }
-                    className={inputClass}
+                    className={getInputClass(isErr(svc.href))}
                   />
+                  {isErr(svc.href) && (
+                    <p className="mt-1 text-xs text-red-500">URL is required</p>
+                  )}
                 </div>
 
                 <button
@@ -561,3 +565,6 @@ export default function ServiceDetailsAdminForm({ data, lang, onChange }) {
     </div>
   );
 }
+
+// Attach static validate method directly to component so FlatEditorPage can find it automatically!
+ServiceDetailsAdminForm.validate = validateServiceDetails;

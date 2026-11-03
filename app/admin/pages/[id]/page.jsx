@@ -27,13 +27,10 @@ const languages = [
   { code: "ps", label: "پښتو (Pashto)" },
 ];
 
-// Safe clone helper that NEVER throws JSON SyntaxError
 const cloneData = (data) => {
   if (!data) return {};
   try {
-    if (typeof structuredClone === "function") {
-      return structuredClone(data);
-    }
+    if (typeof structuredClone === "function") return structuredClone(data);
     return JSON.parse(JSON.stringify(data));
   } catch (err) {
     console.error("Failed to deep clone block defaultData:", err);
@@ -41,7 +38,6 @@ const cloneData = (data) => {
   }
 };
 
-// Helper: Deeply extract EVERY publicId from ANY block data structure
 const extractPublicIds = (obj, acc = []) => {
   if (!obj || typeof obj !== "object") return acc;
 
@@ -63,6 +59,26 @@ const extractPublicIds = (obj, acc = []) => {
   return acc;
 };
 
+// Formats error messages clearly for the user
+const getValidateMessage = (blockName, result) => {
+  if (!result || result.isValid) return "";
+
+  const parts = [];
+
+  if (result.missingHero) parts.push("Hero image is required");
+  if (result.enMissing?.length)
+    parts.push(`EN missing: ${result.enMissing.join(", ")}`);
+  if (result.psMissing?.length)
+    parts.push(`PS missing: ${result.psMissing.join(", ")}`);
+  if (result.faMissing?.length)
+    parts.push(`FA missing: ${result.faMissing.join(", ")}`);
+
+  if (!parts.length && result.message) parts.push(result.message);
+  if (!parts.length) parts.push("Please fill all required fields");
+
+  return `${blockName}: ${parts.join(" | ")}`;
+};
+
 export default function FlatEditorPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -73,6 +89,7 @@ export default function FlatEditorPage() {
   const [saving, setSaving] = useState(false);
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [isDark, setIsDark] = useState(true);
+  const [showErrors, setShowErrors] = useState(false);
 
   useEffect(() => {
     const updateTheme = () => {
@@ -103,6 +120,7 @@ export default function FlatEditorPage() {
           ...rawPage,
           blocks: rawPage?.blocks || [],
         });
+        setShowErrors(false);
       })
       .catch(() => {
         toast.error("Failed to load page");
@@ -111,10 +129,8 @@ export default function FlatEditorPage() {
       .finally(() => setLoading(false));
   }, [id, router]);
 
-  // Bulletproof addBlock handler
   const addBlock = (type) => {
     const block = BLOCK_REGISTRY?.[type];
-
     if (!block) {
       toast.error(`Block type "${type}" is not registered.`);
       return;
@@ -148,33 +164,28 @@ export default function FlatEditorPage() {
       ),
     }));
 
-  // REMOVE BLOCK & AUTOMATICALLY DESTROY ITS IMAGES ON CLOUDINARY
   const removeBlock = async (blockId) => {
     const blockToRemove = (formData?.blocks || []).find(
       (b) => b.blockId === blockId,
     );
 
-    // 1. Destroy all Cloudinary images inside this block template
     if (blockToRemove) {
       const publicIds = [...new Set(extractPublicIds(blockToRemove.data))];
-
       for (const publicId of publicIds) {
         try {
           await axios.post("/api/admin/cloudinary/delete", { publicId });
-          console.log("Destroyed Cloudinary image on block delete:", publicId);
         } catch (err) {
           console.error("Failed to delete Cloudinary image:", err);
         }
       }
     }
 
-    // 2. Remove block template from state
     setFormData((prev) => ({
       ...prev,
       blocks: (prev?.blocks || []).filter((b) => b.blockId !== blockId),
     }));
 
-    toast.success("Block template & Cloudinary images removed!");
+    toast.success("Block removed");
   };
 
   const moveBlock = (idx, dir) => {
@@ -186,25 +197,61 @@ export default function FlatEditorPage() {
     setFormData({ ...formData, blocks });
   };
 
-  const handleSave = async (status) => {
+  // PUBLISH HANDLER (STRICT VALIDATION)
+  const handlePublish = async () => {
     const blocksList = formData?.blocks || [];
 
-    // VALIDATION: Block publishing if there are no templates/blocks
-    if (status === "published" && blocksList.length === 0) {
-      return toast.error(
-        "Cannot publish an empty page. Please add at least one block template.",
-      );
+    // 1. Highlight all empty required fields in red
+    setShowErrors(true);
+
+    if (blocksList.length === 0) {
+      return toast.error("Add at least one block before publishing.");
     }
 
+    // 2. Run validation for every block on the page
+    const errorMessages = [];
+
+    for (const block of blocksList) {
+      const def = BLOCK_REGISTRY?.[block.type];
+      if (!def) continue;
+
+      // Checks both block definition AND AdminForm function for validate method
+      const validateFn =
+        def.validate ||
+        def.AdminForm?.validate ||
+        def.AdminForm?.validateServiceDetails;
+
+      if (typeof validateFn === "function") {
+        const result = validateFn(block.data || {});
+        if (!result?.isValid) {
+          errorMessages.push(
+            getValidateMessage(def.name || block.type, result),
+          );
+        }
+      }
+    }
+
+    // 3. STOP IMMEDIATELY IF ERRORS EXIST
+    if (errorMessages.length > 0) {
+      toast.error(errorMessages[0], {
+        description:
+          "Fix the highlighted red fields in EN, PS, and FA, then publish again.",
+        duration: 6000,
+      });
+      return; // <--- THIS PREVENTS PUBLISHING!
+    }
+
+    // 4. Save to DB only when valid
     setSaving(true);
     try {
-      await axios.put(`/api/admin/pages/${id}`, { ...formData, status });
-      toast.success(
-        status === "published" ? "Published Live!" : "Saved as Draft",
-      );
-      if (status === "published") router.push("/admin/pages");
+      await axios.put(`/api/admin/pages/${id}`, {
+        ...formData,
+        status: "published",
+      });
+      toast.success("Published successfully!");
+      router.push("/admin/pages");
     } catch {
-      toast.error("Save failed");
+      toast.error("Publish failed. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -219,6 +266,7 @@ export default function FlatEditorPage() {
         ...rawPage,
         blocks: rawPage?.blocks || [],
       });
+      setShowErrors(false);
       toast.success("Reloaded saved data");
     } catch {
       toast.error("Failed to reload");
@@ -261,7 +309,7 @@ export default function FlatEditorPage() {
           <div>
             <Link
               href="/admin/pages"
-              className={`mb-4 flex w-fit items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+              className={`mb-4 flex w-fit cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
                 isDark
                   ? "border-[#263442] bg-[#111a23] text-gray-300 hover:bg-[#263442]"
                   : "border-[#e4e7ec] bg-white text-gray-700 hover:bg-gray-50"
@@ -281,15 +329,11 @@ export default function FlatEditorPage() {
             </p>
           </div>
 
-          {/* Language tabs + ball */}
           <div className="min-w-0 sm:min-w-[320px]">
             <label className={`${labelClass} mb-3`}>Content Language</label>
 
             <div className="flex items-center gap-3">
-              <div
-                className="inline-flex w-full flex-wrap items-center gap-1.5 rounded-2xl border border-[#1E8A8A]/20 bg-[#1E8A8A]/5 p-1.5 shadow-sm"
-                role="group"
-              >
+              <div className="inline-flex w-full flex-wrap items-center gap-1.5 rounded-2xl border border-[#1E8A8A]/20 bg-[#1E8A8A]/5 p-1.5 shadow-sm">
                 {languages.map((item) => {
                   const isActive = activeTab === item.code;
                   return (
@@ -298,7 +342,7 @@ export default function FlatEditorPage() {
                       type="button"
                       onClick={() => setActiveTab(item.code)}
                       disabled={saving}
-                      className={`relative flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
+                      className={`relative flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
                         isActive
                           ? "bg-[#1E8A8A] text-white shadow-md shadow-[#1E8A8A]/20"
                           : isDark
@@ -319,7 +363,6 @@ export default function FlatEditorPage() {
                 })}
               </div>
 
-              {/* Working language ball */}
               <AdminLanguageBall
                 language={activeTab}
                 onLanguageChange={setActiveTab}
@@ -327,7 +370,7 @@ export default function FlatEditorPage() {
             </div>
 
             <p className={`mt-2 text-xs ${mutedTextClass}`}>
-              Select a language to edit block content.
+              Fill EN, PS, and FA before publishing.
             </p>
           </div>
         </header>
@@ -347,11 +390,11 @@ export default function FlatEditorPage() {
               </div>
               <h3 className="text-base font-bold">No blocks yet</h3>
               <p className={`mt-1 mb-5 text-sm ${mutedTextClass}`}>
-                Start building your page by adding a block template.
+                Add a block template to build this page.
               </p>
               <button
                 onClick={() => setShowBlockPicker(true)}
-                className="flex items-center gap-2 rounded-xl bg-[#1E8A8A] px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#249b98]"
+                className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#1E8A8A] px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#249b98]"
               >
                 <Plus size={16} /> Add First Block
               </button>
@@ -394,7 +437,7 @@ export default function FlatEditorPage() {
                       <button
                         onClick={() => moveBlock(index, -1)}
                         disabled={index === 0}
-                        className={`rounded-lg p-2 transition disabled:opacity-30 ${
+                        className={`cursor-pointer rounded-lg p-2 transition disabled:cursor-not-allowed disabled:opacity-30 ${
                           isDark ? "hover:bg-[#263442]" : "hover:bg-gray-100"
                         }`}
                       >
@@ -403,7 +446,7 @@ export default function FlatEditorPage() {
                       <button
                         onClick={() => moveBlock(index, 1)}
                         disabled={index === blocks.length - 1}
-                        className={`rounded-lg p-2 transition disabled:opacity-30 ${
+                        className={`cursor-pointer rounded-lg p-2 transition disabled:cursor-not-allowed disabled:opacity-30 ${
                           isDark ? "hover:bg-[#263442]" : "hover:bg-gray-100"
                         }`}
                       >
@@ -416,7 +459,7 @@ export default function FlatEditorPage() {
                       />
                       <button
                         onClick={() => removeBlock(block.blockId)}
-                        className="rounded-lg p-2 text-red-500 transition hover:bg-red-500/10"
+                        className="cursor-pointer rounded-lg p-2 text-red-500 transition hover:bg-red-500/10"
                       >
                         <Trash2 size={16} />
                       </button>
@@ -431,11 +474,11 @@ export default function FlatEditorPage() {
                         onChange={(newData) =>
                           updateBlock(block.blockId, newData)
                         }
+                        showErrors={showErrors}
                       />
                     ) : (
                       <div className="text-xs text-amber-400">
-                        Admin editor component missing for block type:{" "}
-                        {block.type}
+                        Admin editor missing for: {block.type}
                       </div>
                     )}
                   </div>
@@ -447,7 +490,7 @@ export default function FlatEditorPage() {
           {blocks.length > 0 && (
             <button
               onClick={() => setShowBlockPicker(true)}
-              className={`flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-5 text-sm font-bold transition-all hover:border-[#1E8A8A] hover:bg-[#1E8A8A]/5 hover:text-[#1E8A8A] ${
+              className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-5 text-sm font-bold transition-all hover:border-[#1E8A8A] hover:bg-[#1E8A8A]/5 hover:text-[#1E8A8A] ${
                 isDark
                   ? "border-[#263442] bg-[#111a23]/50 text-gray-400"
                   : "border-[#e4e7ec] bg-white/50 text-gray-500"
@@ -458,7 +501,7 @@ export default function FlatEditorPage() {
           )}
         </div>
 
-        {/* STICKY FOOTER */}
+        {/* FOOTER */}
         <footer
           className={`sticky bottom-3 z-10 flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-xl sm:flex-row sm:items-center sm:px-6 ${
             isDark
@@ -466,57 +509,38 @@ export default function FlatEditorPage() {
               : "border-[#e4e7ec] bg-white/95"
           }`}
         >
-          {/* LEFT SIDE: Reload Button */}
-          <div>
-            <button
-              type="button"
-              onClick={handleReload}
-              disabled={saving}
-              className={`flex w-full items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium sm:w-auto ${
-                isDark
-                  ? "border-[#263442] text-gray-300 hover:bg-[#16212c]"
-                  : "border-[#e4e7ec] text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              <RotateCcw size={16} />
-              Reload Saved Data
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleReload}
+            disabled={saving}
+            className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${
+              isDark
+                ? "border-[#263442] text-gray-300 hover:bg-[#16212c]"
+                : "border-[#e4e7ec] text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            <RotateCcw size={16} />
+            Reload Saved Data
+          </button>
 
-          {/* RIGHT SIDE: Save Draft & Publish Live Buttons */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <button
-              type="button"
-              onClick={() => handleSave("draft")}
-              disabled={saving}
-              className={`flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium disabled:opacity-60 ${
-                isDark
-                  ? "border-[#263442] text-gray-300 hover:bg-[#16212c]"
-                  : "border-[#e4e7ec] text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              Save Draft
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSave("published")}
-              disabled={saving}
-              className="flex items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#249b98] disabled:opacity-60"
-            >
-              {saving ? (
-                <>
-                  <LoaderCircle size={17} className="animate-spin" />
-                  Saving Changes...
-                </>
-              ) : (
-                <>
-                  <Save size={17} />
-                  Publish Live
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handlePublish}
+            disabled={saving}
+            className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#249b98] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? (
+              <>
+                <LoaderCircle size={17} className="animate-spin" />
+                Publishing...
+              </>
+            ) : (
+              <>
+                <Save size={17} />
+                Publish Live
+              </>
+            )}
+          </button>
         </footer>
 
         {/* BLOCK PICKER OVERLAY */}
@@ -526,19 +550,19 @@ export default function FlatEditorPage() {
             onClick={() => setShowBlockPicker(false)}
           >
             <div
-              className={`animate-in fade-in zoom-in-95 w-full max-w-2xl rounded-2xl border p-6 shadow-2xl duration-200 ${cardClass}`}
+              className={`w-full max-w-2xl rounded-2xl border p-6 shadow-2xl ${cardClass}`}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-5 flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-bold">Block Library</h2>
                   <p className={`mt-1 text-xs ${mutedTextClass}`}>
-                    Select a template to add to your page
+                    Select a template to add
                   </p>
                 </div>
                 <button
                   onClick={() => setShowBlockPicker(false)}
-                  className={`rounded-full border p-1.5 transition ${
+                  className={`cursor-pointer rounded-full border p-1.5 transition ${
                     isDark
                       ? "border-[#263442] hover:bg-[#263442]"
                       : "border-[#e4e7ec] hover:bg-gray-100"
@@ -553,7 +577,7 @@ export default function FlatEditorPage() {
                   <button
                     key={b.type}
                     onClick={() => addBlock(b.type)}
-                    className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-all hover:border-[#1E8A8A] hover:shadow-md ${
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-left transition-all hover:border-[#1E8A8A] hover:shadow-md ${
                       isDark
                         ? "border-[#263442] bg-[#16212c]"
                         : "border-[#e4e7ec] bg-[#f8fafc]"
@@ -568,9 +592,7 @@ export default function FlatEditorPage() {
                     </div>
                     <div>
                       <div className="text-sm font-bold">{b.name}</div>
-                      <div
-                        className={`mt-0.5 text-xs leading-relaxed ${mutedTextClass}`}
-                      >
+                      <div className={`mt-0.5 text-xs ${mutedTextClass}`}>
                         {b.description}
                       </div>
                     </div>

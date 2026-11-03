@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 export default function SliderAdminForm({ data, onChange }) {
   const slides = data?.slides || [];
+  const [dark, setDark] = useState(true);
   const [preview, setPreview] = useState("");
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -14,7 +15,21 @@ export default function SliderAdminForm({ data, onChange }) {
   const [widgetReady, setWidgetReady] = useState(false);
   const [widgetLoading, setWidgetLoading] = useState(true);
 
-  // Load Cloudinary script
+  // theme changer of cloudinary
+  useEffect(() => {
+    const updateTheme = () =>
+      setDark(document.documentElement.classList.contains("dark"));
+    updateTheme();
+    const obs = new MutationObserver(updateTheme);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
+
+  // upload cloudinary
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -73,6 +88,8 @@ export default function SliderAdminForm({ data, onChange }) {
     }
 
     setUploading(true);
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     window.cloudinary.openUploadWidget(
       {
