@@ -20,6 +20,11 @@ import FeaturesBackend from "./Features/AdminForm";
 import FeaturesConfig from "./Features/config";
 import FeaturesFrontend from "./Features/FrontendView";
 
+// BrandLogos
+import BrandLogosBackend from "./BrandLogos/AdminForm";
+import BrandLogosFrontend from "./BrandLogos/BrandLogosView";
+import BrandLogosConfig from "./BrandLogos/config";
+
 export const BLOCK_REGISTRY = {
   banner: {
     ...BannerConfig,
@@ -40,6 +45,11 @@ export const BLOCK_REGISTRY = {
     ...FeaturesConfig,
     AdminForm: FeaturesBackend,
     FrontendView: FeaturesFrontend,
+  },
+  BrandLogos: {
+    ...BrandLogosConfig,
+    AdminForm: BrandLogosBackend,
+    FrontendView: BrandLogosFrontend,
   },
 };
 
