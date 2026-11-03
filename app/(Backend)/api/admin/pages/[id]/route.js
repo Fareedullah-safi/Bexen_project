@@ -9,11 +9,9 @@ import Page from "@/Models/Pages/Page";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
-// Recursively find every publicId / public_id in any object or array
 function getAllPublicIds(input, acc = []) {
   if (!input || typeof input !== "object") return acc;
 
-  // Convert Mongoose docs / subdocs to plain objects
   let obj = input;
   if (typeof input.toObject === "function") {
     try {
@@ -42,10 +40,8 @@ function getAllPublicIds(input, acc = []) {
   return acc;
 }
 
-// Destroy a list of Cloudinary public IDs safely
 async function destroyImages(publicIds = []) {
   const uniqueIds = [...new Set(publicIds.filter(Boolean))];
-
   for (const publicId of uniqueIds) {
     try {
       await cloudinary.uploader.destroy(publicId, { invalidate: true });
@@ -56,10 +52,18 @@ async function destroyImages(publicIds = []) {
   return uniqueIds.length;
 }
 
-// Remove the deleted page from navbar (never block delete flow)
+function toHref(slug) {
+  return `/${String(slug || "").replace(/^\/+/, "")}`;
+}
+
+function plainItem(item) {
+  return typeof item?.toObject === "function" ? item.toObject() : item;
+}
+
+// Remove page link from navbar (main + children)
 async function removePageFromNavbar(slug) {
   try {
-    const pageHref = `/${String(slug || "").replace(/^\/+/, "")}`;
+    const pageHref = toHref(slug);
     const menu = await NavMenu.findOne();
     if (!menu || !Array.isArray(menu.items)) return;
 
@@ -70,7 +74,7 @@ async function removePageFromNavbar(slug) {
           (child) => child.href !== pageHref,
         );
         return {
-          ...(typeof item.toObject === "function" ? item.toObject() : item),
+          ...plainItem(item),
           children,
           hasDropdown: children.length > 0,
         };
@@ -79,7 +83,92 @@ async function removePageFromNavbar(slug) {
     menu.items = cleaned;
     await menu.save();
   } catch (err) {
-    console.error("Navbar cleanup failed:", err.message);
+    console.error("Navbar remove failed:", err.message);
+  }
+}
+
+// Add or update page link in navbar
+async function syncPageToNavbar(page) {
+  try {
+    const showInNav = Boolean(page.showInNav);
+    const slug = page.slug;
+    const title = page.title || "Untitled";
+    const href = toHref(slug);
+    const showInFooter = Boolean(page.showInFooter);
+    const navParent = page.navParent || "none";
+
+    // If not showing in nav → just remove old link
+    if (!showInNav) {
+      await removePageFromNavbar(slug);
+      // also remove old slug if renamed (handled by caller with oldSlug)
+      return;
+    }
+
+    let menu = await NavMenu.findOne();
+    if (!menu) {
+      menu = await NavMenu.create({ items: [] });
+    }
+
+    // 1) Remove any old version of this href first (prevents duplicates)
+    let items = (menu.items || [])
+      .filter((item) => item.href !== href)
+      .map((item) => {
+        const children = (item.children || []).filter(
+          (child) => child.href !== href,
+        );
+        return {
+          ...plainItem(item),
+          children,
+          hasDropdown: children.length > 0,
+        };
+      });
+
+    // 2) Build nav item
+    const newItem = {
+      id: `nav_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      href,
+      showInFooter,
+      translations: {
+        en: { label: title },
+        ps: { label: title },
+        fa: { label: title },
+      },
+      hasDropdown: false,
+      children: [],
+    };
+
+    // 3) Place under parent dropdown OR as main item
+    const hasParent =
+      navParent &&
+      navParent !== "none" &&
+      navParent !== "null" &&
+      String(navParent).trim() !== "";
+
+    let addedToParent = false;
+
+    if (hasParent) {
+      items = items.map((item) => {
+        if (item.id === navParent) {
+          addedToParent = true;
+          const children = [...(item.children || []), newItem];
+          return {
+            ...plainItem(item),
+            children,
+            hasDropdown: true,
+          };
+        }
+        return item;
+      });
+    }
+
+    if (!hasParent || !addedToParent) {
+      items.push(newItem);
+    }
+
+    menu.items = items;
+    await menu.save();
+  } catch (err) {
+    console.error("Navbar sync failed:", err.message);
   }
 }
 
@@ -111,8 +200,9 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ message: "Page not found" }, { status: 404 });
     }
 
-    // ONLY cleanup Cloudinary when blocks are actually sent in body.
-    // Prevents partial PUT (title/slug only) from wiping all images.
+    const oldSlug = existingPage.slug;
+
+    // Cloudinary cleanup only when blocks are sent
     if (Array.isArray(body.blocks)) {
       const oldPublicIds = getAllPublicIds(existingPage.blocks || []);
       const newPublicIds = new Set(getAllPublicIds(body.blocks || []));
@@ -124,7 +214,6 @@ export async function PUT(req, { params }) {
       }
     }
 
-    // Partial-safe update: only sets fields that were actually sent
     const update = {};
     if (body.title !== undefined) update.title = body.title;
     if (body.slug !== undefined) update.slug = body.slug;
@@ -141,6 +230,26 @@ export async function PUT(req, { params }) {
       { $set: update },
       { new: true, runValidators: true },
     );
+
+    // ===== NAVBAR SYNC ON PAGE UPDATE =====
+    try {
+      // If slug changed, remove OLD href first
+      if (body.slug !== undefined && body.slug !== oldSlug) {
+        await removePageFromNavbar(oldSlug);
+      }
+
+      // Then sync current page settings into navbar
+      // (works for title/slug/showInNav/navParent/showInFooter changes)
+      await syncPageToNavbar({
+        title: page.title,
+        slug: page.slug,
+        showInNav: page.showInNav,
+        navParent: page.navParent,
+        showInFooter: page.showInFooter,
+      });
+    } catch (err) {
+      console.error("Navbar update failed:", err.message);
+    }
 
     try {
       revalidatePath("/", "layout");
@@ -163,7 +272,6 @@ export async function DELETE(req, { params }) {
     await connectMongo();
     const { id } = await params;
 
-    // 1) Load the page first so we have blocks + slug
     const page = await Page.findById(id);
     if (!page) {
       return NextResponse.json({
@@ -176,13 +284,10 @@ export async function DELETE(req, { params }) {
     const plain = page.toObject ? page.toObject() : page;
     const publicIds = getAllPublicIds(plain.blocks || []);
 
-    // 2) Delete Cloudinary images BEFORE removing the DB row
     const deletedCount = await destroyImages(publicIds);
-
-    // 3) Delete page from DB
     await Page.findByIdAndDelete(id);
 
-    // 4) Clean navbar (never fails the delete)
+    // Also remove from navbar when page is deleted
     await removePageFromNavbar(plain.slug);
 
     try {

@@ -4,15 +4,21 @@ import BannerFrontendView from "./Banner/FrontendView";
 
 // service  details
 
-import  ServicesDetailsFrontend from "./ServiceDetails/FrontendView";
-import ServicesDetailsBackend from "./ServiceDetails/AdminForm"
-import ServicesDetailsConfig from "./ServiceDetails/config"
+import ServicesDetailsBackend from "./ServiceDetails/AdminForm";
+import ServicesDetailsConfig from "./ServiceDetails/config";
+import ServicesDetailsFrontend from "./ServiceDetails/FrontendView";
 
 // Sliders
 
-import SlidersFrontend from "./slider/FrontendView"
-import SlidersBackend from "./slider/AdminForm"
-import SlidersConfig from "./slider/config"
+import SlidersBackend from "./slider/AdminForm";
+import SlidersConfig from "./slider/config";
+import SlidersFrontend from "./slider/FrontendView";
+
+//features
+
+import FeaturesBackend from "./Features/AdminForm";
+import FeaturesConfig from "./Features/config";
+import FeaturesFrontend from "./Features/FrontendView";
 
 export const BLOCK_REGISTRY = {
   banner: {
@@ -22,15 +28,19 @@ export const BLOCK_REGISTRY = {
   },
   Services_Details: {
     ...ServicesDetailsConfig,
-    AdminForm:  ServicesDetailsBackend,
-    FrontendView:  ServicesDetailsFrontend,
+    AdminForm: ServicesDetailsBackend,
+    FrontendView: ServicesDetailsFrontend,
   },
   Sliders: {
     ...SlidersConfig,
-    AdminForm:  SlidersBackend,
-    FrontendView:  SlidersFrontend,
+    AdminForm: SlidersBackend,
+    FrontendView: SlidersFrontend,
   },
-  
+  Features: {
+    ...FeaturesConfig,
+    AdminForm: FeaturesBackend,
+    FrontendView: FeaturesFrontend,
+  },
 };
 
 export const BLOCKS_LIST = Object.entries(BLOCK_REGISTRY).map(
