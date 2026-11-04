@@ -31,6 +31,10 @@ import AboutUsFrontendView from "./AboutUs/FrontendView";
 import TeamMembersAdminForm from "./TeamMembers/AdminForm";
 import TeamMembersConfig from "./TeamMembers/config";
 
+// new Admin form
+import NewsConfig from "./News/config";
+import NewsAdminForm from "./News/NewsAdminForm";
+
 export const BLOCK_REGISTRY = {
   banner: {
     ...BannerConfig,
@@ -66,6 +70,12 @@ export const BLOCK_REGISTRY = {
     ...TeamMembersConfig,
     AdminForm: TeamMembersAdminForm,
     FrontendView: null, // ← add view later
+  },
+
+  News: {
+    ...NewsConfig,
+    AdminForm: NewsAdminForm,
+    FrontendView: null,
   },
 };
 

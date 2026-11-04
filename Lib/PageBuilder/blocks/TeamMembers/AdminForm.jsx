@@ -206,6 +206,7 @@ export default function TeamMembersAdminForm({
   const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true; // ← this line was missing
     return () => {
       isMountedRef.current = false;
       try {
