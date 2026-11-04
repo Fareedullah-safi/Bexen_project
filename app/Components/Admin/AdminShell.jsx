@@ -30,6 +30,7 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { GiBackup } from "react-icons/gi";
 import { RiPagesFill } from "react-icons/ri";
 import { TbLayoutNavbar } from "react-icons/tb";
 
@@ -98,6 +99,11 @@ const navigation = [
         name: "Footer and Profile",
         href: "/admin/footerandprofile",
         icon: Phone,
+      },
+      {
+        name: "BackupManager",
+        href: "/admin/backup-data-manager",
+        icon: GiBackup,
       },
       {
         name: "Add Pages",
