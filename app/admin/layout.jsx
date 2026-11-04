@@ -1,5 +1,5 @@
-﻿import AdminThemeProvider from "@/app/Components/Admin/AdminThemeProvider";
-import AdminShell from "@/app/Components/Admin/AdminShell";
+﻿import AdminShell from "@/app/Components/Admin/AdminShell";
+import AdminThemeProvider from "@/app/Components/Admin/AdminThemeProvider";
 
 export default function AdminLayout({ children }) {
   return (

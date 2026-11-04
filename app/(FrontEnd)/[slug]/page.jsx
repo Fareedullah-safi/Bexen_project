@@ -31,6 +31,7 @@ export default async function DynamicFrontendPage({ params }) {
         const def = BLOCK_REGISTRY[block.type];
         if (!def) return null;
         const View = def.FrontendView;
+        if(!View) return null;
 
         return (
           <div key={block.blockId} id={`block-${block.blockId}`}>

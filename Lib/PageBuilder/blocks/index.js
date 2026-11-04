@@ -3,19 +3,16 @@ import BannerConfig from "./Banner/config";
 import BannerFrontendView from "./Banner/FrontendView";
 
 // service  details
-
 import ServicesDetailsAdminForm from "./ServiceDetails/AdminForm";
 import ServicesDetailsConfig from "./ServiceDetails/config";
 import ServicesDetailsFrontend from "./ServiceDetails/FrontendView";
 
 // Sliders
-
 import SlidersAdminForm from "./slider/AdminForm";
 import SlidersConfig from "./slider/config";
 import SlidersFrontend from "./slider/FrontendView";
 
 //features
-
 import FeaturesAdminForm from "./Features/AdminForm";
 import FeaturesConfig from "./Features/config";
 import FeaturesFrontend from "./Features/FrontendView";
@@ -29,6 +26,10 @@ import BrandLogosConfig from "./BrandLogos/config";
 import AboutUsAdminForm from "./AboutUs/AdminForm";
 import AboutUsConfig from "./AboutUs/config";
 import AboutUsFrontendView from "./AboutUs/FrontendView";
+
+// Team Members
+import TeamMembersAdminForm from "./TeamMembers/AdminForm";
+import TeamMembersConfig from "./TeamMembers/config";
 
 export const BLOCK_REGISTRY = {
   banner: {
@@ -60,6 +61,11 @@ export const BLOCK_REGISTRY = {
     ...AboutUsConfig,
     AdminForm: AboutUsAdminForm,
     FrontendView: AboutUsFrontendView,
+  },
+  TeamMembers: {
+    ...TeamMembersConfig,
+    AdminForm: TeamMembersAdminForm,
+    FrontendView: null, // ← add view later
   },
 };
 
