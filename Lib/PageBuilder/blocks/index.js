@@ -35,6 +35,15 @@ import TeamMembersConfig from "./TeamMembers/config";
 import NewsConfig from "./News/config";
 import NewsAdminForm from "./News/NewsAdminForm";
 
+// Albums
+import AlbumsAdminForm from "./Albums/AlbumsAdminForm";
+import AlbumsView from "./Albums/AlbumsView";
+import AlbumsConfig from "./Albums/config";
+
+// videos
+import VideoGalleryConfig from "./VideoGallery/config";
+import VideoGalleryAdmin from "./VideoGallery/VideoGalleryAdminForm";
+import VideoGalleryView from "./VideoGallery/VideoGalleryView";
 export const BLOCK_REGISTRY = {
   banner: {
     ...BannerConfig,
@@ -65,6 +74,16 @@ export const BLOCK_REGISTRY = {
     ...AboutUsConfig,
     AdminForm: AboutUsAdminForm,
     FrontendView: AboutUsFrontendView,
+  },
+  Albums: {
+    ...AlbumsConfig,
+    AdminForm: AlbumsAdminForm,
+    FrontendView: AlbumsView,
+  },
+  GalleryVideos: {
+    ...VideoGalleryConfig,
+    AdminForm: VideoGalleryAdmin,
+    FrontendView: VideoGalleryView,
   },
   TeamMembers: {
     ...TeamMembersConfig,

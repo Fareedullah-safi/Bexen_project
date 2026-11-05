@@ -1,159 +1,87 @@
-/* eslint-disable @next/next/no-img-element */
+// src/Lib/PageBuilder/blocks/Banner/AdminForm.jsx
 "use client";
 
 import {
   AlertCircle,
   CheckCircle2,
   ImagePlus,
-  LinkIcon,
   LoaderCircle,
-  PlayCircle,
-  Text,
   Trash2,
-  Type,
   UploadCloud,
-  User,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const SCRIPT = "script[data-cloudinary-widget]";
 
-// ONE list used for translated inputs + validation
-const TEXT_FIELDS = [
-  {
-    id: "experienceNumber",
-    label: "Experience Number",
-    placeholder: "e.g. 13+",
-  },
-  {
-    id: "experienceLabel",
-    label: "Experience Label",
-    placeholder: "e.g. Years of Experience",
-  },
-  {
-    id: "experienceText",
-    label: "Experience Text",
-    placeholder: "e.g. Decades of Experience...",
-  },
-  {
-    id: "sectionLabel",
-    label: "Section Label",
-    placeholder: "e.g. Get to Know Us",
-  },
-  { id: "title", label: "Title", placeholder: "Enter section title" },
-  {
-    id: "description",
-    label: "Description",
-    type: "textarea",
-    placeholder: "Write your About Us description...",
-  },
-  { id: "buttonText", label: "Button Text", placeholder: "e.g. Learn More" },
-  { id: "clientName", label: "Client Name", placeholder: "Enter client name" },
-  { id: "clientRole", label: "Client Role", placeholder: "Enter client role" },
-];
+const emptyImage = () => ({ url: "", publicId: "" });
 
-// Shared (non-translated) fields
-const SHARED_FIELDS = [
-  { id: "buttonLink", label: "Button Link", placeholder: "/about" },
-  {
-    id: "videoLink",
-    label: "YouTube Video Link",
-    placeholder: "https://www.youtube.com/watch?v=...",
-  },
-];
-
-// Image fields
-const IMAGE_FIELDS = [
-  { id: "mainImage", label: "Main Image" },
-  { id: "thumbnailImage", label: "Video Thumbnail" },
-];
-
-// Helpers
-export const getTranslatedField = (data, langKey, fieldId) => {
-  return data?.translations?.[langKey]?.[fieldId] || "";
-};
-
-// Check missing translated fields for a specific language
-export const checkMissingFields = (data = {}, langKey = "en") => {
-  const missing = [];
-  TEXT_FIELDS.forEach((field) => {
-    if (!String(getTranslatedField(data, langKey, field.id)).trim()) {
-      missing.push(field.label);
-    }
-  });
-  return missing;
-};
-
-// Check missing shared fields
-export const checkMissingShared = (data = {}) => {
-  const missing = [];
-  SHARED_FIELDS.forEach((field) => {
-    if (!String(data?.[field.id] || "").trim()) {
-      missing.push(field.label);
-    }
-  });
-  return missing;
-};
-
-// Check missing images
-export const checkMissingImages = (data = {}) => {
-  const missing = [];
-  IMAGE_FIELDS.forEach((field) => {
-    if (!data?.[field.id]?.url?.trim()) missing.push(field.label);
-  });
-  return missing;
-};
-
-// Complete Validation Function
-export function validateAboutUs(data = {}) {
-  const missingImages = checkMissingImages(data);
-  const missingShared = checkMissingShared(data);
-  const enMissing = checkMissingFields(data, "en");
-  const psMissing = checkMissingFields(data, "ps");
-  const faMissing = checkMissingFields(data, "fa");
+// ==========================================
+// 1. STATIC VALIDATION (Parent reads .isValid)
+// ==========================================
+export function validateBanner(data = {}) {
+  const url = data?.image?.url || data?.url || "";
+  const hasImage = Boolean(String(url).trim());
 
   return {
-    isValid:
-      missingImages.length === 0 &&
-      missingShared.length === 0 &&
-      enMissing.length === 0 &&
-      psMissing.length === 0 &&
-      faMissing.length === 0,
-    missingImages,
-    missingShared,
-    enMissing,
-    psMissing,
-    faMissing,
+    isValid: hasImage,
+    missingImage: !hasImage,
   };
 }
 
-export default function AboutUsAdminForm({
+// ==========================================
+// 2. MAIN COMPONENT
+// ==========================================
+export default function BannerAdminForm({
   data = {},
-  lang = "en",
+  lang = "en", // kept for API parity with other blocks (banner is image-only)
   onChange = () => {},
   showErrors = false,
 }) {
   const [dark, setDark] = useState(true);
   const [ready, setReady] = useState(false);
-  const [uploadingField, setUploadingField] = useState("");
-  const [deletingField, setDeletingField] = useState("");
-  const widget = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const translations = data?.translations || {};
-  const content = translations[lang] || {};
-  const isRtl = lang === "ps" || lang === "fa";
+  const widgetRef = useRef(null);
+  const openingRef = useRef(false);
 
-  const currentMissing = checkMissingFields(data, lang);
-  const enMissing = checkMissingFields(data, "en");
-  const psMissing = checkMissingFields(data, "ps");
-  const faMissing = checkMissingFields(data, "fa");
-  const missingImages = checkMissingImages(data);
-  const missingShared = checkMissingShared(data);
+  // Fresh data for late Cloudinary callbacks
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
-  const isErr = (val) => showErrors && !String(val || "").trim();
+  // StrictMode-safe mount flag
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-  /* ---------- Dark mode detection ---------- */
+  // Normalize shape: always { image: { url, publicId } }
+  const currentData = useMemo(() => {
+    const raw = data?.image ?? data;
+    const url = raw?.url || "";
+    const publicId = raw?.publicId || raw?.public_id || "";
+    return {
+      image: url || publicId ? { url, publicId } : emptyImage(),
+    };
+  }, [data]);
+
+  const image = currentData.image;
+  const hasImage = Boolean(image.url);
+  const valResult = validateBanner(currentData);
+  const hasAnyError = showErrors && !valResult.isValid;
+  const imageError = showErrors && valResult.missingImage;
+
+  const emit = (next) => {
+    onChange(next);
+  };
+
+  /* ---------- Dark mode observer (Cloudinary palette) ---------- */
   useEffect(() => {
     const updateTheme = () =>
       setDark(document.documentElement.classList.contains("dark"));
@@ -168,9 +96,13 @@ export default function AboutUsAdminForm({
 
   /* ---------- Cloudinary script loader ---------- */
   useEffect(() => {
+    isMountedRef.current = true;
     let script = document.querySelector(SCRIPT);
-    const checkReady = () => {
-      if (window.cloudinary?.createUploadWidget) setReady(true);
+
+    const handleLoad = () => {
+      if (isMountedRef.current) {
+        setReady(!!window.cloudinary?.createUploadWidget);
+      }
     };
 
     if (window.cloudinary?.createUploadWidget) {
@@ -183,75 +115,51 @@ export default function AboutUsAdminForm({
         script.dataset.cloudinaryWidget = "true";
         document.head.appendChild(script);
       }
-      script.addEventListener("load", checkReady);
+      script.addEventListener("load", handleLoad);
+      script.addEventListener("error", () => {
+        if (isMountedRef.current) toast.error("Could not load Cloudinary.");
+      });
     }
-    return () => script?.removeEventListener("load", checkReady);
+
+    return () => {
+      isMountedRef.current = false;
+      script?.removeEventListener("load", handleLoad);
+      try {
+        widgetRef.current?.close?.();
+        widgetRef.current?.destroy?.();
+      } catch {}
+      widgetRef.current = null;
+      openingRef.current = false;
+    };
   }, []);
 
-  const destroyCloudinaryImage = async (publicId) => {
+  /* ---------- Delete helper ---------- */
+  const deleteRemote = (publicId) => {
     if (!publicId) return;
-    try {
-      await fetch("/api/admin/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId }),
-      });
-    } catch (e) {
-      console.error("Failed to delete image from Cloudinary:", e);
-    }
+    fetch("/api/admin/cloudinary/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ publicId }),
+    }).catch(() => {});
   };
 
-  /* ---------- Translated text update ---------- */
-  const updateTranslatedField = (fieldId, value) => {
-    onChange({
-      ...data,
-      translations: {
-        ...translations,
-        [lang]: { ...content, [fieldId]: value },
-      },
-    });
-  };
-
-  /* ---------- Shared text update ---------- */
-  const updateSharedField = (fieldId, value) => {
-    onChange({ ...data, [fieldId]: value });
-  };
-
-  /* ---------- Image update ---------- */
-  const updateImage = (field, url, publicId) => {
-    onChange({ ...data, [field]: { url, publicId } });
-  };
-
-  /* ---------- Remove image ---------- */
-  const removeImage = async (field) => {
-    if (deletingField || uploadingField) return;
-    const publicId = data?.[field]?.publicId;
-    setDeletingField(field);
-    if (publicId) await destroyCloudinaryImage(publicId);
-    updateImage(field, "", "");
-    setDeletingField("");
-    toast.success("Image removed.");
-  };
-
-  /* ---------- Open Cloudinary widget ---------- */
-  const openWidget = (field) => {
-    if (uploadingField || deletingField) return;
+  /* ---------- Upload widget ---------- */
+  const openWidget = () => {
+    if (openingRef.current || uploading || deleting) return;
 
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-    if (!cloudName || !uploadPreset) {
-      return toast.error("Check your Cloudinary environment variables.");
-    }
-    if (!window.cloudinary?.createUploadWidget) {
-      return toast.error("Cloudinary widget is still loading. Please wait.");
+    if (!cloudName || !uploadPreset || !window.cloudinary?.createUploadWidget) {
+      toast.error("Check your Cloudinary configuration.");
+      return;
     }
 
-    const oldPublicId = data?.[field]?.publicId || "";
-    setUploadingField(field);
+    openingRef.current = true;
+    setUploading(true);
 
     try {
-      widget.current = window.cloudinary.createUploadWidget(
+      widgetRef.current = window.cloudinary.createUploadWidget(
         {
           cloudName,
           uploadPreset,
@@ -261,7 +169,7 @@ export default function AboutUsAdminForm({
           maxFileSize: 5_000_000,
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
           resourceType: "image",
-          folder: "bexon/pages/about-us",
+          folder: "bexon/banners",
           cropping: false,
           styles: {
             palette: {
@@ -276,60 +184,90 @@ export default function AboutUsAdminForm({
             },
           },
         },
-        async (error, result) => {
+        (error, result) => {
           if (error) {
             toast.error(error.message || "Image upload failed.");
-            setUploadingField("");
+            if (isMountedRef.current) {
+              setUploading(false);
+              openingRef.current = false;
+            }
             return;
           }
 
           if (result?.event === "success") {
-            const newPublicId = result.info.public_id;
-            const newUrl = result.info.secure_url;
+            const url = result.info?.secure_url;
+            const publicId = result.info?.public_id;
 
-            if (oldPublicId && oldPublicId !== newPublicId) {
-              await destroyCloudinaryImage(oldPublicId);
+            if (!url || !publicId) {
+              toast.error("Invalid image returned by Cloudinary.");
+              return;
             }
 
-            updateImage(field, newUrl, newPublicId);
-            toast.success(oldPublicId ? "Image replaced!" : "Image uploaded!");
+            // Replace against FRESH data — never stale closure
+            const fresh = dataRef.current || {};
+            const prevPublicId =
+              fresh?.image?.publicId || fresh?.publicId || "";
+
+            // Delete previous asset after successful replace
+            if (prevPublicId && prevPublicId !== publicId) {
+              deleteRemote(prevPublicId);
+            }
+
+            emit({
+              ...fresh,
+              image: { url, publicId },
+            });
+
+            toast.success("Banner image uploaded.");
           }
 
-          if (["close", "abort"].includes(result?.event)) {
-            setUploadingField("");
+          if (["close", "abort", "queues-end"].includes(result?.event)) {
+            if (isMountedRef.current) {
+              setUploading(false);
+              openingRef.current = false;
+            }
+            widgetRef.current = null;
           }
         },
       );
 
-      widget.current.open();
-    } catch {
-      toast.error("Could not open Cloudinary widget.");
-      setUploadingField("");
+      widgetRef.current.open();
+    } catch (err) {
+      console.error("Cloudinary widget error:", err);
+      toast.error("Could not open Cloudinary.");
+      if (isMountedRef.current) {
+        setUploading(false);
+        openingRef.current = false;
+      }
+      widgetRef.current = null;
     }
   };
 
-  /* ---------- Shared classes ---------- */
-  const getInputClass = (hasError) =>
-    `w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--accent)] ${
-      hasError
-        ? "border-red-500 bg-red-500/10 focus:border-red-500"
-        : "border-[var(--border)]"
-    }`;
+  /* ---------- Remove banner ---------- */
+  const removeBanner = () => {
+    if (uploading || deleting) return;
+    if (!confirm("Remove this banner image?")) return;
 
-  const sectionClass =
-    "mb-4 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5";
+    setDeleting(true);
+    const fresh = dataRef.current || {};
+    const publicId = fresh?.image?.publicId || fresh?.publicId || "";
 
-  const hasAnyError =
-    showErrors &&
-    (missingImages.length > 0 ||
-      missingShared.length > 0 ||
-      currentMissing.length > 0);
+    deleteRemote(publicId);
+
+    emit({
+      ...fresh,
+      image: emptyImage(),
+    });
+
+    if (isMountedRef.current) setDeleting(false);
+    toast.success("Banner removed.");
+  };
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* ==================== STATUS BANNER ==================== */}
       <div
-        className={`mb-4 rounded-2xl border p-4 transition-colors ${
+        className={`rounded-2xl border p-4 transition-colors ${
           hasAnyError
             ? "border-red-500/40 bg-red-500/10"
             : "border-[var(--border)] bg-[var(--surface)]"
@@ -339,306 +277,125 @@ export default function AboutUsAdminForm({
           Completion Status
         </h3>
         <div className="flex flex-wrap gap-2 text-xs font-semibold">
-          {/* Images */}
           <span
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
-              missingImages.length === 0
+              hasImage
                 ? "bg-emerald-500/10 text-emerald-600"
                 : showErrors
                   ? "bg-red-500/20 text-red-500"
                   : "bg-[var(--border)] text-[var(--text-muted)]"
             }`}
           >
-            {missingImages.length === 0 ? (
-              <CheckCircle2 size={14} />
-            ) : (
-              <AlertCircle size={14} />
-            )}
-            Images (
-            {missingImages.length === 0
-              ? "Complete"
-              : `${missingImages.length} missing`}
-            )
+            {hasImage ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+            Banner Image
           </span>
-
-          {/* Shared fields */}
-          <span
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
-              missingShared.length === 0
-                ? "bg-emerald-500/10 text-emerald-600"
-                : showErrors
-                  ? "bg-red-500/20 text-red-500"
-                  : "bg-[var(--border)] text-[var(--text-muted)]"
-            }`}
-          >
-            {missingShared.length === 0 ? (
-              <CheckCircle2 size={14} />
-            ) : (
-              <AlertCircle size={14} />
-            )}
-            Links (
-            {missingShared.length === 0
-              ? "Complete"
-              : `${missingShared.length} missing`}
-            )
-          </span>
-
-          {/* Per-language chips */}
-          {[
-            ["EN", enMissing],
-            ["PS", psMissing],
-            ["FA", faMissing],
-          ].map(([code, missing]) => (
-            <span
-              key={code}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
-                missing.length === 0
-                  ? "bg-emerald-500/10 text-emerald-600"
-                  : showErrors
-                    ? "bg-red-500/20 text-red-500"
-                    : "bg-[var(--border)] text-[var(--text-muted)]"
-              }`}
-            >
-              {missing.length === 0 ? (
-                <CheckCircle2 size={14} />
-              ) : (
-                <AlertCircle size={14} />
-              )}
-              {code} (
-              {missing.length === 0 ? "Complete" : `${missing.length} missing`})
-            </span>
-          ))}
         </div>
-
-        {hasAnyError && (
-          <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-red-500">
-            <AlertCircle size={14} />
-            Please upload both images, fill the shared links, and complete all
-            fields in EN, PS, FA before publishing.
-          </p>
-        )}
       </div>
 
-      {/* ==================== IMAGES (Shared) ==================== */}
-      <section className={sectionClass}>
-        <h2 className="flex items-center gap-2 font-bold">
-          <ImagePlus size={18} className="text-[var(--accent)]" /> Section
-          Images (Shared)
-        </h2>
+      {/* ==================== PREVIEW CARD ==================== */}
+      <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4 sm:px-6">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">
+              Banner Preview
+            </h2>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              {hasImage ? "Current banner" : "No banner uploaded"}
+            </p>
+          </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {IMAGE_FIELDS.map((field) => {
-            const img = data?.[field.id] || {};
-            const imgUrl = img?.url || "";
-            const imgMissing = !imgUrl.trim();
-            const isUploading = uploadingField === field.id;
-            const isDeleting = deletingField === field.id;
+          {hasImage && (
+            <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-500">
+              <CheckCircle2 size={15} />
+              Ready
+            </span>
+          )}
+        </div>
 
-            return (
-              <div key={field.id}>
-                <label className="mb-1.5 block text-sm font-medium">
-                  {field.label}
-                </label>
-
-                <div
-                  className={`flex min-h-48 items-center justify-center overflow-hidden rounded-xl border bg-[var(--surface)] ${
-                    showErrors && imgMissing
-                      ? "border-red-500 bg-red-500/5"
-                      : "border-[var(--border)]"
+        <div className="p-4 sm:p-6">
+          <div
+            className={`flex min-h-48 w-full items-center justify-center overflow-hidden rounded-xl border sm:min-h-64 ${
+              imageError
+                ? "border-red-500/50 bg-red-500/5"
+                : "border-[var(--border)] bg-[var(--surface-soft)]"
+            }`}
+          >
+            {hasImage ? (
+              <img
+                src={image.url}
+                alt="Banner"
+                className="block h-auto max-h-[70vh] w-full object-contain"
+              />
+            ) : (
+              <div className="px-5 py-12 text-center">
+                <ImagePlus
+                  size={34}
+                  className={`mx-auto mb-3 ${
+                    imageError ? "text-red-500" : "text-[var(--accent)]"
+                  }`}
+                />
+                <p
+                  className={`text-sm font-semibold ${
+                    imageError ? "text-red-500" : "text-[var(--foreground)]"
                   }`}
                 >
-                  {imgUrl ? (
-                    <img
-                      src={imgUrl}
-                      alt={field.label}
-                      className="max-h-56 w-full object-cover"
-                    />
-                  ) : (
-                    <div
-                      className={`py-8 text-center ${
-                        showErrors && imgMissing
-                          ? "text-red-500"
-                          : "text-[var(--text-muted)]"
-                      }`}
-                    >
-                      <ImagePlus
-                        size={32}
-                        className="mx-auto mb-2 opacity-50"
-                      />
-                      <p className="text-sm font-semibold">
-                        {showErrors && imgMissing
-                          ? `${field.label} is required`
-                          : `No ${field.label.toLowerCase()}`}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openWidget(field.id)}
-                    disabled={!ready || isUploading || isDeleting}
-                    className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isUploading ? (
-                      <LoaderCircle size={16} className="animate-spin" />
-                    ) : (
-                      <UploadCloud size={16} />
-                    )}
-                    {isUploading
-                      ? "Uploading..."
-                      : imgUrl
-                        ? "Replace Image"
-                        : ready
-                          ? "Upload Image"
-                          : "Loading..."}
-                  </button>
-
-                  {imgUrl && (
-                    <button
-                      type="button"
-                      onClick={() => removeImage(field.id)}
-                      disabled={isDeleting || isUploading}
-                      className="flex cursor-pointer items-center gap-1 rounded-xl bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isDeleting ? (
-                        <LoaderCircle size={16} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
-                    </button>
-                  )}
-                </div>
+                  {imageError
+                    ? "Banner image is required."
+                    : "No banner uploaded"}
+                </p>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  JPG, PNG, WebP · Max 5 MB
+                </p>
               </div>
-            );
-          })}
-        </div>
-      </section>
+            )}
+          </div>
 
-      {/* ==================== SHARED LINKS ==================== */}
-      <section className={sectionClass}>
-        <h2 className="flex items-center gap-2 font-bold">
-          <LinkIcon size={18} className="text-[var(--accent)]" /> Links (Shared)
-        </h2>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={openWidget}
+              disabled={!ready || uploading || deleting}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#187777] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {uploading ? (
+                <LoaderCircle size={18} className="animate-spin" />
+              ) : (
+                <UploadCloud size={18} />
+              )}
+              {uploading
+                ? "Uploading..."
+                : hasImage
+                  ? "Replace Banner"
+                  : ready
+                    ? "Upload Banner"
+                    : "Loading Cloudinary..."}
+            </button>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {SHARED_FIELDS.map((field) => {
-            const val = data?.[field.id] || "";
-            const Icon = field.id === "videoLink" ? PlayCircle : LinkIcon;
-
-            return (
-              <div key={field.id}>
-                <label className="mb-1.5 flex items-center gap-2 text-sm font-medium">
-                  <Icon
-                    size={14}
-                    className={
-                      field.id === "videoLink"
-                        ? "text-red-500"
-                        : "text-[var(--accent)]"
-                    }
-                  />
-                  {field.label}
-                </label>
-                <input
-                  dir="ltr"
-                  value={val}
-                  onChange={(e) => updateSharedField(field.id, e.target.value)}
-                  className={getInputClass(isErr(val))}
-                  placeholder={field.placeholder}
-                />
-                {isErr(val) && (
-                  <p className="mt-1 text-xs text-red-500">
-                    {field.label} is required
-                  </p>
+            {hasImage && (
+              <button
+                type="button"
+                onClick={removeBanner}
+                disabled={uploading || deleting}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-3 text-sm font-semibold text-red-500 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting ? (
+                  <LoaderCircle size={18} className="animate-spin" />
+                ) : (
+                  <Trash2 size={18} />
                 )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+                Remove
+              </button>
+            )}
+          </div>
 
-      {/* ==================== TRANSLATED CONTENT ==================== */}
-      <section className={sectionClass}>
-        <h2 className="flex items-center gap-2 font-bold">
-          <Text size={18} className="text-[var(--accent)]" /> Section Content (
-          {lang.toUpperCase()})
-        </h2>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          {TEXT_FIELDS.filter(
-            (f) => f.id !== "clientName" && f.id !== "clientRole",
-          ).map((field) => {
-            const val = content[field.id] || "";
-            const isTextarea = field.type === "textarea";
-            const InputTag = isTextarea ? "textarea" : "input";
-
-            return (
-              <div key={field.id} className={isTextarea ? "sm:col-span-2" : ""}>
-                <label className="mb-1.5 block text-sm font-medium">
-                  {field.label}
-                </label>
-                <InputTag
-                  rows={isTextarea ? 4 : undefined}
-                  dir={isRtl ? "rtl" : "ltr"}
-                  value={val}
-                  onChange={(e) =>
-                    updateTranslatedField(field.id, e.target.value)
-                  }
-                  className={getInputClass(isErr(val))}
-                  placeholder={field.placeholder || ""}
-                />
-                {isErr(val) && (
-                  <p className="mt-1 text-xs text-red-500">
-                    {field.label} is required in {lang.toUpperCase()}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ==================== CLIENT INFO ==================== */}
-      <section className={sectionClass}>
-        <h2 className="flex items-center gap-2 font-bold">
-          <User size={18} className="text-[var(--accent)]" /> Client Information
-          ({lang.toUpperCase()})
-        </h2>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          {TEXT_FIELDS.filter(
-            (f) => f.id === "clientName" || f.id === "clientRole",
-          ).map((field) => {
-            const val = content[field.id] || "";
-
-            return (
-              <div key={field.id}>
-                <label className="mb-1.5 flex items-center gap-2 text-sm font-medium">
-                  <Type size={12} /> {field.label}
-                </label>
-                <input
-                  dir={isRtl ? "rtl" : "ltr"}
-                  value={val}
-                  onChange={(e) =>
-                    updateTranslatedField(field.id, e.target.value)
-                  }
-                  className={getInputClass(isErr(val))}
-                  placeholder={field.placeholder || ""}
-                />
-                {isErr(val) && (
-                  <p className="mt-1 text-xs text-red-500">
-                    {field.label} is required in {lang.toUpperCase()}
-                  </p>
-                )}
-              </div>
-            );
-          })}
+          <p className="mt-3 text-center text-xs text-[var(--muted)]">
+            JPG, PNG, WebP · Maximum 5 MB
+          </p>
         </div>
       </section>
     </div>
   );
 }
 
-// Attach static validate method directly to component so FlatEditorPage can find it automatically!
-AboutUsAdminForm.validate = validateAboutUs;
+// Attach static validator for parent FlatEditorPage
+BannerAdminForm.validate = validateBanner;

@@ -140,6 +140,26 @@ export default function AboutUsAdminForm({
   const [deletingField, setDeletingField] = useState("");
   const widget = useRef(null);
 
+  // --- NEW: Safe Refs for Data & Mounting ---
+  const dataRef = useRef(data);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      try {
+        widget.current?.close?.();
+        widget.current?.destroy?.();
+      } catch {}
+    };
+  }, []);
+  // ------------------------------------------
+
   const translations = data?.translations || {};
   const content = translations[lang] || {};
   const isRtl = lang === "ps" || lang === "fa";
@@ -201,39 +221,47 @@ export default function AboutUsAdminForm({
     }
   };
 
-  /* ---------- Translated text update ---------- */
+  /* ---------- Translated text update (SAFE) ---------- */
   const updateTranslatedField = (fieldId, value) => {
+    const fresh = dataRef.current || {};
+    const freshTranslations = fresh.translations || {};
+    const freshContent = freshTranslations[lang] || {};
     onChange({
-      ...data,
+      ...fresh,
       translations: {
-        ...translations,
-        [lang]: { ...content, [fieldId]: value },
+        ...freshTranslations,
+        [lang]: { ...freshContent, [fieldId]: value },
       },
     });
   };
 
-  /* ---------- Shared text update ---------- */
+  /* ---------- Shared text update (SAFE) ---------- */
   const updateSharedField = (fieldId, value) => {
-    onChange({ ...data, [fieldId]: value });
+    const fresh = dataRef.current || {};
+    onChange({ ...fresh, [fieldId]: value });
   };
 
-  /* ---------- Image update ---------- */
+  /* ---------- Image update (SAFE) ---------- */
   const updateImage = (field, url, publicId) => {
-    onChange({ ...data, [field]: { url, publicId } });
+    const fresh = dataRef.current || {};
+    onChange({ ...fresh, [field]: { url, publicId } });
   };
 
-  /* ---------- Remove image ---------- */
+  /* ---------- Remove image (SAFE) ---------- */
   const removeImage = async (field) => {
     if (deletingField || uploadingField) return;
-    const publicId = data?.[field]?.publicId;
+    const fresh = dataRef.current || {};
+    const publicId = fresh?.[field]?.publicId;
+    
     setDeletingField(field);
     if (publicId) await destroyCloudinaryImage(publicId);
-    updateImage(field, "", "");
-    setDeletingField("");
+    
+    onChange({ ...dataRef.current, [field]: { url: "", publicId: "" } });
+    if (isMountedRef.current) setDeletingField("");
     toast.success("Image removed.");
   };
 
-  /* ---------- Open Cloudinary widget ---------- */
+  /* ---------- Open Cloudinary widget (SAFE) ---------- */
   const openWidget = (field) => {
     if (uploadingField || deletingField) return;
 
@@ -247,8 +275,13 @@ export default function AboutUsAdminForm({
       return toast.error("Cloudinary widget is still loading. Please wait.");
     }
 
-    const oldPublicId = data?.[field]?.publicId || "";
+    const fresh = dataRef.current || {};
+    const oldPublicId = fresh?.[field]?.publicId || "";
     setUploadingField(field);
+
+    try {
+      widget.current?.destroy?.();
+    } catch {}
 
     try {
       widget.current = window.cloudinary.createUploadWidget(
@@ -277,26 +310,46 @@ export default function AboutUsAdminForm({
           },
         },
         async (error, result) => {
+          const clear = () => {
+            if (isMountedRef.current) setUploadingField("");
+          };
+
           if (error) {
             toast.error(error.message || "Image upload failed.");
-            setUploadingField("");
+            clear();
             return;
           }
 
-          if (result?.event === "success") {
+          if (!result?.event) return;
+
+          if (result.event === "success") {
             const newPublicId = result.info.public_id;
             const newUrl = result.info.secure_url;
+
+            // Write against LATEST data — other fields never wiped
+            const latest = dataRef.current || {};
+            onChange({
+              ...latest,
+              [field]: { url: newUrl, publicId: newPublicId },
+            });
 
             if (oldPublicId && oldPublicId !== newPublicId) {
               await destroyCloudinaryImage(oldPublicId);
             }
 
-            updateImage(field, newUrl, newPublicId);
-            toast.success(oldPublicId ? "Image replaced!" : "Image uploaded!");
+            if (isMountedRef.current) {
+              toast.success(oldPublicId ? "Image replaced!" : "Image uploaded!");
+            }
+            clear();
+            try {
+              widget.current?.close?.();
+            } catch {}
+            return;
           }
 
-          if (["close", "abort"].includes(result?.event)) {
-            setUploadingField("");
+          // Spinner never sticks
+          if (["close", "abort", "queues-end"].includes(result.event)) {
+            clear();
           }
         },
       );
