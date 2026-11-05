@@ -13,13 +13,12 @@ export default function BackupManager() {
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
 
-  /* ── Load list ── */
   const fetchBackups = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/backup");
+      const res = await fetch("/api/admin/backup", { cache: "no-store" });
       const json = await res.json();
-      if (!json.success) throw new Error(json.message);
-      setBackups(json.data || []);
+      if (!json.success) throw new Error(json.message || "Failed to load");
+      setBackups(json.backups || json.data || []);
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to load backups");
@@ -32,7 +31,6 @@ export default function BackupManager() {
     fetchBackups();
   }, [fetchBackups]);
 
-  /* ── Create backup (saves ALL pages into DB) ── */
   const handleCreate = async () => {
     setSaving(true);
     try {
@@ -48,7 +46,11 @@ export default function BackupManager() {
       const json = await res.json();
       if (!json.success) throw new Error(json.message);
 
-      toast.success("Backup saved in database!");
+      if (json.navbarSaved === false) {
+        toast.warning(json.message || "Backup saved, but no navbar was found");
+      } else {
+        toast.success(json.message || "Backup saved");
+      }
       setName("");
       setNote("");
       fetchBackups();
@@ -60,10 +62,15 @@ export default function BackupManager() {
     }
   };
 
-  /* ── Restore ── */
   const handleRestore = async (backup) => {
     const ok = window.confirm(
-      `⚠️ This will REPLACE all current pages with backup:\n\n"${backup.name}"\n(${backup.pageCount} pages)\n\nContinue?`,
+      `⚠️ RESTORE will replace:\n\n` +
+        `• All pages\n` +
+        (backup.hasNavbar
+          ? `• Full navbar menu\n\n`
+          : `• (Navbar stays unchanged - none saved in this backup)\n\n`) +
+        `Backup: "${backup.name}" (${backup.pageCount} pages)\n\n` +
+        `Any pages${backup.hasNavbar ? "/menu items" : ""} added after this backup will be removed.\n\nContinue?`,
     );
     if (!ok) return;
 
@@ -80,8 +87,7 @@ export default function BackupManager() {
       const json = await res.json();
       if (!json.success) throw new Error(json.message);
 
-      toast.success(json.message || "Restored successfully!");
-      // Reload so admin UI shows restored pages
+      toast.success(json.message || "Restored successfully");
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
       console.error(err);
@@ -90,10 +96,9 @@ export default function BackupManager() {
     }
   };
 
-  /* ── Delete backup record ── */
   const handleDelete = async (backup) => {
     const ok = window.confirm(
-      `Delete backup "${backup.name}"?\nThis only deletes the backup, not your live pages.`,
+      `Delete backup "${backup.name}"?\n\nThis only deletes the backup snapshot.\nLive pages and navbar stay safe.`,
     );
     if (!ok) return;
 
@@ -130,7 +135,6 @@ export default function BackupManager() {
 
   return (
     <div className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
-      {/* Header */}
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
           <Database size={20} />
@@ -140,13 +144,14 @@ export default function BackupManager() {
             Database Backup
           </h2>
           <p className="mt-0.5 text-sm text-[var(--muted)]">
-            Save all pages into the database. Restore anytime without losing
-            your real data.
+            Saves <strong>all pages</strong> and the{" "}
+            <strong>full navbar</strong> into the database. Restore puts both
+            back exactly — extra pages and menu items added later are removed.
           </p>
         </div>
       </div>
 
-      {/* Create form */}
+      {/* Create */}
       <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-4">
         <div>
           <label className="mb-1.5 block text-sm font-medium">
@@ -169,7 +174,7 @@ export default function BackupManager() {
             type="text"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="e.g. Before testing News block"
+            placeholder="e.g. Before testing new page"
             maxLength={240}
             className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)]"
           />
@@ -182,8 +187,8 @@ export default function BackupManager() {
         >
           {saving ? (
             <>
-              <LoaderCircle size={16} className="animate-spin" /> Saving to
-              DB...
+              <LoaderCircle size={16} className="animate-spin" /> Saving pages +
+              navbar...
             </>
           ) : (
             <>
@@ -205,7 +210,7 @@ export default function BackupManager() {
           </div>
         ) : backups.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[var(--border)] px-4 py-8 text-center text-sm text-[var(--muted)]">
-            No backups yet. Click &quot;Save Backup to Database&quot; first.
+            No backups yet. Save one before you test.
           </div>
         ) : (
           <div className="space-y-2">
@@ -221,6 +226,7 @@ export default function BackupManager() {
                   <p className="mt-0.5 text-xs text-[var(--muted)]">
                     {formatDate(b.createdAt)} · {b.pageCount} page
                     {b.pageCount === 1 ? "" : "s"}
+                    {b.hasNavbar ? " + navbar" : " · ⚠ no navbar saved"}
                     {b.note ? ` · ${b.note}` : ""}
                   </p>
                 </div>

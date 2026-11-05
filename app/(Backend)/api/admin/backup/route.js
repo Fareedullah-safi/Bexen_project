@@ -1,73 +1,126 @@
-import dbConnect from "@/Lib/mongoDB";
+import connectMongo from "@/Lib/mongoDB";
 import Backup from "@/Models/Backup/Backup";
+import NavMenu from "@/Models/NavBar/NavBar";
 import Page from "@/Models/Pages/Page";
 import { NextResponse } from "next/server";
 
-/* ── GET: list all backups (newest first) ── */
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET(req) {
   try {
-    await dbConnect();
+    await connectMongo();
+
     const backups = await Backup.find({})
-      .select("name pageCount note createdAt")
+      .select("_id name note pageCount navbar createdAt")
       .sort({ createdAt: -1 })
       .lean();
 
-    return NextResponse.json({ success: true, data: backups });
+    const formatted = backups.map((b) => ({
+      _id: b._id.toString(),
+      name: b.name,
+      note: b.note,
+      pageCount: b.pageCount || 0,
+      hasNavbar: !!b.navbar,
+      createdAt: b.createdAt,
+    }));
+
+    return NextResponse.json({
+      success: true,
+      backups: formatted,
+      data: formatted, // alias so either `json.backups` or `json.data` works
+    });
   } catch (error) {
-    console.error("Backup list error:", error);
+    console.error("[Backup GET Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message },
+      { success: false, message: error.message, error: error.message },
       { status: 500 },
     );
   }
 }
 
-/* ── POST: create a new backup OR restore / delete ── */
 export async function POST(req) {
   try {
-    await dbConnect();
-    const body = await req.json();
-    const { action } = body;
+    await connectMongo();
 
-    /* ───────── CREATE BACKUP ───────── */
-    if (action === "create") {
-      const pages = await Page.find({}).lean();
-
-      // Strip mongoose internals so restore stays clean
-      const cleanPages = pages.map((p) => {
-        const { __v, ...rest } = p;
-        return rest;
-      });
-
-      const backup = await Backup.create({
-        name: body.name || `Backup ${new Date().toLocaleString()}`,
-        note: body.note || "",
-        pages: cleanPages,
-        pageCount: cleanPages.length,
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: "Backup saved to database",
-        data: {
-          _id: backup._id,
-          name: backup.name,
-          pageCount: backup.pageCount,
-          createdAt: backup.createdAt,
-        },
-      });
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, message: "Invalid JSON body" },
+        { status: 400 },
+      );
     }
 
-    /* ───────── RESTORE BACKUP ───────── */
-    if (action === "restore") {
-      if (!body.backupId) {
+    const { action, name, note, backupId } = body || {};
+
+    // ==========================================
+    // STEP 1: CREATE BACKUP (Pages First, then Navbar)
+    // ==========================================
+    if (action === "create") {
+      if (!name || !name.trim()) {
         return NextResponse.json(
-          { success: false, message: "backupId is required" },
+          { success: false, message: "Backup name is required" },
           { status: 400 },
         );
       }
 
-      const backup = await Backup.findById(body.backupId).lean();
+      // 1A. Fetch and serialize Pages cleanly
+      const rawPages = await Page.find({}).lean();
+      const cleanPages = JSON.parse(JSON.stringify(rawPages));
+
+      // 1B. Fetch and serialize Navbar cleanly
+      const rawNav = await NavMenu.findOne({}).lean();
+      let cleanNav = null;
+      if (rawNav) {
+        cleanNav = JSON.parse(JSON.stringify(rawNav));
+        delete cleanNav._id;
+        delete cleanNav.__v;
+        delete cleanNav.createdAt;
+        delete cleanNav.updatedAt;
+      } else {
+        console.warn(
+          "[Backup Create]: NavMenu.findOne({}) returned null - no navbar found in the database",
+        );
+      }
+
+      // 1C. Store into Backup model in MongoDB
+      const newBackup = await Backup.create({
+        name: name.trim(),
+        note: note ? note.trim() : "",
+        pages: cleanPages,
+        pageCount: cleanPages.length,
+        navbar: cleanNav,
+      });
+
+      const navbarSaved = !!newBackup.navbar;
+
+      console.log(
+        `[Backup Created]: Pages count=${cleanPages.length}, Navbar found=${!!cleanNav}, Navbar saved=${navbarSaved}`,
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: navbarSaved
+          ? `Backup created (${cleanPages.length} pages + navbar)`
+          : `Backup created (${cleanPages.length} pages, but NO navbar was saved)`,
+        navbarSaved,
+        backup: newBackup,
+      });
+    }
+
+    // ==========================================
+    // STEP 2: RESTORE BACKUP (Pages First, then Navbar)
+    // ==========================================
+    if (action === "restore") {
+      if (!backupId) {
+        return NextResponse.json(
+          { success: false, message: "Backup ID required" },
+          { status: 400 },
+        );
+      }
+
+      const backup = await Backup.findById(backupId).lean();
       if (!backup) {
         return NextResponse.json(
           { success: false, message: "Backup not found" },
@@ -75,45 +128,105 @@ export async function POST(req) {
         );
       }
 
-      // 1. Wipe current pages
+      // --- 2A. RESTORE PAGES FIRST ---
       await Page.deleteMany({});
-
-      // 2. Insert pages from backup (keep original _id)
-      if (backup.pages?.length) {
-        await Page.insertMany(backup.pages, { ordered: false });
+      if (backup.pages && backup.pages.length > 0) {
+        const cleanPagesToInsert = JSON.parse(JSON.stringify(backup.pages));
+        await Page.insertMany(cleanPagesToInsert);
       }
+
+      // --- 2B. RESTORE NAVBAR SAFELY SECOND ---
+      let navbarRestored = false;
+      if (backup.navbar) {
+        const cleanNavToInsert = JSON.parse(JSON.stringify(backup.navbar));
+        delete cleanNavToInsert._id;
+        delete cleanNavToInsert.__v;
+        delete cleanNavToInsert.createdAt;
+        delete cleanNavToInsert.updatedAt;
+
+        await NavMenu.deleteMany({});
+        await NavMenu.create(cleanNavToInsert);
+        navbarRestored = true;
+      }
+
+      console.log(
+        `[Backup Restored]: Pages=${backup.pages?.length || 0}, Navbar=${navbarRestored}`,
+      );
 
       return NextResponse.json({
         success: true,
-        message: `Restored ${backup.pageCount} page(s) from "${backup.name}"`,
+        message: navbarRestored
+          ? `Restored ${backup.pages?.length || 0} pages and navbar successfully`
+          : `Restored ${backup.pages?.length || 0} pages (this backup has no navbar, so the navbar was left unchanged)`,
+        details: {
+          pagesRestored: backup.pages?.length || 0,
+          navbarRestored,
+        },
       });
     }
 
-    /* ───────── DELETE BACKUP ───────── */
+    // ==========================================
+    // STEP 3: DELETE BACKUP
+    // ==========================================
     if (action === "delete") {
-      if (!body.backupId) {
+      if (!backupId) {
         return NextResponse.json(
-          { success: false, message: "backupId is required" },
+          { success: false, message: "Backup ID required" },
           { status: 400 },
         );
       }
 
-      await Backup.findByIdAndDelete(body.backupId);
+      await Backup.findByIdAndDelete(backupId);
+      return NextResponse.json({
+        success: true,
+        message: "Backup deleted successfully",
+      });
+    }
+
+    // ==========================================
+    // STEP 4: EMERGENCY NAVBAR REBUILD FROM PAGES
+    // ==========================================
+    if (action === "sync-navbar") {
+      const pages = await Page.find({
+        showInNav: { $ne: false },
+        status: "published",
+      }).lean();
+
+      const newItems = pages.map((page) => ({
+        id: `nav_${page._id.toString()}`,
+        href: page.slug === "home" ? "/" : `/${page.slug}`,
+        hasDropdown: false,
+        showInFooter: false,
+        translations: {
+          en: { label: page.title?.en || "" },
+          ps: { label: page.title?.ps || "" },
+          fa: { label: page.title?.fa || "" },
+        },
+        children: [],
+      }));
+
+      const existingNav = await NavMenu.findOne({});
+      if (existingNav) {
+        existingNav.items = newItems;
+        await existingNav.save();
+      } else {
+        await NavMenu.create({ items: newItems });
+      }
 
       return NextResponse.json({
         success: true,
-        message: "Backup deleted",
+        message: "Navbar rebuilt successfully from live pages",
       });
     }
 
     return NextResponse.json(
-      { success: false, message: "Unknown action" },
+      { success: false, message: "Invalid action" },
       { status: 400 },
     );
   } catch (error) {
-    console.error("Backup POST error:", error);
+    console.error("[Backup POST Error]:", error);
     return NextResponse.json(
-      { success: false, message: error.message },
+      { success: false, message: error.message || "Server error" },
       { status: 500 },
     );
   }
