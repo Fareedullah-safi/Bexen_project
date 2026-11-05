@@ -18,7 +18,7 @@ export default function BackupManager() {
       const res = await fetch("/api/admin/backup", { cache: "no-store" });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Failed to load");
-      setBackups(json.backups || json.data || []);
+      setBackups(json.backups || []);
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Failed to load backups");
@@ -31,26 +31,28 @@ export default function BackupManager() {
     fetchBackups();
   }, [fetchBackups]);
 
+  const post = async (payload) => {
+    const res = await fetch("/api/admin/backup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  };
+
   const handleCreate = async () => {
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/backup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "create",
-          name: name.trim() || `Backup ${new Date().toLocaleString()}`,
-          note: note.trim(),
-        }),
+      const json = await post({
+        action: "create",
+        name: name.trim() || `Backup ${new Date().toLocaleString()}`,
+        note: note.trim(),
       });
-      const json = await res.json();
       if (!json.success) throw new Error(json.message);
 
-      if (json.navbarSaved === false) {
-        toast.warning(json.message || "Backup saved, but no navbar was found");
-      } else {
-        toast.success(json.message || "Backup saved");
-      }
+      if (json.navbarSaved === false) toast.warning(json.message);
+      else toast.success(json.message || "Backup saved");
+
       setName("");
       setNote("");
       fetchBackups();
@@ -70,21 +72,13 @@ export default function BackupManager() {
           ? `• Full navbar menu\n\n`
           : `• (Navbar stays unchanged - none saved in this backup)\n\n`) +
         `Backup: "${backup.name}" (${backup.pageCount} pages)\n\n` +
-        `Any pages${backup.hasNavbar ? "/menu items" : ""} added after this backup will be removed.\n\nContinue?`,
+        `Your current content is saved automatically first, so you can undo this.\n\nContinue?`,
     );
     if (!ok) return;
 
     setRestoringId(backup._id);
     try {
-      const res = await fetch("/api/admin/backup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "restore",
-          backupId: backup._id,
-        }),
-      });
-      const json = await res.json();
+      const json = await post({ action: "restore", backupId: backup._id });
       if (!json.success) throw new Error(json.message);
 
       toast.success(json.message || "Restored successfully");
@@ -93,6 +87,7 @@ export default function BackupManager() {
       console.error(err);
       toast.error(err.message || "Restore failed");
       setRestoringId(null);
+      fetchBackups();
     }
   };
 
@@ -104,15 +99,7 @@ export default function BackupManager() {
 
     setDeletingId(backup._id);
     try {
-      const res = await fetch("/api/admin/backup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "delete",
-          backupId: backup._id,
-        }),
-      });
-      const json = await res.json();
+      const json = await post({ action: "delete", backupId: backup._id });
       if (!json.success) throw new Error(json.message);
 
       toast.success("Backup deleted");
@@ -147,6 +134,7 @@ export default function BackupManager() {
             Saves <strong>all pages</strong> and the{" "}
             <strong>full navbar</strong> into the database. Restore puts both
             back exactly — extra pages and menu items added later are removed.
+            Your current content is saved automatically before every restore.
           </p>
         </div>
       </div>
@@ -227,6 +215,7 @@ export default function BackupManager() {
                     {formatDate(b.createdAt)} · {b.pageCount} page
                     {b.pageCount === 1 ? "" : "s"}
                     {b.hasNavbar ? " + navbar" : " · ⚠ no navbar saved"}
+                    {b.kind === "auto" ? " · automatic" : ""}
                     {b.note ? ` · ${b.note}` : ""}
                   </p>
                 </div>

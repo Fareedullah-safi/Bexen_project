@@ -1,44 +1,104 @@
+import mongoose from "mongoose";
+import { NextResponse } from "next/server";
+
 import connectMongo from "@/Lib/mongoDB";
 import Backup from "@/Models/Backup/Backup";
 import NavMenu from "@/Models/NavBar/NavBar";
 import Page from "@/Models/Pages/Page";
-import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req) {
+const MAX_AUTO_BACKUPS = 5; // how many automatic "before restore" backups to keep
+
+const reply = (body, status = 200) => NextResponse.json(body, { status });
+const toPlain = (doc) => JSON.parse(JSON.stringify(doc));
+
+function cleanNavbar(nav) {
+  if (!nav) return null;
+  const copy = toPlain(nav);
+  delete copy._id;
+  delete copy.__v;
+  delete copy.createdAt;
+  delete copy.updatedAt;
+  return copy;
+}
+
+// Reads the current live pages + navbar
+async function readLiveSite() {
+  const pages = toPlain(await Page.find({}).lean());
+  const navbar = cleanNavbar(await NavMenu.findOne({}).lean());
+  return { pages, navbar };
+}
+
+// Saves the current live site as a backup
+async function saveBackup({ name, note = "", kind = "manual" }) {
+  const { pages, navbar } = await readLiveSite();
+
+  const backup = await Backup.create({
+    name,
+    note,
+    kind,
+    pages,
+    pageCount: pages.length,
+    navbar,
+  });
+
+  if (kind === "auto") {
+    const old = await Backup.find({ kind: "auto" })
+      .sort({ createdAt: -1 })
+      .skip(MAX_AUTO_BACKUPS)
+      .select("_id")
+      .lean();
+    if (old.length) {
+      await Backup.deleteMany({ _id: { $in: old.map((b) => b._id) } });
+    }
+  }
+
+  return { backup, pages, navbar };
+}
+
+// Puts pages (and navbar, if there is one) onto the live site
+async function applyData({ pages, navbar }) {
+  await Page.deleteMany({});
+  if (pages?.length) await Page.insertMany(pages);
+
+  const nav = cleanNavbar(navbar);
+  if (nav) {
+    await NavMenu.deleteMany({});
+    await NavMenu.create(nav);
+  }
+}
+
+export async function GET() {
+  // NOTE: protect /api/admin/* with your admin login (middleware).
   try {
     await connectMongo();
 
     const backups = await Backup.find({})
-      .select("_id name note pageCount navbar createdAt")
+      .select("-pages")
       .sort({ createdAt: -1 })
       .lean();
 
-    const formatted = backups.map((b) => ({
-      _id: b._id.toString(),
-      name: b.name,
-      note: b.note,
-      pageCount: b.pageCount || 0,
-      hasNavbar: !!b.navbar,
-      createdAt: b.createdAt,
-    }));
-
-    return NextResponse.json({
+    return reply({
       success: true,
-      backups: formatted,
-      data: formatted, // alias so either `json.backups` or `json.data` works
+      backups: backups.map((b) => ({
+        _id: b._id.toString(),
+        name: b.name,
+        note: b.note || "",
+        kind: b.kind || "manual",
+        pageCount: b.pageCount || 0,
+        hasNavbar: !!b.navbar,
+        createdAt: b.createdAt,
+      })),
     });
   } catch (error) {
     console.error("[Backup GET Error]:", error);
-    return NextResponse.json(
-      { success: false, message: error.message, error: error.message },
-      { status: 500 },
-    );
+    return reply({ success: false, message: "Server error" }, 500);
   }
 }
 
 export async function POST(req) {
+  // NOTE: protect /api/admin/* with your admin login (middleware).
   try {
     await connectMongo();
 
@@ -46,188 +106,132 @@ export async function POST(req) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json(
-        { success: false, message: "Invalid JSON body" },
-        { status: 400 },
-      );
+      return reply({ success: false, message: "Invalid JSON body" }, 400);
     }
 
     const { action, name, note, backupId } = body || {};
 
-    // ==========================================
-    // STEP 1: CREATE BACKUP (Pages First, then Navbar)
-    // ==========================================
+    // ---------- CREATE ----------
     if (action === "create") {
       if (!name || !name.trim()) {
-        return NextResponse.json(
+        return reply(
           { success: false, message: "Backup name is required" },
-          { status: 400 },
+          400,
         );
       }
 
-      // 1A. Fetch and serialize Pages cleanly
-      const rawPages = await Page.find({}).lean();
-      const cleanPages = JSON.parse(JSON.stringify(rawPages));
-
-      // 1B. Fetch and serialize Navbar cleanly
-      const rawNav = await NavMenu.findOne({}).lean();
-      let cleanNav = null;
-      if (rawNav) {
-        cleanNav = JSON.parse(JSON.stringify(rawNav));
-        delete cleanNav._id;
-        delete cleanNav.__v;
-        delete cleanNav.createdAt;
-        delete cleanNav.updatedAt;
-      } else {
-        console.warn(
-          "[Backup Create]: NavMenu.findOne({}) returned null - no navbar found in the database",
-        );
-      }
-
-      // 1C. Store into Backup model in MongoDB
-      const newBackup = await Backup.create({
+      const { backup, pages } = await saveBackup({
         name: name.trim(),
         note: note ? note.trim() : "",
-        pages: cleanPages,
-        pageCount: cleanPages.length,
-        navbar: cleanNav,
       });
 
-      const navbarSaved = !!newBackup.navbar;
-
+      const navbarSaved = !!backup.navbar;
       console.log(
-        `[Backup Created]: Pages count=${cleanPages.length}, Navbar found=${!!cleanNav}, Navbar saved=${navbarSaved}`,
+        `[Backup Created]: pages=${pages.length}, navbar=${navbarSaved}`,
       );
 
-      return NextResponse.json({
+      return reply({
         success: true,
-        message: navbarSaved
-          ? `Backup created (${cleanPages.length} pages + navbar)`
-          : `Backup created (${cleanPages.length} pages, but NO navbar was saved)`,
         navbarSaved,
-        backup: newBackup,
+        message: navbarSaved
+          ? `Backup created (${pages.length} pages + navbar)`
+          : `Backup created (${pages.length} pages, but NO navbar was found in the database)`,
       });
     }
 
-    // ==========================================
-    // STEP 2: RESTORE BACKUP (Pages First, then Navbar)
-    // ==========================================
+    // ---------- RESTORE ----------
     if (action === "restore") {
-      if (!backupId) {
-        return NextResponse.json(
-          { success: false, message: "Backup ID required" },
-          { status: 400 },
+      if (!mongoose.isValidObjectId(backupId)) {
+        return reply(
+          { success: false, message: "Valid backup ID required" },
+          400,
         );
       }
 
       const backup = await Backup.findById(backupId).lean();
       if (!backup) {
-        return NextResponse.json(
-          { success: false, message: "Backup not found" },
-          { status: 404 },
+        return reply({ success: false, message: "Backup not found" }, 404);
+      }
+      if (!backup.pages?.length) {
+        return reply(
+          {
+            success: false,
+            message:
+              "This backup has no pages, so restoring it would empty your site. Nothing was changed.",
+          },
+          422,
         );
       }
 
-      // --- 2A. RESTORE PAGES FIRST ---
-      await Page.deleteMany({});
-      if (backup.pages && backup.pages.length > 0) {
-        const cleanPagesToInsert = JSON.parse(JSON.stringify(backup.pages));
-        await Page.insertMany(cleanPagesToInsert);
+      // 1. Save the current site first (if this fails, nothing is touched)
+      const safety = await saveBackup({
+        name: `Auto: before restoring "${backup.name}"`.slice(0, 120),
+        note: "Created automatically before a restore",
+        kind: "auto",
+      });
+
+      // 2. Restore. If anything fails, put the old site back.
+      try {
+        await applyData({ pages: backup.pages, navbar: backup.navbar });
+      } catch (error) {
+        console.error("[Backup Restore Error]:", error);
+        try {
+          await applyData(safety);
+          return reply(
+            {
+              success: false,
+              message:
+                "Restore failed, but your site was put back exactly as it was. Nothing was lost.",
+            },
+            500,
+          );
+        } catch (rollbackError) {
+          console.error("[Backup Rollback Error]:", rollbackError);
+          return reply(
+            {
+              success: false,
+              message: `Restore failed and the automatic rollback failed too. Restore the backup named "${safety.backup.name}" from the list now.`,
+            },
+            500,
+          );
+        }
       }
 
-      // --- 2B. RESTORE NAVBAR SAFELY SECOND ---
-      let navbarRestored = false;
-      if (backup.navbar) {
-        const cleanNavToInsert = JSON.parse(JSON.stringify(backup.navbar));
-        delete cleanNavToInsert._id;
-        delete cleanNavToInsert.__v;
-        delete cleanNavToInsert.createdAt;
-        delete cleanNavToInsert.updatedAt;
-
-        await NavMenu.deleteMany({});
-        await NavMenu.create(cleanNavToInsert);
-        navbarRestored = true;
-      }
-
+      const navbarRestored = !!backup.navbar;
       console.log(
-        `[Backup Restored]: Pages=${backup.pages?.length || 0}, Navbar=${navbarRestored}`,
+        `[Backup Restored]: pages=${backup.pages.length}, navbar=${navbarRestored}`,
       );
 
-      return NextResponse.json({
+      return reply({
         success: true,
         message: navbarRestored
-          ? `Restored ${backup.pages?.length || 0} pages and navbar successfully`
-          : `Restored ${backup.pages?.length || 0} pages (this backup has no navbar, so the navbar was left unchanged)`,
-        details: {
-          pagesRestored: backup.pages?.length || 0,
-          navbarRestored,
-        },
+          ? `Restored ${backup.pages.length} pages and the navbar. Your previous content was saved as an automatic backup.`
+          : `Restored ${backup.pages.length} pages. This backup has no navbar, so the navbar was left unchanged.`,
       });
     }
 
-    // ==========================================
-    // STEP 3: DELETE BACKUP
-    // ==========================================
+    // ---------- DELETE ----------
     if (action === "delete") {
-      if (!backupId) {
-        return NextResponse.json(
-          { success: false, message: "Backup ID required" },
-          { status: 400 },
+      if (!mongoose.isValidObjectId(backupId)) {
+        return reply(
+          { success: false, message: "Valid backup ID required" },
+          400,
         );
       }
 
-      await Backup.findByIdAndDelete(backupId);
-      return NextResponse.json({
-        success: true,
-        message: "Backup deleted successfully",
-      });
-    }
-
-    // ==========================================
-    // STEP 4: EMERGENCY NAVBAR REBUILD FROM PAGES
-    // ==========================================
-    if (action === "sync-navbar") {
-      const pages = await Page.find({
-        showInNav: { $ne: false },
-        status: "published",
-      }).lean();
-
-      const newItems = pages.map((page) => ({
-        id: `nav_${page._id.toString()}`,
-        href: page.slug === "home" ? "/" : `/${page.slug}`,
-        hasDropdown: false,
-        showInFooter: false,
-        translations: {
-          en: { label: page.title?.en || "" },
-          ps: { label: page.title?.ps || "" },
-          fa: { label: page.title?.fa || "" },
-        },
-        children: [],
-      }));
-
-      const existingNav = await NavMenu.findOne({});
-      if (existingNav) {
-        existingNav.items = newItems;
-        await existingNav.save();
-      } else {
-        await NavMenu.create({ items: newItems });
+      const deleted = await Backup.findByIdAndDelete(backupId);
+      if (!deleted) {
+        return reply({ success: false, message: "Backup not found" }, 404);
       }
-
-      return NextResponse.json({
-        success: true,
-        message: "Navbar rebuilt successfully from live pages",
-      });
+      return reply({ success: true, message: "Backup deleted successfully" });
     }
 
-    return NextResponse.json(
-      { success: false, message: "Invalid action" },
-      { status: 400 },
-    );
+    return reply({ success: false, message: "Invalid action" }, 400);
   } catch (error) {
     console.error("[Backup POST Error]:", error);
-    return NextResponse.json(
-      { success: false, message: error.message || "Server error" },
-      { status: 500 },
+    return reply(
+      { success: false, message: "Server error. Check the server logs." },
+      500,
     );
   }
 }
