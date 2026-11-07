@@ -1,7 +1,7 @@
 export default {
   type: "slider",
   name: "Hero Slider",
-  icon: "🖼️",
+  icon: "🖼️" ,
   description: "Full-width image slider with captions and buttons.",
   defaultData: {
     slides: [
