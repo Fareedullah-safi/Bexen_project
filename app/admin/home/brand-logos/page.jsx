@@ -2,9 +2,67 @@
 
 import Spinner from "@/app/Components/Admin/Spinner";
 import axios from "axios";
-import { ImagePlus, Link, Trash2Icon, Upload } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ImagePlus, Trash2Icon, Upload, X } from "lucide-react";
+import Script from "next/script";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
+// ==========================================
+// PERMISSION HELPER
+// ==========================================
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+// ==========================================
+// CLOUDINARY WIDGET THEME
+// ==========================================
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -19,13 +77,8 @@ const EMPTY_TITLES = {
 };
 
 export default function BrandLogos() {
-  const fileRefs = useRef({});
-  const previewUrls = useRef(new Set());
-
-  // Only one logo can be added through this form.
-  const [logos, setLogos] = useState([
-    { id: 1, preview: "", file: null, url: "" },
-  ]);
+  // All picked (unsaved) logos from Cloudinary
+  const [pickedLogos, setPickedLogos] = useState([]);
 
   const [titleDrafts, setTitleDrafts] = useState(EMPTY_TITLES);
   const [titleLanguage, setTitleLanguage] = useState("en");
@@ -35,116 +88,44 @@ export default function BrandLogos() {
   const [isFetching, setIsFetching] = useState(true);
   const [isChangingTitle, setIsChangingTitle] = useState(false);
   const [isFetchingTitle, setIsFetchingTitle] = useState(true);
-  const [imageErrors, setImageErrors] = useState({});
 
-  const revokePreview = (url) => {
-    if (url && previewUrls.current.has(url)) {
-      URL.revokeObjectURL(url);
-      previewUrls.current.delete(url);
-    }
-  };
+  // Theme + permission-check state
+  const [theme, setTheme] = useState("light");
+  const [checking, setChecking] = useState(false);
+  const [widgetReady, setWidgetReady] = useState(false);
 
+  // Theme watcher
   useEffect(() => {
-    return () => {
-      previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
-      previewUrls.current.clear();
+    const update = () => {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
     };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
   }, []);
 
-  // Validate and select the single logo image.
-  const handleLogo = (id, e) => {
-    const file = e.target.files?.[0];
-
-    if (!file) return;
-
-    if (
-      !["image/jpeg", "image/png", "image/webp", "image/svg+xml"].includes(
-        file.type,
-      )
-    ) {
-      toast.error("Only JPG, PNG, WEBP, and SVG images are allowed");
-      e.target.value = "";
-      return;
+  // Remove one picked (unsaved) logo by its publicId
+  const handleRemovePicked = (publicId) => {
+    const filtered = [];
+    for (let i = 0; i < pickedLogos.length; i++) {
+      if (pickedLogos[i].publicId !== publicId) {
+        filtered.push(pickedLogos[i]);
+      }
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be 5 MB or smaller");
-      e.target.value = "";
-      return;
-    }
-
-    const currentLogo = logos.find((logo) => logo.id === id);
-
-    if (currentLogo?.url) {
-      e.target.value = "";
-      return;
-    }
-
-    const preview = URL.createObjectURL(file);
-    previewUrls.current.add(preview);
-
-    setLogos((prev) =>
-      prev.map((logo) => {
-        if (logo.id !== id) return logo;
-
-        revokePreview(logo.preview);
-
-        return {
-          ...logo,
-          file,
-          url: "",
-          preview,
-        };
-      }),
-    );
-
-    setImageErrors((prev) => ({
-      ...prev,
-      [id]: false,
-    }));
-
-    e.target.value = "";
+    setPickedLogos(filtered);
   };
 
-  const handleUrl = (id, e) => {
-    const url = e.target.value;
-    const currentLogo = logos.find((logo) => logo.id === id);
-
-    if (currentLogo?.file) return;
-
-    revokePreview(currentLogo?.preview);
-
-    setLogos((prev) =>
-      prev.map((logo) =>
-        logo.id === id ? { ...logo, file: null, url, preview: url } : logo,
-      ),
-    );
-
-    setImageErrors((prev) => ({
-      ...prev,
-      [id]: false,
-    }));
-  };
-
-  const handleRemove = (id) => {
-    const currentLogo = logos.find((logo) => logo.id === id);
-
-    revokePreview(currentLogo?.preview);
-
-    setLogos((prev) =>
-      prev.map((logo) =>
-        logo.id === id ? { ...logo, file: null, url: "", preview: "" } : logo,
-      ),
-    );
-
-    setImageErrors((prev) => ({
-      ...prev,
-      [id]: false,
-    }));
-
-    if (fileRefs.current[id]) {
-      fileRefs.current[id].value = "";
-    }
+  // Clear all picked (unsaved) logos
+  const handleClearAll = () => {
+    setPickedLogos([]);
   };
 
   const allBoxData = async () => {
@@ -210,59 +191,95 @@ export default function BrandLogos() {
     }
   };
 
-  // Save exactly one image.
-  const handleSubmit = async () => {
-    if (isSaving) return;
-
-    const logo = logos[0];
-
-    if (!logo?.file && !logo?.url?.trim()) {
-      toast.error("Please upload one brand logo or enter an image URL");
+  // Open the Cloudinary widget (with permission check + theme)
+  const openCloudinary = async () => {
+    if (!widgetReady || !window.cloudinary) {
+      toast.error("Cloudinary is still loading...");
       return;
     }
 
-    if (logo.url.trim()) {
-      try {
-        const parsedUrl = new URL(logo.url.trim());
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-          toast.error("Please enter a valid HTTP or HTTPS image URL");
+    if (!cloudName || !uploadPreset) {
+      toast.error("Cloudinary configuration is missing.");
+      return;
+    }
+
+    // Permission check BEFORE opening widget
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
+    const widget = window.cloudinary.createUploadWidget(
+      {
+        cloudName,
+        uploadPreset,
+        folder: "bexon/brand-logos",
+        multiple: true,
+        maxFileSize: 5 * 1024 * 1024,
+        sources: ["local", "url", "camera"],
+        clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "svg"],
+        styles: cloudinaryStyles(theme),
+      },
+      (err, result) => {
+        if (err) {
+          toast.error("Upload failed");
           return;
         }
-      } catch {
-        toast.error("Please enter a valid image URL");
-        return;
-      }
+        if (result?.event === "success") {
+          // Add each successfully uploaded image to the picked list
+          const newLogo = {
+            url: result.info.secure_url,
+            publicId: result.info.public_id,
+          };
+
+          setPickedLogos((prev) => {
+            // Avoid duplicates (same publicId)
+            for (let i = 0; i < prev.length; i++) {
+              if (prev[i].publicId === newLogo.publicId) {
+                return prev;
+              }
+            }
+            return [...prev, newLogo];
+          });
+
+          toast.success("Logo added. Upload more or click Save.");
+        }
+      },
+    );
+
+    widget.open();
+  };
+
+  // Save all picked logos to the database
+  const handleSubmit = async () => {
+    if (isSaving) return;
+
+    if (pickedLogos.length === 0) {
+      toast.error("Please upload at least one brand logo first.");
+      return;
     }
 
     try {
       setIsSaving(true);
 
-      const formData = new FormData();
-
-      // The API receives only one logo ID and one image.
-      formData.append("ids", "1");
-
-      if (logo.file) {
-        formData.append("file_1", logo.file);
-      }
-
-      formData.append("url_1", logo.url || "");
-
-      const { data: uploadResult } = await axios.post(
-        "/api/homepage/brand-logos/upload",
-        formData,
-      );
-
-      if (!uploadResult?.success) {
-        throw new Error(uploadResult?.message || "Logo upload failed");
+      // Build the logos array for the API
+      const logosPayload = [];
+      for (let i = 0; i < pickedLogos.length; i++) {
+        logosPayload.push({
+          url: pickedLogos[i].url,
+          publicId: pickedLogos[i].publicId,
+        });
       }
 
       const { data: saveResult } = await axios.post(
         "/api/homepage/brand-logos",
-        {
-          logos: uploadResult.logos,
-        },
+        { logos: logosPayload },
       );
 
       if (!saveResult?.success) {
@@ -271,17 +288,9 @@ export default function BrandLogos() {
         );
       }
 
-      Object.values(fileRefs.current).forEach((input) => {
-        if (input) input.value = "";
-      });
+      setPickedLogos([]);
 
-      logos.forEach((item) => revokePreview(item.preview));
-
-      setLogos([{ id: 1, preview: "", file: null, url: "" }]);
-
-      setImageErrors({});
-
-      toast.success("Brand logo saved successfully");
+      toast.success("All brand logos saved successfully");
 
       await allBoxData();
     } catch (error) {
@@ -417,6 +426,14 @@ export default function BrandLogos() {
 
   return (
     <div className="w-full bg-[var(--background)] text-[var(--foreground)]">
+      {/* Cloudinary script */}
+      <Script
+        src="https://upload-widget.cloudinary.com/latest/global/all.js"
+        strategy="lazyOnload"
+        onReady={() => setWidgetReady(true)}
+        onError={() => toast.error("Unable to load Cloudinary.")}
+      />
+
       <div className="mb-10 flex items-center gap-4">
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
           <ImagePlus size={27} />
@@ -426,7 +443,7 @@ export default function BrandLogos() {
           <h1 className="text-3xl font-bold tracking-tight">Brand Logos</h1>
 
           <p className="mt-1 text-base text-[var(--muted)]">
-            Manage the brand logo displayed on your homepage.
+            Manage the brand logos displayed on your homepage.
           </p>
         </div>
       </div>
@@ -451,8 +468,6 @@ export default function BrandLogos() {
             >
               {LANGUAGES.map((language) => {
                 const isActive = titleLanguage === language.code;
-
-                const isRTL = titleLanguage === "ps" || titleLanguage === "fa";
 
                 return (
                   <button
@@ -514,140 +529,109 @@ export default function BrandLogos() {
           </button>
         </div>
 
-        {/* Single-logo editor */}
+        {/* Logo uploader (Cloudinary, unlimited) */}
         <div className="p-7 sm:p-8">
           <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-bold">Brand Logo</h2>
+              <h2 className="text-lg font-bold">Brand Logos</h2>
 
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Add one company logo. Only one image is allowed in this form.
+                Upload as many brand logos as you need via Cloudinary.
               </p>
             </div>
 
             <span className="w-fit rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent)]">
-              One logo allowed
+              {pickedLogos.length} picked
             </span>
           </div>
 
-          <div className="space-y-5">
-            {logos.map((logo) => (
-              <div
-                key={logo.id}
-                className="relative flex flex-col gap-6 rounded-3xl border border-[var(--border)] bg-[var(--background)] p-5 transition hover:border-[var(--accent)]/40 hover:shadow-lg sm:p-6 lg:flex-row lg:items-center"
-              >
-                {logo.preview && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(logo.id)}
-                    disabled={isSaving}
-                    title="Remove logo"
-                    className="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Trash2Icon size={17} />
-                  </button>
-                )}
-
-                <div className="flex h-36 w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 sm:h-40 lg:w-56">
-                  {logo.preview && !imageErrors[logo.id] ? (
-                    <img
-                      src={logo.preview}
-                      alt="Brand logo preview"
-                      className="h-full w-full object-contain"
-                      onError={() =>
-                        setImageErrors((prev) => ({
-                          ...prev,
-                          [logo.id]: true,
-                        }))
-                      }
-                      onLoad={() =>
-                        setImageErrors((prev) => ({
-                          ...prev,
-                          [logo.id]: false,
-                        }))
-                      }
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-[var(--muted)]">
-                      {imageErrors[logo.id] ? (
-                        <p className="text-center text-sm">
-                          Image unavailable. Check the URL.
-                        </p>
-                      ) : (
-                        <>
-                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
-                            <ImagePlus size={29} />
-                          </div>
-
-                          <span className="mt-3 text-sm font-medium">
-                            Brand Logo
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1 pr-0 lg:pr-12">
-                  <div className="mb-4">
-                    <p className="text-lg font-bold">Brand Logo</p>
-
-                    <p className="mt-1 text-sm text-[var(--muted)]">
-                      Required brand logo · Maximum 5 MB
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <label
-                      htmlFor={`logo-${logo.id}`}
-                      className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-semibold transition ${
-                        isSaving || logo.url
-                          ? "cursor-not-allowed border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
-                          : "cursor-pointer bg-[var(--foreground)] text-[var(--background)] hover:bg-[var(--accent)] hover:text-white"
-                      }`}
-                    >
-                      <Upload size={18} />
-                      Upload Logo
-                    </label>
-
-                    <input
-                      ref={(element) => {
-                        fileRefs.current[logo.id] = element;
-                      }}
-                      id={`logo-${logo.id}`}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/svg+xml"
-                      className="hidden"
-                      disabled={isSaving || !!logo.url}
-                      onChange={(e) => handleLogo(logo.id, e)}
-                    />
-
-                    <div className="relative flex-1">
-                      <Link
-                        size={17}
-                        className="absolute top-1/2 left-4 -translate-y-1/2 text-[var(--muted)]"
-                      />
-
-                      <input
-                        type="url"
-                        value={logo.url}
-                        disabled={isSaving || !!logo.file}
-                        placeholder="Paste image URL"
-                        onChange={(e) => handleUrl(logo.id, e)}
-                        className="min-h-12 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] py-3 pr-4 pl-11 text-sm text-[var(--foreground)] transition outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-60"
-                      />
-                    </div>
-                  </div>
-                </div>
+          {/* Picked logos preview grid */}
+          {pickedLogos.length > 0 && (
+            <div className="mb-6">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  Ready to save ({pickedLogos.length})
+                </p>
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  disabled={isSaving}
+                  className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 disabled:opacity-50"
+                >
+                  <X size={14} /> Clear all
+                </button>
               </div>
-            ))}
+
+              <div className="flex flex-wrap gap-4">
+                {pickedLogos.map((logo) => (
+                  <div
+                    key={logo.publicId}
+                    className="group relative flex h-28 w-36 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-sm transition hover:border-[var(--accent)]/40 hover:shadow-md"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePicked(logo.publicId)}
+                      disabled={isSaving}
+                      title="Remove"
+                      className="absolute top-1.5 right-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-white opacity-0 shadow-md transition group-hover:opacity-100 disabled:opacity-50"
+                    >
+                      <X size={14} />
+                    </button>
+                    <img
+                      src={logo.url}
+                      alt="Picked logo"
+                      className="h-full w-full object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Upload area */}
+          <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border-2 border-dashed border-[var(--border)] bg-[var(--background)] p-8 transition hover:border-[var(--accent)]/40">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
+              <ImagePlus size={29} />
+            </div>
+
+            <div className="text-center">
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                {pickedLogos.length === 0
+                  ? "No logos picked yet"
+                  : `${pickedLogos.length} logo${pickedLogos.length > 1 ? "s" : ""} ready`}
+              </p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                JPG, PNG, WEBP or SVG · Maximum 5 MB each · Unlimited uploads
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={openCloudinary}
+              disabled={isSaving || checking || !widgetReady}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-6 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {checking ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              ) : (
+                <Upload size={18} />
+              )}
+              {checking
+                ? "Checking..."
+                : pickedLogos.length > 0
+                  ? "Add More Logos"
+                  : "Upload Logos"}
+            </button>
           </div>
 
           <div className="mt-7 flex justify-end border-t border-[var(--border)] pt-7">
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={isSaving}
+              disabled={isSaving || pickedLogos.length === 0}
               className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] px-7 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {isSaving ? (
@@ -658,7 +642,8 @@ export default function BrandLogos() {
               ) : (
                 <>
                   <Upload size={18} />
-                  Save Brand Logo
+                  Save {pickedLogos.length > 0 ? `${pickedLogos.length} ` : ""}
+                  Logo{pickedLogos.length !== 1 ? "s" : ""}
                 </>
               )}
             </button>

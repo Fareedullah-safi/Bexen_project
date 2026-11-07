@@ -20,6 +20,63 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 // ==========================================
+// 0. PERMISSION HELPER
+// ==========================================
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+// ==========================================
+// 0b. CLOUDINARY WIDGET THEME
+// ==========================================
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
+// ==========================================
 // 1. HELPER VARIABLES
 // ==========================================
 const API = "/api/navbar";
@@ -64,6 +121,10 @@ export default function NavigationAdmin() {
   const [lang, setLang] = useState("en"); // Keeps track of the current language being edited
   const [config, setConfig] = useState(defaultConfig); // Holds all the navigation data
 
+  // Theme + permission-check state (for Cloudinary widget)
+  const [theme, setTheme] = useState("light");
+  const [checking, setChecking] = useState(false);
+
   // Check if the current language is Right-To-Left (Pashto or Dari)
   // We will only use this for text inputs!
   const isRTL = lang === "ps" || lang === "fa";
@@ -86,6 +147,26 @@ export default function NavigationAdmin() {
       })
       .catch(() => toast.error("Failed to load navigation configuration"))
       .finally(() => setLoading(false)); // Stop the loading spinner
+  }, []);
+
+  // ==========================================
+  // 3b. THEME WATCHER (for Cloudinary widget)
+  // ==========================================
+  useEffect(() => {
+    const update = () => {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
   }, []);
 
   // ==========================================
@@ -204,11 +285,20 @@ export default function NavigationAdmin() {
   // ==========================================
   // 7. IMAGE UPLOAD FUNCTIONS
   // ==========================================
-  const uploadLogo = () => {
+  const uploadLogo = async () => {
     if (!window.cloudinary)
       return toast.error("Cloudinary is still loading...");
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+    // Permission check BEFORE opening widget
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
 
     window.cloudinary
       .createUploadWidget(
@@ -218,6 +308,7 @@ export default function NavigationAdmin() {
           folder: "bexon/logo",
           multiple: false,
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "svg"],
+          styles: cloudinaryStyles(theme),
         },
         (err, result) => {
           if (err) return toast.error("Upload failed");
@@ -484,10 +575,19 @@ export default function NavigationAdmin() {
                   <button
                     type="button"
                     onClick={uploadLogo}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#249b98]"
+                    disabled={checking}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#249b98] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <Upload size={16} />
-                    {config.logo ? "Replace Logo" : "Upload Logo"}
+                    {checking ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Upload size={16} />
+                    )}
+                    {checking
+                      ? "Checking..."
+                      : config.logo
+                        ? "Replace Logo"
+                        : "Upload Logo"}
                   </button>
                   {config.logo && (
                     <button

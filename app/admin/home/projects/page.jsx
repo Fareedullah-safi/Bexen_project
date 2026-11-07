@@ -19,6 +19,63 @@ import Script from "next/script";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+/* ──────────────────────────────────────────────
+   Cloudinary permission check (reused everywhere)
+   ────────────────────────────────────────────── */
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Unified Cloudinary widget theme (dark / light)
+   ────────────────────────────────────────────── */
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+
+  return { palette: palettes[theme] || palettes.light };
+}
+
+/* ────────────────────────────────────────────── */
+
 const API = "/api/homepage/projects";
 
 const LANGUAGES = [
@@ -166,6 +223,7 @@ function ProjectCard({
   language,
   busy,
   cloudinaryReady,
+  checking,
   onChange,
   onMove,
   onDelete,
@@ -293,13 +351,21 @@ function ProjectCard({
 
           <button
             type="button"
-            disabled={busy || !cloudinaryReady}
+            disabled={busy || !cloudinaryReady || checking}
             onClick={() => onUploadImage(project)}
             className={`${imageButtonClass} mt-4`}
           >
-            <Upload size={17} />
+            {checking ? (
+              <LoaderCircle size={17} className="animate-spin" />
+            ) : (
+              <Upload size={17} />
+            )}
 
-            {project.image ? "Change Image" : "Upload Image"}
+            {checking
+              ? "Checking..."
+              : project.image
+                ? "Change Image"
+                : "Upload Image"}
           </button>
 
           {!cloudinaryReady && (
@@ -328,12 +394,32 @@ export default function ProjectsAdmin() {
   const [deleting, setDeleting] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [theme, setTheme] = useState("light");
 
   const busy = saving || deleting;
   const inputDirection = language === "en" ? "ltr" : "rtl";
 
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+  /* ── Detect dark / light theme for Cloudinary widget ── */
+  useEffect(() => {
+    const update = () =>
+      setTheme(
+        document.documentElement.classList.contains("dark") ? "dark" : "light",
+      );
+
+    update();
+
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   async function loadData() {
     setLoading(true);
@@ -412,8 +498,8 @@ export default function ProjectsAdmin() {
     });
   }
 
-  function uploadProjectImage(project) {
-    if (busy) return;
+  async function uploadProjectImage(project) {
+    if (busy || checking) return;
 
     if (!cloudName || !uploadPreset) {
       toast.error(
@@ -427,6 +513,16 @@ export default function ProjectsAdmin() {
       return;
     }
 
+    /* ── Permission check BEFORE opening the widget ── */
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
     const widget = window.cloudinary.createUploadWidget(
       {
         cloudName,
@@ -437,33 +533,10 @@ export default function ProjectsAdmin() {
         resourceType: "image",
         clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
         maxFileSize: 5000000,
-        sources: ["local", "url"],
+        // sources: ["local", "url"],
         showAdvancedOptions: false,
         cropping: false,
-        styles: {
-          palette: {
-            window: "#FFFFFF",
-            windowBorder: "#1E8A8A",
-            tabIcon: "#1E8A8A",
-            menuIcons: "#1E8A8A",
-            textDark: "#101828",
-            textLight: "#FFFFFF",
-            link: "#1E8A8A",
-            action: "#1E8A8A",
-            inactiveTabIcon: "#667085",
-            error: "#D92D20",
-            inProgress: "#1E8A8A",
-            complete: "#12B76A",
-            sourceBg: "#F7F9FC",
-          },
-          fonts: {
-            default: null,
-            "'Mona Sans', sans-serif": {
-              url: null,
-              active: true,
-            },
-          },
-        },
+        styles: cloudinaryStyles(theme),
       },
       (error, result) => {
         if (error) {
@@ -829,6 +902,7 @@ export default function ProjectsAdmin() {
                   language={language}
                   busy={busy}
                   cloudinaryReady={cloudinaryReady}
+                  checking={checking}
                   onChange={updateProject}
                   onMove={moveProject}
                   onDelete={deleteProject}

@@ -23,6 +23,63 @@ import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+/* ──────────────────────────────────────────────
+   Cloudinary permission check (reused everywhere)
+   ────────────────────────────────────────────── */
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Unified Cloudinary widget theme (dark / light)
+   ────────────────────────────────────────────── */
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+
+  return { palette: palettes[theme] || palettes.light };
+}
+
+/* ────────────────────────────────────────────── */
+
 const API = "/api/homepage/articles-section";
 
 const LANGUAGES = [
@@ -171,11 +228,36 @@ export default function BlogSectionAdmin() {
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [theme, setTheme] = useState("light");
 
   const widgetRef = useRef(null);
   const uploadTarget = useRef(null);
 
   const inputDirection = language === "en" ? "ltr" : "rtl";
+
+  /* ── Detect dark / light theme for Cloudinary widget ── */
+  useEffect(() => {
+    const update = () =>
+      setTheme(
+        document.documentElement.classList.contains("dark") ? "dark" : "light",
+      );
+
+    update();
+
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  /* ── Rebuild the widget when theme flips so palette stays in sync ── */
+  useEffect(() => {
+    widgetRef.current = null;
+  }, [theme]);
 
   useEffect(() => {
     async function loadArticles() {
@@ -276,7 +358,7 @@ export default function BlogSectionAdmin() {
     );
   }
 
-  function uploadImage(articleId = null) {
+  async function uploadImage(articleId = null) {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
@@ -287,6 +369,18 @@ export default function BlogSectionAdmin() {
 
     if (!cloudName || !uploadPreset) {
       toast.error("Check your Cloudinary environment variables.");
+      return;
+    }
+
+    if (checking) return;
+
+    /* ── Permission check BEFORE opening the widget ── */
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
       return;
     }
 
@@ -301,6 +395,7 @@ export default function BlogSectionAdmin() {
           multiple: false,
           maxFileSize: 5 * 1024 * 1024,
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "gif"],
+          styles: cloudinaryStyles(theme),
         },
         (error, result) => {
           if (error) {
@@ -704,11 +799,19 @@ export default function BlogSectionAdmin() {
         <button
           type="button"
           onClick={() => uploadImage()}
-          disabled={!cloudinaryReady || isBusy}
+          disabled={!cloudinaryReady || isBusy || checking}
           className="flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] disabled:opacity-60"
         >
-          <ImagePlus size={16} />
-          {cloudinaryReady ? "Upload Image" : "Loading uploader..."}
+          {checking ? (
+            <LoaderCircle size={16} className="animate-spin" />
+          ) : (
+            <ImagePlus size={16} />
+          )}
+          {checking
+            ? "Checking..."
+            : cloudinaryReady
+              ? "Upload Image"
+              : cloudinaryReady}
         </button>
 
         {article.image && (
@@ -885,11 +988,15 @@ export default function BlogSectionAdmin() {
                         <button
                           type="button"
                           onClick={() => uploadImage(item._id)}
-                          disabled={!cloudinaryReady || isBusy}
+                          disabled={!cloudinaryReady || isBusy || checking}
                           className="flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] disabled:opacity-60"
                         >
-                          <ImagePlus size={16} />
-                          Replace Image
+                          {checking ? (
+                            <LoaderCircle size={16} className="animate-spin" />
+                          ) : (
+                            <ImagePlus size={16} />
+                          )}
+                          {checking ? "Checking..." : "Replace Image"}
                         </button>
                       </div>
 
@@ -910,7 +1017,6 @@ export default function BlogSectionAdmin() {
                                       ? "Author"
                                       : "Article Title"}
                             </label>
-
                             {field === "month" ? (
                               <select
                                 dir={inputDirection}
@@ -946,6 +1052,7 @@ export default function BlogSectionAdmin() {
                                 className={inputClass}
                               />
                             )}
+                            `
                           </div>
                         ),
                       )}

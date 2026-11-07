@@ -34,15 +34,85 @@ const newAlbum = () => ({
   images: [],
 });
 
+// --- Theme helper for Cloudinary widget (dark / light) ---
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
+// --- Permission check helper ---
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
 export default function GalleryAlbumsAdmin() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [language, setLanguage] = useState("en");
   const [langErr, setLangErr] = useState({ en: false, ps: false, fa: false });
+  const [theme, setTheme] = useState("light");
   const [data, setData] = useState({
     translations: { en: emptyText(), ps: emptyText(), fa: emptyText() },
     albums: [],
   });
+
+  // --- Watch dark / light mode ---
+  useEffect(() => {
+    const update = () => {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     axios
@@ -130,7 +200,7 @@ export default function GalleryAlbumsAdmin() {
     toast.success("Album removed.");
   };
 
-  const uploadAlbumImages = (albumIdx) => {
+  const uploadAlbumImages = async (albumIdx) => {
     if (!window.cloudinary) return toast.error("Cloudinary widget loading...");
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
@@ -138,15 +208,25 @@ export default function GalleryAlbumsAdmin() {
     if (!cloudName || !uploadPreset)
       return toast.error("Cloudinary keys missing.");
 
+    // --- Permission check before opening widget ---
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
     window.cloudinary
       .createUploadWidget(
         {
           cloudName,
           uploadPreset,
-          sources: ["local", "url"],
+          // sources: ["local", "url"],
           multiple: true,
           folder: "bexon/albums",
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+          styles: cloudinaryStyles(theme),
         },
         (err, result) => {
           if (err) return toast.error("Upload error.");
@@ -262,7 +342,6 @@ export default function GalleryAlbumsAdmin() {
         strategy="lazyOnload"
       />
 
-      {/* tighter main — old admin style, less top/left padding */}
       <div className="mx-auto max-w-6xl space-y-5">
         {/* HEADER */}
         <header className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start lg:items-center">
@@ -452,9 +531,15 @@ export default function GalleryAlbumsAdmin() {
                           <button
                             type="button"
                             onClick={() => uploadAlbumImages(albumIdx)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-white"
+                            disabled={checking}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-white disabled:opacity-50"
                           >
-                            <Upload size={14} /> Add Photos
+                            {checking ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Upload size={14} />
+                            )}
+                            {checking ? "Checking..." : "Add Photos"}
                           </button>
                         </div>
 
@@ -510,7 +595,7 @@ export default function GalleryAlbumsAdmin() {
           </div>
         </section>
 
-        {/* STICKY SAVE — same pattern as Image Gallery Admin */}
+        {/* STICKY SAVE */}
         <footer className="sticky bottom-3 z-40 mt-6 flex flex-col justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/95 p-4 shadow-2xl backdrop-blur-xl sm:flex-row sm:items-center sm:px-5">
           <p className="text-xs text-[var(--muted)]">
             Editing:{" "}

@@ -125,7 +125,7 @@ const navigation = [
   },
   {
     label: "System",
-    items: [{ name: "Settings", href: "admin/adminusers", icon: Settings }],
+    items: [{ name: "Settings", href: "/admin/adminusers", icon: Settings }],
   },
 ];
 

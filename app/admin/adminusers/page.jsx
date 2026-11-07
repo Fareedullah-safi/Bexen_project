@@ -30,6 +30,63 @@ import { toast } from "sonner";
 import Spinner from "../../Components/Admin/Spinner";
 
 /* ==========================================================================
+   PERMISSION HELPER
+   ========================================================================== */
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+/* ==========================================================================
+   CLOUDINARY WIDGET THEME
+   ========================================================================== */
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
+/* ==========================================================================
    CONSTANTS & STYLES
    ========================================================================== */
 const initialAdmin = { name: "", email: "", password: "", role: "" };
@@ -216,6 +273,10 @@ export default function AdminUsersPage() {
   const [showPassword, setShowPassword] = useState({});
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
+  // Theme + permission-check state
+  const [theme, setTheme] = useState("light");
+  const [checking, setChecking] = useState(false);
+
   // Forms
   const [addAdmin, setAddAdmin] = useState(initialAdmin);
   const [changePassword, setChangePassword] = useState(initialPassword);
@@ -238,6 +299,34 @@ export default function AdminUsersPage() {
     upload: false,
   });
   const toggleLoad = (key, val) => setLoadState((p) => ({ ...p, [key]: val }));
+
+  /* --------------------------- THEME WATCHER ------------------------- */
+  useEffect(() => {
+    const update = () => {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  /* --------------------- REBUILD WIDGET ON THEME FLIP ---------------- */
+  useEffect(() => {
+    if (widgetRef.current) {
+      if (widgetRef.current.destroy) {
+        widgetRef.current.destroy();
+      }
+      widgetRef.current = null;
+    }
+  }, [theme]);
 
   /* --------------------------- EFFECTS ------------------------- */
   useEffect(() => {
@@ -462,7 +551,7 @@ export default function AdminUsersPage() {
     [contactData, validateContactForm],
   );
 
-  const openCloudinary = useCallback(() => {
+  const openCloudinary = useCallback(async () => {
     const [cloudName, preset] = [
       process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
       process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
@@ -471,6 +560,16 @@ export default function AdminUsersPage() {
       return toast.error("Widget loading.");
     if (!cloudName || !preset || !profileData.uid)
       return toast.error("Configure Cloudinary variables or login.");
+
+    // Permission check BEFORE opening widget
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
     if (widgetRef.current) return widgetRef.current.open();
 
     widgetRef.current = window.cloudinary.createUploadWidget(
@@ -481,6 +580,7 @@ export default function AdminUsersPage() {
         maxFiles: 1,
         maxFileSize: 5000000,
         clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+        styles: cloudinaryStyles(theme),
       },
       (err, res) => {
         if (err) return toast.error("Upload failed.");
@@ -498,7 +598,7 @@ export default function AdminUsersPage() {
       },
     );
     widgetRef.current.open();
-  }, [profileData.uid, widgetReady]);
+  }, [profileData.uid, widgetReady, theme]);
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
@@ -607,14 +707,14 @@ export default function AdminUsersPage() {
 
   if (isPageLoading)
     return (
-      <div className="flex min-h-screen items-center justify-center overflow-hidden bg-[var(--background)]">
+      <div className="flex min-h-96 items-center justify-center bg-[var(--background)]">
         <Spinner />
       </div>
     );
 
   /* ---------------------------------- RENDER ------------------------------ */
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[var(--background)] px-4 py-6 text-[var(--foreground)] transition-colors duration-300 sm:px-6 sm:py-8 lg:px-8">
+    <main className="relative isolate min-h-screen overflow-hidden bg-[var(--background)] px-2 py-2 text-[var(--foreground)] transition-colors duration-300">
       <Script
         src="https://upload-widget.cloudinary.com/latest/global/all.js"
         onReady={() => setWidgetReady(true)}
@@ -712,64 +812,106 @@ export default function AdminUsersPage() {
                     </div>
                   </div>
                   <form onSubmit={handleProfileSubmit} className="space-y-7">
-                    <div className="flex flex-col items-center gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-5 sm:flex-row sm:items-start sm:p-6">
-                      <div className="group relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full border-4 border-[var(--surface)] bg-[var(--accent-soft)] shadow-lg">
-                        <div className="absolute inset-0 overflow-hidden rounded-full">
-                          {profileData.image ? (
-                            <img
-                              src={profileData.image}
-                              alt="Profile"
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <UserRound
-                              size={48}
-                              className="text-[var(--accent)]"
-                            />
-                          )}
-                        </div>
-                        <div className="absolute right-0.5 bottom-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-md">
-                          <Camera size={16} />
-                        </div>
-                      </div>
-                      <div className="w-full flex-1 text-center sm:text-left">
-                        <h3 className="text-base font-bold">Profile Picture</h3>
-                        <div className="mt-4 flex flex-wrap justify-center gap-3 sm:justify-start">
-                          <button
-                            type="button"
-                            onClick={openCloudinary}
-                            disabled={!widgetReady || loadState.upload}
-                            className={CLASSES.btn}
-                          >
-                            {loadState.upload ? (
-                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    {/* -------- POLISHED PROFILE PICTURE BLOCK -------- */}
+                    <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-gradient-to-br from-[var(--surface-soft)] via-[var(--surface)] to-[var(--surface-soft)] p-6 sm:p-7">
+                      {/* Decorative glow */}
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-[var(--accent)]/10 blur-3xl"
+                      />
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-[var(--accent)]/5 blur-3xl"
+                      />
+
+                      <div className="relative flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:gap-7">
+                        {/* Avatar */}
+                        <div className="group relative shrink-0">
+                          {/* Accent ring */}
+                          <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-[var(--accent)] via-[#35B5B5] to-[var(--accent)] opacity-80 blur-[2px]" />
+                          <div className="relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-[var(--surface)] bg-[var(--accent-soft)] shadow-xl sm:h-36 sm:w-36">
+                            {profileData.image ? (
+                              <img
+                                src={profileData.image}
+                                alt="Profile"
+                                className="h-full w-full object-cover"
+                              />
                             ) : (
-                              <Upload size={17} />
+                              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[var(--accent-soft)] to-[var(--surface-soft)]">
+                                <UserRound
+                                  size={56}
+                                  className="text-[var(--accent)]/70"
+                                  strokeWidth={1.5}
+                                />
+                              </div>
                             )}
-                            {loadState.upload
-                              ? "Uploading..."
-                              : profileData.image
-                                ? "Change Picture"
-                                : "Upload Picture"}
-                          </button>
-                          {profileData.image && (
+                          </div>
+                          {/* Camera badge */}
+                          <div className="absolute right-1 bottom-1 flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--surface)] bg-[var(--accent)] text-white shadow-md">
+                            <Camera size={16} />
+                          </div>
+                        </div>
+
+                        {/* Info + actions */}
+                        <div className="w-full flex-1 text-center sm:text-left">
+                          <h3 className="text-base font-bold text-[var(--foreground)]">
+                            Profile Picture
+                          </h3>
+                          <p className="mt-1.5 text-xs text-[var(--muted)]">
+                            JPG, PNG or WEBP • Maximum 5 MB • Square images look
+                            best
+                          </p>
+
+                          {!profileData.image && (
+                            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-dashed border-[var(--accent)]/40 bg-[var(--accent-soft)]/50 px-3 py-1 text-xs font-medium text-[var(--accent)]">
+                              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+                              No picture uploaded yet
+                            </div>
+                          )}
+
+                          <div className="mt-5 flex flex-wrap justify-center gap-3 sm:justify-start">
                             <button
                               type="button"
-                              onClick={() =>
-                                setProfileData((p) => ({
-                                  ...p,
-                                  image: "",
-                                  publicId: "",
-                                }))
+                              onClick={openCloudinary}
+                              disabled={
+                                !widgetReady || loadState.upload || checking
                               }
-                              className={`${CLASSES.btnSec} hover:bg-red-50 hover:text-red-600`}
+                              className={CLASSES.btn}
                             >
-                              <Trash2 size={16} /> Remove
+                              {loadState.upload || checking ? (
+                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                              ) : (
+                                <Upload size={17} />
+                              )}
+                              {checking
+                                ? "Checking..."
+                                : loadState.upload
+                                  ? "Uploading..."
+                                  : profileData.image
+                                    ? "Change Picture"
+                                    : "Upload Picture"}
                             </button>
-                          )}
+                            {profileData.image && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setProfileData((p) => ({
+                                    ...p,
+                                    image: "",
+                                    publicId: "",
+                                  }))
+                                }
+                                className={`${CLASSES.btnSec} hover:border-red-400 hover:bg-red-50 hover:text-red-600`}
+                              >
+                                <Trash2 size={16} /> Remove
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
+                    {/* -------- END PROFILE PICTURE BLOCK -------- */}
+
                     <div>
                       <label className={CLASSES.label}>Profile Name</label>
                       <div className="group relative">

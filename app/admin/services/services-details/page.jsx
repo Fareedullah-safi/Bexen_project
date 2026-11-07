@@ -7,6 +7,7 @@ import {
   Image as ImageIcon,
   Layout,
   Link as LinkIcon,
+  Loader2,
   Plus,
   Save,
   Text,
@@ -15,7 +16,8 @@ import {
   UploadCloud,
 } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import Script from "next/script";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const API = "/api/servicespage/services-details";
@@ -64,16 +66,84 @@ const FieldError = ({ message }) => {
   return <p className="mt-1.5 text-xs font-medium text-red-500">{message}</p>;
 };
 
+// --- Theme helper for Cloudinary widget (dark / light) ---
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
+// --- Permission check helper ---
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
 export default function ServiceDetailsAdmin() {
   const [data, setData] = useState(emptyData());
   const [language, setLanguage] = useState("en");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [theme, setTheme] = useState("light");
   const [errors, setErrors] = useState(initializeErrors());
 
-  const fileInputRef = useRef(null);
   const inputDirection = language === "en" ? "ltr" : "rtl";
+
+  // --- Watch dark / light mode ---
+  useEffect(() => {
+    const update = () => {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   // --- DATA LOADING ---
   useEffect(() => {
@@ -101,18 +171,10 @@ export default function ServiceDetailsAdmin() {
     loadData();
   }, []);
 
-  // --- CLOUDINARY DIRECT REST UPLOAD ---
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select a valid image file.");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size must be less than 5MB.");
+  // --- CLOUDINARY WIDGET UPLOAD ---
+  const openUploadWidget = async () => {
+    if (!window.cloudinary) {
+      toast.error("Cloudinary is still loading...");
       return;
     }
 
@@ -124,39 +186,49 @@ export default function ServiceDetailsAdmin() {
       return;
     }
 
-    setUploadingImage(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("upload_preset", uploadPreset);
-
-      const res = await axios.post(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        formData,
-      );
-
-      if (res.data?.secure_url) {
-        setData((prev) => ({
-          ...prev,
-          heroImage: {
-            url: res.data.secure_url,
-            publicId: res.data.public_id || "",
-          },
-        }));
-        setErrors((prev) => ({
-          ...prev,
-          shared: { ...prev.shared, heroImage: null },
-        }));
-        toast.success("Image uploaded successfully.");
-      }
-    } catch (err) {
-      toast.error(
-        err.response?.data?.error?.message || "Failed to upload image.",
-      );
-    } finally {
-      setUploadingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+    // --- Permission check before opening widget ---
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
     }
+
+    window.cloudinary
+      .createUploadWidget(
+        {
+          cloudName,
+          uploadPreset,
+          // sources: ["local", "url", "camera"],
+          multiple: false,
+          folder: "bexon/services-details",
+          clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+          maxFileSize: 5 * 1024 * 1024,
+          styles: cloudinaryStyles(theme),
+        },
+        (err, result) => {
+          if (err) {
+            toast.error("Upload failed.");
+            return;
+          }
+          if (result?.event === "success") {
+            setData((prev) => ({
+              ...prev,
+              heroImage: {
+                url: result.info.secure_url,
+                publicId: result.info.public_id || "",
+              },
+            }));
+            setErrors((prev) => ({
+              ...prev,
+              shared: { ...prev.shared, heroImage: null },
+            }));
+            toast.success("Image uploaded successfully.");
+          }
+        },
+      )
+      .open();
   };
 
   // --- HANDLERS ---
@@ -340,14 +412,10 @@ export default function ServiceDetailsAdmin() {
 
   return (
     <div className="min-h-screen space-y-5 bg-[#f7f9fc] pb-24 text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
-      {/* Hidden File Input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileUpload}
-        className="hidden"
-        id="hero-image-upload-input"
+      {/* Cloudinary Script */}
+      <Script
+        src="https://upload-widget.cloudinary.com/latest/global/all.js"
+        strategy="lazyOnload"
       />
 
       {/* HEADER */}
@@ -415,11 +483,14 @@ export default function ServiceDetailsAdmin() {
               <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/40 opacity-0 transition-opacity hover:opacity-100">
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingImage}
-                  className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-md transition hover:bg-gray-100 disabled:opacity-50"
+                  onClick={openUploadWidget}
+                  disabled={checking}
+                  className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-md transition hover:bg-gray-100 disabled:opacity-50"
                 >
-                  {uploadingImage ? "Uploading..." : "Change Image"}
+                  {checking ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : null}
+                  {checking ? "Checking..." : "Change Image"}
                 </button>
                 <button
                   type="button"
@@ -444,11 +515,16 @@ export default function ServiceDetailsAdmin() {
               </p>
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingImage}
-                className="rounded-lg bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#167575] disabled:opacity-50"
+                onClick={openUploadWidget}
+                disabled={checking}
+                className="flex items-center gap-2 rounded-lg bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#167575] disabled:opacity-50"
               >
-                {uploadingImage ? "Uploading..." : "Choose Image"}
+                {checking ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <UploadCloud size={16} />
+                )}
+                {checking ? "Checking..." : "Choose Image"}
               </button>
             </div>
           )}
@@ -654,7 +730,7 @@ export default function ServiceDetailsAdmin() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving || uploadingImage}
+          disabled={saving || checking}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
         >
           <Save size={16} /> {saving ? "Saving..." : "Save Details"}

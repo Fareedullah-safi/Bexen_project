@@ -76,6 +76,11 @@ export async function GET() {
 // ==========================================
 export async function DELETE(request) {
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

@@ -274,12 +274,11 @@ export async function GET(request, { params }) {
 // Example: PUT /api/pages/123 → updates page with ID 123
 export async function PUT(request, { params }) {
   try {
-    // Step 1: Check if user is allowed to edit
-    let permission = await requireEditPermission();
+    const permission = await requireEditPermission();
+
     if (!permission.authorized) {
       return permission.response;
     }
-
     // Step 2: Connect to database
     await connectMongo();
 

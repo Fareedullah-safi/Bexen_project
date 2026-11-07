@@ -3,9 +3,67 @@
 import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
 import Spinner from "@/app/Components/Admin/Spinner";
 import axios from "axios";
-import { ImagePlus, Save, Upload } from "lucide-react";
+import { ImagePlus, LoaderCircle, Save, Upload } from "lucide-react";
+import Script from "next/script";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
+/* ──────────────────────────────────────────────
+   Cloudinary permission check (reused everywhere)
+   ────────────────────────────────────────────── */
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Unified Cloudinary widget theme (dark / light)
+   ────────────────────────────────────────────── */
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+
+  return { palette: palettes[theme] || palettes.light };
+}
+
+/* ────────────────────────────────────────────── */
 
 const languages = [
   { code: "en", label: "English" },
@@ -90,14 +148,44 @@ export default function FaqAdminPanel() {
   const [formData, setFormData] = useState(defaultFormData);
   const [language, setLanguage] = useState("en");
 
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState("");
   const [savedImageURL, setSavedImageURL] = useState("");
   const [savedImagePublicId, setSavedImagePublicId] = useState("");
 
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [imageError, setImageError] = useState("");
+
+  const [cloudinaryReady, setCloudinaryReady] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [theme, setTheme] = useState("light");
+
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+  /* ── Detect dark / light theme for Cloudinary widget ── */
+  useEffect(() => {
+    const update = () =>
+      setTheme(
+        document.documentElement.classList.contains("dark") ? "dark" : "light",
+      );
+
+    update();
+
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // In case the script is already loaded (e.g. navigating back to the page).
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.cloudinary) {
+      setCloudinaryReady(true);
+    }
+  }, []);
 
   // Synchronize with the admin language selector.
   useEffect(() => {
@@ -192,37 +280,6 @@ export default function FaqAdminPanel() {
     }));
   };
 
-  // Validate selected image.
-  const handleImageSelect = (event) => {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setImageError("Please select a valid image file.");
-      toast.error("Please select a valid image file.");
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setImageError("Image size must be less than 5MB.");
-      toast.error("Image size must be less than 5MB.");
-      event.target.value = "";
-      return;
-    }
-
-    setImageError("");
-    setSelectedImage(file);
-    setPreviewUrl(URL.createObjectURL(file));
-
-    setFormData((previous) => ({
-      ...previous,
-      imageURL: "",
-      imagePublicId: "",
-    }));
-  };
-
   const handleImageUrlChange = (value) => {
     setFormData((previous) => ({
       ...previous,
@@ -230,10 +287,81 @@ export default function FaqAdminPanel() {
       imagePublicId: "",
     }));
 
-    setSelectedImage(null);
-    setPreviewUrl("");
     setImageError("");
   };
+
+  // Open the Cloudinary upload widget.
+  async function openCloudinaryWidget() {
+    if (isSaving || checking) return;
+
+    if (!cloudName || !uploadPreset) {
+      toast.error(
+        "Cloudinary configuration is missing. Check your public environment variables.",
+      );
+      return;
+    }
+
+    if (!window.cloudinary) {
+      toast.error("Image uploader is not ready. Please try again.");
+      return;
+    }
+
+    /* ── Permission check BEFORE opening the widget ── */
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
+    const widget = window.cloudinary.createUploadWidget(
+      {
+        cloudName,
+        uploadPreset,
+        folder: "bexon/images",
+        // sources: ["local", "url", "camera"],
+        multiple: false,
+        maxFiles: 1,
+        resourceType: "image",
+        clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+        maxFileSize: 5 * 1024 * 1024,
+        cropping: false,
+        showAdvancedOptions: false,
+        styles: cloudinaryStyles(theme),
+      },
+      (error, result) => {
+        if (error) {
+          console.error("Cloudinary upload:", error);
+          toast.error("Image upload failed. Please try again.");
+          return;
+        }
+
+        if (result?.event !== "success") return;
+
+        const imageUrl = result.info?.secure_url;
+        const publicId = result.info?.public_id;
+
+        if (!imageUrl || !publicId || !imageUrl.startsWith("https://")) {
+          toast.error("Cloudinary did not return a valid image.");
+          return;
+        }
+
+        setFormData((previous) => ({
+          ...previous,
+          imageURL: imageUrl,
+          imagePublicId: publicId,
+        }));
+
+        setImageError("");
+
+        toast.success("Image uploaded. Click Update Changes to save it.");
+      },
+    );
+
+    widget.open();
+  }
 
   // Validate all languages in order: English -> Pashto -> Dari.
   const validateForm = () => {
@@ -307,91 +435,41 @@ export default function FaqAdminPanel() {
       }
     }
 
-    if (!selectedImage && !formData.imageURL?.trim() && !savedImageURL) {
-      toast.error("Please select or enter an FAQ background image.");
+    if (!formData.imageURL?.trim() && !savedImageURL) {
+      toast.error("Please upload or enter an FAQ background image.");
       return false;
     }
 
     return true;
   };
 
-  // Upload image and save FAQ data.
+  // Save FAQ data. Image is already uploaded by the Cloudinary widget.
   const handleAllUpdates = async () => {
     if (!validateForm()) return;
 
     try {
       setIsSaving(true);
 
-      let updatedData = { ...formData };
+      const previousPublicId = savedImagePublicId;
 
-      const imageUrlChanged = formData.imageURL.trim() !== savedImageURL;
-
-      if (selectedImage || imageUrlChanged) {
-        let uploadResponse;
-
-        if (selectedImage) {
-          const uploadData = new FormData();
-          uploadData.append("file", selectedImage);
-
-          uploadResponse = await axios.post(
-            "/api/homepage/faq/upload",
-            uploadData,
-          );
-        } else {
-          // The API expects JSON when uploading an image from a URL.
-          uploadResponse = await axios.post(
-            "/api/homepage/faq/upload",
-            { imageUrl: formData.imageURL.trim() },
-            { headers: { "Content-Type": "application/json" } },
-          );
-        }
-
-        // The upload API returns { url, publicId } directly.
-        const imageURL = uploadResponse.data?.url;
-        const imagePublicId = uploadResponse.data?.publicId;
-
-        if (!imageURL) {
-          throw new Error(
-            uploadResponse.data?.error ||
-              "Image upload failed: image URL is missing.",
-          );
-        }
-
-        updatedData = {
-          ...updatedData,
-          imageURL,
-          imagePublicId: imagePublicId || "",
-        };
-      }
-
-      const response = await axios.put("/api/homepage/faq", updatedData);
+      const response = await axios.put("/api/homepage/faq", formData);
 
       if (!response.data?.success) {
         throw new Error(response.data?.message || "Failed to update FAQ.");
       }
 
-      const savedData = formatFaqData(response.data?.data || updatedData);
+      const savedData = formatFaqData(response.data?.data || formData);
 
       setFormData(savedData);
       setSavedImageURL(savedData.imageURL);
       setSavedImagePublicId(savedData.imagePublicId);
-
-      setSelectedImage(null);
-
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-
-      setPreviewUrl("");
       setImageError("");
 
-      if (
-        savedImagePublicId &&
-        savedImagePublicId !== savedData.imagePublicId
-      ) {
+      // If the image changed, delete the old one from Cloudinary.
+      if (previousPublicId && previousPublicId !== savedData.imagePublicId) {
         try {
           await axios.delete("/api/homepage/faq/delete-image", {
-            data: { publicId: savedImagePublicId },
+            data: { publicId: previousPublicId },
           });
         } catch (deleteError) {
           console.error("Failed to delete previous FAQ image:", deleteError);
@@ -426,6 +504,16 @@ export default function FaqAdminPanel() {
       dir="ltr"
       className="-m-4 space-y-6 bg-[var(--background)] p-4 text-[var(--foreground)] sm:p-6"
     >
+      <Script
+        src="https://upload-widget.cloudinary.com/global/all.js"
+        strategy="afterInteractive"
+        onLoad={() => setCloudinaryReady(true)}
+        onError={() => {
+          setCloudinaryReady(false);
+          toast.error("Could not load the Cloudinary image uploader.");
+        }}
+      />
+
       {/* Header */}
       <section className={cardClass}>
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
@@ -510,15 +598,15 @@ export default function FaqAdminPanel() {
         <div className="mb-6">
           <h2 className="text-lg font-semibold">Background Image</h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Upload an image or provide an image URL.
+            Upload an image through Cloudinary, or paste an existing image URL.
           </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="flex min-h-52 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 dark:border-white/10 dark:bg-[#16212C]">
-            {previewUrl || formData.imageURL || savedImageURL ? (
+            {formData.imageURL || savedImageURL ? (
               <img
-                src={previewUrl || formData.imageURL || savedImageURL}
+                src={formData.imageURL || savedImageURL}
                 alt="FAQ background preview"
                 className="h-64 w-full object-cover"
                 onError={() => setImageError("Unable to load image preview.")}
@@ -544,20 +632,38 @@ export default function FaqAdminPanel() {
                 dir="ltr"
                 className={inputClass}
               />
+
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                Paste an existing image URL, or upload a new one below.
+              </p>
             </div>
 
             <div>
               <label className={labelClass}>Upload Image</label>
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] dark:border-white/10 dark:bg-[#16212C] dark:text-slate-300">
-                <Upload size={18} />
-                {selectedImage ? selectedImage.name : "Choose Image"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="hidden"
-                />
-              </label>
+
+              <button
+                type="button"
+                onClick={openCloudinaryWidget}
+                disabled={!cloudinaryReady || checking || isSaving}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#176f6f] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {checking ? (
+                  <LoaderCircle size={18} className="animate-spin" />
+                ) : (
+                  <Upload size={18} />
+                )}
+                {checking
+                  ? "Checking..."
+                  : formData.imageURL
+                    ? "Change Image"
+                    : "Upload Image"}
+              </button>
+
+              {!cloudinaryReady && (
+                <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
+                  Loading image uploader...
+                </p>
+              )}
 
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                 JPG, PNG, WEBP. Maximum size: 5MB.
@@ -718,7 +824,7 @@ export default function FaqAdminPanel() {
         <button
           type="button"
           onClick={handleAllUpdates}
-          disabled={isSaving}
+          disabled={isSaving || checking}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#176f6f] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSaving ? (

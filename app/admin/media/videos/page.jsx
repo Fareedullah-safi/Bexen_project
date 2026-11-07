@@ -44,15 +44,85 @@ const newVideo = () => ({
 const isYouTube = (url = "") =>
   /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/i.test(url.trim());
 
+// --- Theme helper for Cloudinary widget (dark / light) ---
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
+// --- Permission check helper ---
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
 export default function VideoGalleryAdmin() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [language, setLanguage] = useState("en");
   const [langErr, setLangErr] = useState({ en: false, ps: false, fa: false });
+  const [theme, setTheme] = useState("light");
   const [data, setData] = useState({
     translations: { en: emptyPage(), ps: emptyPage(), fa: emptyPage() },
     videos: [],
   });
+
+  // --- Watch dark / light mode ---
+  useEffect(() => {
+    const update = () => {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     axios
@@ -73,7 +143,6 @@ export default function VideoGalleryAdmin() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Same pattern as FAQSectionAdmin — ball + tabs stay in sync
   const changeLanguage = (code) => {
     if (!LANGS.some((l) => l.code === code)) return;
     setLanguage(code);
@@ -164,12 +233,21 @@ export default function VideoGalleryAdmin() {
     }
   };
 
-  const uploadThumb = (idx) => {
+  const uploadThumb = async (idx) => {
     if (!window.cloudinary) return toast.error("Cloudinary is loading...");
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
     if (!cloudName || !uploadPreset)
       return toast.error("Cloudinary keys missing.");
+
+    // --- Permission check before opening widget ---
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
 
     window.cloudinary
       .createUploadWidget(
@@ -180,6 +258,7 @@ export default function VideoGalleryAdmin() {
           folder: "bexon/videos",
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
           maxFileSize: 5 * 1024 * 1024,
+          styles: cloudinaryStyles(theme),
         },
         (err, result) => {
           if (err) return toast.error("Upload failed.");
@@ -267,7 +346,7 @@ export default function VideoGalleryAdmin() {
     "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10";
 
   return (
-    <div className="min-h-screen bg-[var(--background)] p-3 text-[var(--foreground)] sm:p-5 lg:p-8">
+    <div className="min-h-screen bg-[var(--background)] p-4 text-[var(--foreground)]">
       <Script
         src="https://upload-widget.cloudinary.com/latest/global/all.js"
         strategy="lazyOnload"
@@ -421,10 +500,19 @@ export default function VideoGalleryAdmin() {
                       <button
                         type="button"
                         onClick={() => uploadThumb(idx)}
-                        className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-lg bg-black/70 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-[var(--accent)]"
+                        disabled={checking}
+                        className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-lg bg-black/70 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-[var(--accent)] disabled:opacity-50"
                       >
-                        <Upload size={14} />
-                        {vid.thumbnail?.url ? "Change" : "Upload Image"}
+                        {checking ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Upload size={14} />
+                        )}
+                        {checking
+                          ? "Checking..."
+                          : vid.thumbnail?.url
+                            ? "Change"
+                            : "Upload Image"}
                       </button>
                       <span className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-xs font-bold text-white">
                         {idx + 1}

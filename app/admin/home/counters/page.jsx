@@ -18,6 +18,63 @@ import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+/* ──────────────────────────────────────────────
+   Cloudinary permission check (reused everywhere)
+   ────────────────────────────────────────────── */
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   Unified Cloudinary widget theme (dark / light)
+   ────────────────────────────────────────────── */
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+
+  return { palette: palettes[theme] || palettes.light };
+}
+
+/* ────────────────────────────────────────────── */
+
 const languages = [
   { code: "en", label: "English" },
   { code: "ps", label: "پښتو" },
@@ -107,6 +164,8 @@ export default function ReviewsAdminPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [theme, setTheme] = useState("light");
 
   const cloudinaryWidget = useRef(null);
   const uploadTarget = useRef("draft");
@@ -129,6 +188,27 @@ export default function ReviewsAdminPanel() {
 
   const primaryButton =
     "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#1E8A8A] to-[#176F6F] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50";
+
+  // --------------------------------------------------
+  // Detect dark / light theme for Cloudinary widget.
+  // --------------------------------------------------
+
+  useEffect(() => {
+    const update = () =>
+      setTheme(
+        document.documentElement.classList.contains("dark") ? "dark" : "light",
+      );
+
+    update();
+
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   // --------------------------------------------------
   // 1. GET: Load section, statistics, and reviews.
@@ -217,14 +297,14 @@ export default function ReviewsAdminPanel() {
         cloudName,
         uploadPreset,
         folder: "bexon/images",
-        sources: ["local", "camera", "url"],
+        // sources: ["local", "camera", "url"],
         multiple: false,
         maxFileSize: 5 * 1024 * 1024,
         clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
         resourceType: "image",
         cropping: false,
         showSkipCropButton: true,
-        theme: "minimal",
+        styles: cloudinaryStyles(theme),
       },
       (error, result) => {
         if (error) {
@@ -265,9 +345,35 @@ export default function ReviewsAdminPanel() {
     setCloudinaryReady(true);
   }
 
-  function openCloudinary(target) {
+  // --------------------------------------------------
+  // Re-create the widget whenever the theme flips so
+  // the palette matches the current dark / light mode.
+  // --------------------------------------------------
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.cloudinary) return;
+
+    // Drop the old widget so setupCloudinary can rebuild with the new theme.
+    cloudinaryWidget.current = null;
+    setupCloudinary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme]);
+
+  async function openCloudinary(target) {
     if (!cloudinaryWidget.current) {
       toast.error("Image uploader is not ready.");
+      return;
+    }
+
+    if (checking) return;
+
+    /* ── Permission check BEFORE opening the widget ── */
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
       return;
     }
 
@@ -783,13 +889,19 @@ export default function ReviewsAdminPanel() {
               <button
                 type="button"
                 onClick={() => openCloudinary("draft")}
-                disabled={!cloudinaryReady}
+                disabled={!cloudinaryReady || checking}
                 className={primaryButton}
               >
-                <Upload size={18} />
-                {cloudinaryReady
-                  ? "Choose Client Image"
-                  : "Loading Uploader..."}
+                {checking ? (
+                  <LoaderCircle size={18} className="animate-spin" />
+                ) : (
+                  <Upload size={18} />
+                )}
+                {checking
+                  ? "Checking..."
+                  : cloudinaryReady
+                    ? "Choose Client Image"
+                    : "Loading Uploader..."}
               </button>
 
               {draft.image ? (
@@ -964,11 +1076,18 @@ export default function ReviewsAdminPanel() {
                             <button
                               type="button"
                               onClick={() => openCloudinary(review._id)}
-                              disabled={!cloudinaryReady || saving}
+                              disabled={!cloudinaryReady || saving || checking}
                               className={secondaryButton}
                             >
-                              <Upload size={17} />
-                              Change Image
+                              {checking ? (
+                                <LoaderCircle
+                                  size={17}
+                                  className="animate-spin"
+                                />
+                              ) : (
+                                <Upload size={17} />
+                              )}
+                              {checking ? "Checking..." : "Change Image"}
                             </button>
 
                             {review.image && (

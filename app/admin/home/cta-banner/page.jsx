@@ -25,11 +25,63 @@ const LANGS = [
 
 const emptyText = () => ({ en: "", ps: "", fa: "" });
 
+// --- Theme helper for Cloudinary widget (dark / light) ---
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
+// --- Permission check helper ---
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
 export default function CtaBannerAdmin() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [language, setLanguage] = useState("en");
   const [langErr, setLangErr] = useState({ en: false, ps: false, fa: false });
+  const [theme, setTheme] = useState("light");
   const [data, setData] = useState({
     title: emptyText(),
     buttonText: emptyText(),
@@ -37,6 +89,24 @@ export default function CtaBannerAdmin() {
     image: "",
     imagePublicId: "",
   });
+
+  // --- Watch dark / light mode ---
+  useEffect(() => {
+    const update = () => {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     axios
@@ -78,22 +148,33 @@ export default function CtaBannerAdmin() {
     setLangErr((p) => ({ ...p, [language]: false }));
   };
 
-  const uploadImage = () => {
+  const uploadImage = async () => {
     if (!window.cloudinary) return toast.error("Cloudinary is loading...");
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
     if (!cloudName || !uploadPreset)
       return toast.error("Cloudinary keys missing.");
 
+    // --- Permission check before opening widget ---
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
     window.cloudinary
       .createUploadWidget(
         {
           cloudName,
           uploadPreset,
+          // sources: ["local", "camera", "url"],
           multiple: false,
           folder: "bexon/cta_banner",
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
           maxFileSize: 5 * 1024 * 1024,
+          styles: cloudinaryStyles(theme),
         },
         async (err, result) => {
           if (err) return toast.error("Upload failed.");
@@ -319,19 +400,32 @@ export default function CtaBannerAdmin() {
                 <button
                   type="button"
                   onClick={uploadImage}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  disabled={checking}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
                 >
-                  <Upload size={16} /> Change Image
+                  {checking ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Upload size={16} />
+                  )}
+                  {checking ? "Checking..." : "Change Image"}
                 </button>
               </div>
             ) : (
               <button
                 type="button"
                 onClick={uploadImage}
-                className="flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[var(--border)] py-16 text-[var(--muted)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 hover:text-[var(--accent)]"
+                disabled={checking}
+                className="flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[var(--border)] py-16 text-[var(--muted)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 hover:text-[var(--accent)] disabled:opacity-50"
               >
-                <Upload size={32} className="opacity-50" />
-                <span className="font-semibold">Upload Feature Image</span>
+                {checking ? (
+                  <Loader2 size={32} className="animate-spin opacity-50" />
+                ) : (
+                  <Upload size={32} className="opacity-50" />
+                )}
+                <span className="font-semibold">
+                  {checking ? "Checking..." : "Upload Feature Image"}
+                </span>
               </button>
             )}
           </div>

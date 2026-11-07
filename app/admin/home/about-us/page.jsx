@@ -58,6 +58,56 @@ const initialData = {
   clientRole: { en: "", fa: "", ps: "" },
 };
 
+// 🔐 Verify upload permission before opening Cloudinary widget
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
+// 🎨 Cloudinary Widget Theme (matches SliderAdminForm)
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
 export default function AboutUsAdmin() {
   const [formData, setFormData] = useState(initialData);
   const [language, setLanguage] = useState("en");
@@ -168,7 +218,6 @@ export default function AboutUsAdmin() {
 
         const data = result.data;
 
-        // Support old string values and new translated objects.
         fields.forEach((field) => {
           const value = data[field];
 
@@ -212,7 +261,6 @@ export default function AboutUsAdmin() {
     loadData();
   }, []);
 
-  // Update a text field in the selected language only.
   function handleChange(event) {
     const { name, value } = event.target;
 
@@ -225,7 +273,6 @@ export default function AboutUsAdmin() {
         },
       }));
     } else {
-      // Links are shared between languages.
       setFormData((prev) => ({
         ...prev,
         [name]: value,
@@ -233,29 +280,24 @@ export default function AboutUsAdmin() {
     }
   }
 
-  // Return translated fields missing in a particular language.
   function getMissingFieldsForLanguage(languageCode) {
     return fields.filter((field) => {
       const value = formData[field]?.[languageCode];
-
       return typeof value !== "string" || !value.trim();
     });
   }
 
-  // Check whether all translated fields are complete for a language.
   function isLanguageComplete(languageCode) {
     return getMissingFieldsForLanguage(languageCode).length === 0;
   }
 
-  // Format field names for readable validation messages.
   function getFieldLabel(field) {
     return field
       .replace(/([A-Z])/g, " $1")
       .replace(/^./, (character) => character.toUpperCase());
   }
 
-  // Open Cloudinary Widget and upload directly to Cloudinary.
-  function openCloudinaryWidget(field) {
+  async function openCloudinaryWidget(field) {
     if (isSaving || uploadingImage) return;
 
     if (!isCloudinaryReady || !window.cloudinary?.createUploadWidget) {
@@ -273,21 +315,30 @@ export default function AboutUsAdmin() {
       return;
     }
 
+    // 🔐 PERMISSION CHECK
+    setUploadingImage(field);
+    activeUploadRef.current = field;
+
+    const allowed = await verifyUploadPermission();
+
+    if (!allowed) {
+      setUploadingImage("");
+      activeUploadRef.current = "";
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
     try {
-      // Close any previously opened widget instance.
       if (cloudinaryWidgetRef.current) {
         cloudinaryWidgetRef.current.close();
         cloudinaryWidgetRef.current = null;
       }
 
-      activeUploadRef.current = field;
-      setUploadingImage(field);
-
       const widget = window.cloudinary.createUploadWidget(
         {
           cloudName,
           uploadPreset,
-          sources: ["local"],
+          // sources: ["local"],
           multiple: false,
           maxFileSize: 5 * 1024 * 1024,
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
@@ -296,6 +347,7 @@ export default function AboutUsAdmin() {
           showAdvancedOptions: false,
           showCompletedButton: true,
           resourceType: "image",
+          styles: cloudinaryStyles(isDark ? "dark" : "light"),
         },
         (error, result) => {
           if (error) {
@@ -318,7 +370,6 @@ export default function AboutUsAdmin() {
               return;
             }
 
-            // Store the Cloudinary URL and public ID immediately.
             setFormData((prev) => ({
               ...prev,
               [targetField]: uploaded.secure_url,
@@ -365,8 +416,6 @@ export default function AboutUsAdmin() {
     }
   }
 
-  // Remove the selected image from the form.
-  // This clears the form reference; it does not delete the asset from Cloudinary.
   function removeImage(field) {
     setFormData((prev) => ({ ...prev, [field]: "" }));
     setPreviews((prev) => ({ ...prev, [field]: "" }));
@@ -374,9 +423,7 @@ export default function AboutUsAdmin() {
     setImageErrors((prev) => ({ ...prev, [field]: false }));
   }
 
-  // Validate all languages and all shared fields before saving.
   function validateForm() {
-    // Validate every translated field in every language.
     for (const item of languages) {
       const missingFields = getMissingFieldsForLanguage(item.code);
 
@@ -392,7 +439,6 @@ export default function AboutUsAdmin() {
       }
     }
 
-    // Validate the shared button link.
     if (
       typeof formData.buttonLink !== "string" ||
       !formData.buttonLink.trim()
@@ -410,7 +456,6 @@ export default function AboutUsAdmin() {
       return false;
     }
 
-    // Validate the YouTube link.
     if (typeof formData.videoLink !== "string" || !formData.videoLink.trim()) {
       toast.error("YouTube Video Link is required.");
       return false;
@@ -437,7 +482,6 @@ export default function AboutUsAdmin() {
       return false;
     }
 
-    // Validate both Cloudinary image references.
     for (const field of imageFields) {
       const value = formData[field];
       const publicId = imageIds[field];
@@ -479,7 +523,6 @@ export default function AboutUsAdmin() {
     return true;
   }
 
-  // Save translations and Cloudinary image references.
   async function handleSave(event) {
     event.preventDefault();
 
@@ -488,7 +531,6 @@ export default function AboutUsAdmin() {
     setIsSaving(true);
 
     try {
-      // No image upload API is needed: the widget already uploaded images.
       const payload = {
         ...Object.fromEntries(fields.map((field) => [field, formData[field]])),
         buttonLink: formData.buttonLink.trim(),
@@ -517,7 +559,6 @@ export default function AboutUsAdmin() {
 
       const saved = result.data;
 
-      // Preserve the response format used by the existing API.
       setFormData((prev) => ({
         ...prev,
         ...saved,
@@ -722,7 +763,6 @@ export default function AboutUsAdmin() {
             </p>
           </div>
 
-          {/* Three teal language-selection buttons */}
           <div className="min-w-0 sm:min-w-[320px]">
             <label className={`${labelClass} mb-3`}>Content Language</label>
 

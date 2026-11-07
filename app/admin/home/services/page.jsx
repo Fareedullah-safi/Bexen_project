@@ -57,16 +57,74 @@ const createEmptySolution = () => ({
   publicId: "",
 });
 
+// 🔐 Verify upload permission before opening Cloudinary widget
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
+
+// 🎨 Cloudinary Widget Theme (matches SliderAdminForm)
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
 /* ==================== Image Picker ==================== */
 
-function ImagePicker({ value, publicId, onChange, disabled, cloudinaryReady }) {
+function ImagePicker({
+  value,
+  publicId,
+  onChange,
+  disabled,
+  cloudinaryReady,
+  theme,
+}) {
   const [imageError, setImageError] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     setImageError(false);
   }, [value]);
 
-  function openCloudinaryWidget() {
+  async function openCloudinaryWidget() {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
       toast.error(
         "Configure NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.",
@@ -76,6 +134,16 @@ function ImagePicker({ value, publicId, onChange, disabled, cloudinaryReady }) {
 
     if (!cloudinaryReady || !window.cloudinary) {
       toast.error("Cloudinary is still loading. Try again shortly.");
+      return;
+    }
+
+    // 🔐 PERMISSION CHECK: block viewers BEFORE opening widget
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
       return;
     }
 
@@ -89,27 +157,11 @@ function ImagePicker({ value, publicId, onChange, disabled, cloudinaryReady }) {
         resourceType: "image",
         clientAllowedFormats: ["png", "jpg", "jpeg", "webp"],
         maxFileSize: 5 * 1024 * 1024,
-        sources: ["local", "camera", "url"],
+        // sources: ["local", "camera", "url"],
         showUploadMoreButton: false,
         cropping: false,
         theme: "minimal",
-        styles: {
-          palette: {
-            window: "#FFFFFF",
-            windowBorder: "#1E8A8A",
-            tabIcon: "#1E8A8A",
-            menuIcons: "#1E8A8A",
-            textDark: "#101828",
-            textLight: "#FFFFFF",
-            link: "#1E8A8A",
-            action: "#1E8A8A",
-            inactiveTabIcon: "#667085",
-            error: "#D92D20",
-            inProgress: "#1E8A8A",
-            complete: "#12B76A",
-            sourceBg: "#F7F9FC",
-          },
-        },
+        styles: cloudinaryStyles(theme),
       },
       (error, result) => {
         if (error) {
@@ -200,11 +252,20 @@ function ImagePicker({ value, publicId, onChange, disabled, cloudinaryReady }) {
         <button
           type="button"
           onClick={openCloudinaryWidget}
-          disabled={disabled}
+          disabled={disabled || checking}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-3 text-sm font-semibold text-white transition hover:bg-[#1E8A8A] disabled:opacity-40"
         >
-          <Upload size={16} />
-          {value && !imageError ? "Change Image" : "Upload with Cloudinary"}
+          {checking ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Checking...
+            </>
+          ) : (
+            <>
+              <Upload size={16} />
+              {value && !imageError ? "Change Image" : "Upload with Cloudinary"}
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -216,6 +277,7 @@ function ImagePicker({ value, publicId, onChange, disabled, cloudinaryReady }) {
 export default function SolutionsAdmin() {
   const [language, setLanguage] = useState("en");
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
+  const [theme, setTheme] = useState("light");
 
   const [badge, setBadge] = useState(() => createTranslation("OUR SOLUTIONS"));
   const [headingOne, setHeadingOne] = useState(() =>
@@ -236,6 +298,22 @@ export default function SolutionsAdmin() {
 
   const inputDirection = language === "en" ? "ltr" : "rtl";
   const busy = isSaving || !!deletingId;
+
+  /* ==================== Theme Watcher ==================== */
+
+  useEffect(() => {
+    const update = () =>
+      setTheme(
+        document.documentElement.classList.contains("dark") ? "dark" : "light",
+      );
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   /* ==================== Load Data ==================== */
 
@@ -786,6 +864,7 @@ export default function SolutionsAdmin() {
                       publicId={item.publicId}
                       disabled={busy}
                       cloudinaryReady={cloudinaryReady}
+                      theme={theme}
                       onChange={(uploaded) => updateImage(item.id, uploaded)}
                     />
                   </div>

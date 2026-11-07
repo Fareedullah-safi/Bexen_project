@@ -1,6 +1,10 @@
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
+import {
+  requireDeletePermission,
+  requireEditPermission,
+} from "@/Lib/AdminPermission/adminPermissions";
 import connectMongo from "@/Lib/mongoDB";
 import Backup from "@/Models/Backup/Backup";
 import NavMenu from "@/Models/NavBar/NavBar";
@@ -100,6 +104,11 @@ export async function GET() {
 export async function POST(req) {
   // NOTE: protect /api/admin/* with your admin login (middleware).
   try {
+    const permission = await requireEditPermission();
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
     await connectMongo();
 
     let body;
@@ -218,7 +227,11 @@ export async function POST(req) {
           400,
         );
       }
+      const permission = await requireDeletePermission();
 
+      if (!permission.authorized) {
+        return permission.response;
+      }
       const deleted = await Backup.findByIdAndDelete(backupId);
       if (!deleted) {
         return reply({ success: false, message: "Backup not found" }, 404);

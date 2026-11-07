@@ -3,10 +3,19 @@
 
 import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
 import Spinner from "@/app/Components/Admin/Spinner";
-import { ImagePlus, Plus, Save, Trash2 } from "lucide-react";
-import Script from "next/script";
+import { ImagePlus, LoaderCircle, Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+
+// ── Cloudinary Config ──
+const CLOUDINARY_SCRIPT_SELECTOR = "script[data-cloudinary-widget]";
+const CLOUDINARY_SCRIPT_SRC =
+  "https://upload-widget.cloudinary.com/global/all.js";
+const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+const UPLOAD_FOLDER = "bexon/images";
+const ALLOWED_FORMATS = ["jpg", "jpeg", "png", "webp", "svg"];
+const MAX_FILE_SIZE = 5_000_000;
 
 const LANGUAGES = [
   { id: "en", label: "English" },
@@ -14,124 +23,223 @@ const LANGUAGES = [
   { id: "fa", label: "دری" },
 ];
 
-const emptySectionTranslation = () => ({
-  tagline: "",
-  title: "",
-});
+// ── Cloudinary Theme ──
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
 
-const emptyCardTranslation = () => ({
-  title: "",
-  description: "",
-});
+// ── Permission check before opening widget ──
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
 
+// ── Empty Factories ──
+const emptySectionTranslation = () => ({ tagline: "", title: "" });
+const emptyCardTranslation = () => ({ title: "", description: "" });
 const createEmptyTranslations = () => ({
   en: emptySectionTranslation(),
   ps: emptySectionTranslation(),
   fa: emptySectionTranslation(),
 });
+const createEmptyIcon = () => ({
+  mode: "cloudinary",
+  file: null,
+  preview: "",
+  url: "",
+  publicId: "",
+  clear: false,
+});
+const createEmptyCard = () => ({
+  _id: "",
+  clientId: `${Date.now()}-${Math.random()}`,
+  translations: {
+    en: emptyCardTranslation(),
+    ps: emptyCardTranslation(),
+    fa: emptyCardTranslation(),
+  },
+  icon: createEmptyIcon(),
+});
+
+const normalizeIcon = (icon) => {
+  const url = icon?.url || "";
+  const publicId = icon?.publicId || "";
+  return {
+    mode: "cloudinary",
+    file: null,
+    preview: url,
+    url,
+    publicId,
+    clear: false,
+  };
+};
+
+const normalizeSavedCards = (cards = []) =>
+  cards.map((card) => ({
+    _id: card._id || "",
+    clientId: card._id || `${Date.now()}-${Math.random()}`,
+    translations: {
+      en: {
+        title: card.translations?.en?.title || "",
+        description: card.translations?.en?.description || "",
+      },
+      ps: {
+        title: card.translations?.ps?.title || "",
+        description: card.translations?.ps?.description || "",
+      },
+      fa: {
+        title: card.translations?.fa?.title || "",
+        description: card.translations?.fa?.description || "",
+      },
+    },
+    icon: normalizeIcon(card.icon),
+  }));
 
 /* ==================== ICON PICKER ==================== */
 
-function IconPicker({ icon, onChange, cloudinaryReady }) {
+function IconPicker({ icon, onChange, cloudinaryReady, theme }) {
   const [imageError, setImageError] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const widgetRef = useRef(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => setImageError(false), [icon.preview]);
 
   useEffect(() => {
-    setImageError(false);
-  }, [icon.preview]);
-
-  useEffect(() => {
+    isMountedRef.current = true;
     return () => {
-      widgetRef.current = null;
+      isMountedRef.current = false;
+      try {
+        widgetRef.current?.close?.();
+        widgetRef.current?.destroy?.();
+      } catch {}
     };
   }, []);
 
-  const openCloudinaryWidget = () => {
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
-    if (!cloudName || !uploadPreset) {
-      toast.error("Please configure your Cloudinary environment variables.");
+  const openCloudinaryWidget = async () => {
+    // ── Config check ──
+    if (!CLOUD_NAME || !UPLOAD_PRESET) {
+      toast.error("Cloudinary is not configured.");
       return;
     }
 
     if (!cloudinaryReady || !window.cloudinary?.createUploadWidget) {
-      toast.error("Cloudinary uploader is still loading.");
+      toast.message("Uploader is still loading…");
       return;
     }
 
-    if (widgetRef.current) {
-      widgetRef.current.open();
+    // ── 🔐 PERMISSION CHECK: block viewers BEFORE opening widget ──
+    setUploading(true);
+    const allowed = await verifyUploadPermission();
+
+    if (!allowed) {
+      setUploading(false);
+      toast.error("You don't have permission to upload images.");
       return;
     }
 
-    const widget = window.cloudinary.createUploadWidget(
+    // ── Destroy old widget to avoid stale callbacks ──
+    try {
+      widgetRef.current?.destroy?.();
+    } catch {}
+
+    widgetRef.current = window.cloudinary.createUploadWidget(
       {
-        cloudName,
-        uploadPreset,
-        folder: "bexon/images",
+        cloudName: CLOUD_NAME,
+        uploadPreset: UPLOAD_PRESET,
+        folder: UPLOAD_FOLDER,
         resourceType: "image",
-        sources: ["local", "url"],
+        // sources: ["local", "url"],
         multiple: false,
         maxFiles: 1,
-        maxFileSize: 5 * 1024 * 1024,
-        clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "svg"],
+        maxFileSize: MAX_FILE_SIZE,
+        clientAllowedFormats: ALLOWED_FORMATS,
         showAdvancedOptions: false,
         cropping: false,
         singleUploadAutoClose: true,
-        styles: {
-          palette: {
-            window: "#FFFFFF",
-            windowBorder: "#E4E7EC",
-            tabIcon: "#1E8A8A",
-            menuIcons: "#1E8A8A",
-            textDark: "#101828",
-            textLight: "#FFFFFF",
-            link: "#1E8A8A",
-            action: "#1E8A8A",
-            inactiveTabIcon: "#667085",
-            error: "#D92D20",
-            inProgress: "#1E8A8A",
-            complete: "#12B76A",
-            sourceBg: "#F7F9FC",
-          },
-        },
+        styles: cloudinaryStyles(theme),
       },
       (error, result) => {
+        const clear = () => setUploading(false);
+
         if (error) {
-          console.error("Cloudinary upload error:", error);
-          toast.error("Image upload failed. Please try again.");
+          clear();
+          toast.error(error?.statusText || "Upload failed");
           return;
         }
 
-        if (result?.event === "success") {
-          const uploaded = result.info;
+        if (!result?.event) return;
 
-          if (!uploaded?.secure_url || !uploaded?.public_id) {
-            toast.error("Cloudinary did not return a valid image.");
-            return;
+        if (result.event === "success" && result.info?.secure_url) {
+          if (isMountedRef.current) {
+            onChange({
+              mode: "cloudinary",
+              file: null,
+              preview: result.info.secure_url,
+              url: result.info.secure_url,
+              publicId: result.info.public_id,
+              clear: false,
+            });
+            toast.success("Image uploaded successfully.");
           }
-
-          onChange({
-            mode: "cloudinary",
-            file: null,
-            preview: uploaded.secure_url,
-            url: uploaded.secure_url,
-            publicId: uploaded.public_id,
-            clear: false,
-          });
-
-          toast.success("Image uploaded successfully.");
+          clear();
+          try {
+            widgetRef.current?.close?.();
+          } catch {}
+          return;
         }
 
-        if (result?.event === "close") {
-          widgetRef.current = null;
+        if (["close", "abort", "queues-end"].includes(result.event)) {
+          clear();
         }
       },
     );
 
-    widgetRef.current = widget;
-    widget.open();
+    try {
+      widgetRef.current.open();
+    } catch {
+      setUploading(false);
+      toast.error("Could not open uploader");
+    }
   };
 
   const clearIcon = () => {
@@ -170,10 +278,19 @@ function IconPicker({ icon, onChange, cloudinaryReady }) {
           <button
             type="button"
             onClick={openCloudinaryWidget}
-            disabled={!cloudinaryReady}
-            className="h-11 w-full rounded-xl border border-[var(--border)] text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!cloudinaryReady || uploading}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--border)] text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {icon.publicId ? "Change Icon" : "Upload Icon"}
+            {uploading ? (
+              <>
+                <LoaderCircle size={16} className="animate-spin" />
+                Checking...
+              </>
+            ) : icon.publicId ? (
+              "Change Icon"
+            ) : (
+              "Upload Icon"
+            )}
           </button>
 
           <p className="mt-1 truncate text-xs text-[var(--muted)]">
@@ -206,63 +323,6 @@ function IconPicker({ icon, onChange, cloudinaryReady }) {
   );
 }
 
-/* ==================== HELPERS ==================== */
-
-const createEmptyIcon = () => ({
-  mode: "cloudinary",
-  file: null,
-  preview: "",
-  url: "",
-  publicId: "",
-  clear: false,
-});
-
-const createEmptyCard = () => ({
-  _id: "",
-  clientId: `${Date.now()}-${Math.random()}`,
-  translations: {
-    en: emptyCardTranslation(),
-    ps: emptyCardTranslation(),
-    fa: emptyCardTranslation(),
-  },
-  icon: createEmptyIcon(),
-});
-
-const normalizeIcon = (icon) => {
-  const url = icon?.url || "";
-  const publicId = icon?.publicId || "";
-
-  return {
-    mode: "cloudinary",
-    file: null,
-    preview: url,
-    url,
-    publicId,
-    clear: false,
-  };
-};
-
-const normalizeSavedCards = (cards = []) =>
-  cards.map((card) => ({
-    _id: card._id || "",
-    clientId: card._id || `${Date.now()}-${Math.random()}`,
-    translations: {
-      en: {
-        title: card.translations?.en?.title || "",
-        description: card.translations?.en?.description || "",
-      },
-      ps: {
-        title: card.translations?.ps?.title || "",
-        description: card.translations?.ps?.description || "",
-      },
-      fa: {
-        title: card.translations?.fa?.title || "",
-        description: card.translations?.fa?.description || "",
-      },
-    },
-    icon: normalizeIcon(card.icon),
-  }));
-
 /* ==================== FEATURES ==================== */
 
 export default function Features() {
@@ -273,47 +333,77 @@ export default function Features() {
   const [fetching, setFetching] = useState(true);
   const [languageReady, setLanguageReady] = useState(false);
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
+  const [theme, setTheme] = useState("light");
 
   const currentTranslation =
     translations[language] || emptySectionTranslation();
 
-  /* ==================== LOAD ALL LANGUAGE DRAFTS ==================== */
+  /* ── Theme watcher ── */
+  useEffect(() => {
+    const update = () =>
+      setTheme(
+        document.documentElement.classList.contains("dark") ? "dark" : "light",
+      );
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
 
+  /* ── Cloudinary script loader ── */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (window.cloudinary?.createUploadWidget) {
+      setCloudinaryReady(true);
+      return;
+    }
+
+    let script = document.querySelector(CLOUDINARY_SCRIPT_SELECTOR);
+    const onLoad = () => {
+      if (window.cloudinary?.createUploadWidget) setCloudinaryReady(true);
+    };
+
+    if (!script) {
+      script = document.createElement("script");
+      script.src = CLOUDINARY_SCRIPT_SRC;
+      script.async = true;
+      script.dataset.cloudinaryWidget = "true";
+      document.head.appendChild(script);
+    }
+
+    script.addEventListener("load", onLoad);
+    return () => script.removeEventListener("load", onLoad);
+  }, []);
+
+  /* ── Load data ── */
   useEffect(() => {
     let cancelled = false;
 
     const loadFeatures = async () => {
       setFetching(true);
-
       try {
-        const [enResponse, psResponse, faResponse, languageResponse] =
-          await Promise.all([
-            fetch("/api/homepage/features?lang=en", {
-              cache: "no-store",
-            }),
-            fetch("/api/homepage/features?lang=ps", {
-              cache: "no-store",
-            }),
-            fetch("/api/homepage/features?lang=fa", {
-              cache: "no-store",
-            }),
-            fetch("/api/admin/adminusers/language", {
-              cache: "no-store",
-            }),
-          ]);
+        const [enRes, psRes, faRes, langRes] = await Promise.all([
+          fetch("/api/homepage/features?lang=en", { cache: "no-store" }),
+          fetch("/api/homepage/features?lang=ps", { cache: "no-store" }),
+          fetch("/api/homepage/features?lang=fa", { cache: "no-store" }),
+          fetch("/api/admin/adminusers/language", { cache: "no-store" }),
+        ]);
 
-        const [enResult, psResult, faResult, languageResult] =
-          await Promise.all([
-            enResponse.json(),
-            psResponse.json(),
-            faResponse.json(),
-            languageResponse.json(),
-          ]);
+        const [enResult, psResult, faResult, langResult] = await Promise.all([
+          enRes.json(),
+          psRes.json(),
+          faRes.json(),
+          langRes.json(),
+        ]);
 
         if (
-          !enResponse.ok ||
-          !psResponse.ok ||
-          !faResponse.ok ||
+          !enRes.ok ||
+          !psRes.ok ||
+          !faRes.ok ||
           !enResult.success ||
           !psResult.success ||
           !faResult.success
@@ -323,32 +413,28 @@ export default function Features() {
 
         if (cancelled) return;
 
-        const languageData = {
+        const data = {
           en: enResult.data || {},
           ps: psResult.data || {},
           fa: faResult.data || {},
         };
 
         const nextTranslations = createEmptyTranslations();
-
         for (const lang of ["en", "ps", "fa"]) {
           nextTranslations[lang] = {
-            tagline: languageData[lang].tagline || "",
-            title: languageData[lang].title || "",
+            tagline: data[lang].tagline || "",
+            title: data[lang].title || "",
           };
         }
 
-        const englishCards = languageData.en.cards || [];
-
+        const englishCards = data.en.cards || [];
         const nextCards = englishCards.map((card, index) => {
           const getTranslation = (lang) => {
-            const matchingCard = (languageData[lang].cards || []).find(
-              (item) => item._id === card._id,
+            const match = (data[lang].cards || []).find(
+              (i) => i._id === card._id,
             );
-
-            const fallbackCard = (languageData[lang].cards || [])[index];
-            const item = matchingCard || fallbackCard;
-
+            const fallback = (data[lang].cards || [])[index];
+            const item = match || fallback;
             return {
               title: item?.title || "",
               description: item?.description || "",
@@ -370,19 +456,11 @@ export default function Features() {
         setTranslations(nextTranslations);
         setCards(nextCards);
 
-        const savedLanguage = languageResult?.success
-          ? languageResult.language
-          : "en";
-
-        setLanguage(
-          ["en", "ps", "fa"].includes(savedLanguage) ? savedLanguage : "en",
-        );
+        const savedLang = langResult?.success ? langResult.language : "en";
+        setLanguage(["en", "ps", "fa"].includes(savedLang) ? savedLang : "en");
       } catch (error) {
         console.error("Load features error:", error);
-
-        if (!cancelled) {
-          toast.error(error.message || "Failed to load features");
-        }
+        if (!cancelled) toast.error(error.message || "Failed to load features");
       } finally {
         if (!cancelled) {
           setFetching(false);
@@ -392,55 +470,39 @@ export default function Features() {
     };
 
     loadFeatures();
-
     return () => {
       cancelled = true;
     };
   }, []);
 
-  /* ==================== LANGUAGE SELECTOR ==================== */
-  /* ==================== LANGUAGE SELECTOR ==================== */
-
+  /* ── Language sync ── */
   useEffect(() => {
-    const handleLanguageChange = (event) => {
-      const nextLanguage = event.detail?.language;
-
-      if (["en", "ps", "fa"].includes(nextLanguage)) {
-        setLanguage(nextLanguage);
-      }
+    const handleLanguageChange = (e) => {
+      const next = e.detail?.language;
+      if (["en", "ps", "fa"].includes(next)) setLanguage(next);
     };
-
     window.addEventListener("admin-language-change", handleLanguageChange);
-
-    return () => {
+    return () =>
       window.removeEventListener("admin-language-change", handleLanguageChange);
-    };
   }, []);
 
-  /* ==================== FORM HANDLERS ==================== */
-
+  /* ── Handlers ── */
   const setField = (name, value) => {
     setTranslations((prev) => ({
       ...prev,
-      [language]: {
-        ...prev[language],
-        [name]: value,
-      },
+      [language]: { ...prev[language], [name]: value },
     }));
   };
 
   const setCardTranslation = (index, name, value) => {
     setCards((prev) =>
-      prev.map((card, cardIndex) =>
-        cardIndex === index
+      prev.map((card, i) =>
+        i === index
           ? {
               ...card,
               translations: {
                 ...card.translations,
-                [language]: {
-                  ...card.translations[language],
-                  [name]: value,
-                },
+                [language]: { ...card.translations[language], [name]: value },
               },
             }
           : card,
@@ -450,17 +512,11 @@ export default function Features() {
 
   const setCardIcon = (index, icon) => {
     setCards((prev) =>
-      prev.map((card, cardIndex) =>
-        cardIndex === index ? { ...card, icon } : card,
-      ),
+      prev.map((card, i) => (i === index ? { ...card, icon } : card)),
     );
   };
 
-  const addCard = () => {
-    setCards((prev) => [...prev, createEmptyCard()]);
-  };
-
-  /* ==================== DELETE CARD ==================== */
+  const addCard = () => setCards((prev) => [...prev, createEmptyCard()]);
 
   const removeCard = async (cardId, index) => {
     if (loading) return;
@@ -471,22 +527,18 @@ export default function Features() {
     }
 
     try {
-      const response = await fetch("/api/homepage/features", {
+      const res = await fetch("/api/homepage/features", {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cardId }),
       });
+      const result = await res.json();
 
-      const result = await response.json();
-
-      if (!response.ok || result?.success === false) {
+      if (!res.ok || result?.success === false) {
         throw new Error(result?.message || "Failed to delete card");
       }
 
-      setCards((prev) => prev.filter((card) => card._id !== cardId));
-
+      setCards((prev) => prev.filter((c) => c._id !== cardId));
       toast.success("Card deleted successfully");
     } catch (error) {
       console.error("Failed to delete card:", error);
@@ -494,77 +546,60 @@ export default function Features() {
     }
   };
 
-  /* ==================== SAVE ALL LANGUAGES ONCE ==================== */
-
+  /* ── Save ── */
   const handleSubmit = async () => {
     if (loading) return;
 
-    const languageNames = {
-      en: "English",
-      ps: "Pashto",
-      fa: "Dari",
-    };
-
-    const requiredSectionFields = [
+    const languageNames = { en: "English", ps: "Pashto", fa: "Dari" };
+    const required = [
       { key: "tagline", label: "Section tagline" },
       { key: "title", label: "Section heading" },
     ];
 
-    // Validate every card icon.
-    for (let index = 0; index < cards.length; index += 1) {
-      const icon = cards[index]?.icon;
-
+    for (let i = 0; i < cards.length; i++) {
+      const icon = cards[i]?.icon;
       if (!icon?.url?.trim() || !icon?.publicId?.trim()) {
-        toast.error(`Please upload an icon for Card ${index + 1}.`);
+        toast.error(`Please upload an icon for Card ${i + 1}.`);
         return;
       }
     }
 
-    // Validate all required text fields in all languages.
     for (const lang of ["en", "ps", "fa"]) {
-      for (const field of requiredSectionFields) {
+      for (const field of required) {
         if (!translations[lang]?.[field.key]?.trim()) {
           toast.error(
             `Please fill in ${field.label} in the ${languageNames[lang]} tab.`,
           );
-
           setLanguage(lang);
           return;
         }
       }
 
-      for (let index = 0; index < cards.length; index += 1) {
-        const cardTranslation = cards[index]?.translations?.[lang];
-
-        if (!cardTranslation?.title?.trim()) {
+      for (let i = 0; i < cards.length; i++) {
+        const t = cards[i]?.translations?.[lang];
+        if (!t?.title?.trim()) {
           toast.error(
-            `Please fill in Card ${index + 1} title in the ${languageNames[lang]} tab.`,
+            `Please fill in Card ${i + 1} title in the ${languageNames[lang]} tab.`,
           );
-
           setLanguage(lang);
           return;
         }
-
-        if (!cardTranslation?.description?.trim()) {
+        if (!t?.description?.trim()) {
           toast.error(
-            `Please fill in Card ${index + 1} description in the ${languageNames[lang]} tab.`,
+            `Please fill in Card ${i + 1} description in the ${languageNames[lang]} tab.`,
           );
-
           setLanguage(lang);
           return;
         }
       }
     }
 
-    // Only save after every required field passes validation.
     setLoading(true);
-
     try {
       const formData = new FormData();
-
       formData.append("translations", JSON.stringify(translations));
 
-      const submittedCards = cards.map((card) => ({
+      const submitted = cards.map((card) => ({
         _id: card._id || "",
         translations: {
           en: {
@@ -586,35 +621,24 @@ export default function Features() {
         clearIcon: Boolean(card.icon.clear),
       }));
 
-      formData.append("cards", JSON.stringify(submittedCards));
+      formData.append("cards", JSON.stringify(submitted));
 
-      const response = await fetch("/api/homepage/features", {
+      const res = await fetch("/api/homepage/features", {
         method: "POST",
         body: formData,
       });
+      const result = await res.json();
 
-      const result = await response.json();
-
-      if (!response.ok || result?.success === false) {
+      if (!res.ok || result?.success === false) {
         throw new Error(result?.message || "Failed to save features");
       }
 
       if (result?.data) {
         setTranslations({
-          en: {
-            ...emptySectionTranslation(),
-            ...result.data.translations?.en,
-          },
-          ps: {
-            ...emptySectionTranslation(),
-            ...result.data.translations?.ps,
-          },
-          fa: {
-            ...emptySectionTranslation(),
-            ...result.data.translations?.fa,
-          },
+          en: { ...emptySectionTranslation(), ...result.data.translations?.en },
+          ps: { ...emptySectionTranslation(), ...result.data.translations?.ps },
+          fa: { ...emptySectionTranslation(), ...result.data.translations?.fa },
         });
-
         setCards(normalizeSavedCards(result.data.cards || []));
       }
 
@@ -627,8 +651,6 @@ export default function Features() {
     }
   };
 
-  /* ==================== LOADING ==================== */
-
   if (fetching || !languageReady) {
     return (
       <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
@@ -640,17 +662,9 @@ export default function Features() {
     );
   }
 
-  /* ==================== UI ==================== */
-
   return (
     <div className="mx-auto w-full max-w-[1400px]">
       <AdminLanguageBall language={language} onLanguageChange={setLanguage} />
-
-      <Script
-        src="https://upload-widget.cloudinary.com/latest/global/all.js"
-        strategy="afterInteractive"
-        onReady={() => setCloudinaryReady(true)}
-      />
 
       <div className="mb-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -658,11 +672,9 @@ export default function Features() {
             <p className="text-sm font-semibold text-[var(--accent)]">
               Home Page
             </p>
-
             <h1 className="mt-1 text-2xl font-black sm:text-3xl lg:text-4xl">
               Features
             </h1>
-
             <p className="mt-2 text-sm text-[var(--muted)]">
               Edit the heading and the feature cards.
             </p>
@@ -694,7 +706,6 @@ export default function Features() {
 
       <div className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
         <h2 className="font-bold">Section Heading</h2>
-
         <p className="mt-1 text-xs text-[var(--muted)]">
           The small text and big title above the cards.
         </p>
@@ -704,7 +715,6 @@ export default function Features() {
             <label className="mb-1.5 block text-sm font-semibold">
               Tagline
             </label>
-
             <input
               dir={language === "en" ? "ltr" : "rtl"}
               type="text"
@@ -718,7 +728,6 @@ export default function Features() {
             <label className="mb-1.5 block text-sm font-semibold">
               Heading
             </label>
-
             <input
               dir={language === "en" ? "ltr" : "rtl"}
               type="text"
@@ -734,7 +743,6 @@ export default function Features() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Feature Cards</h2>
-
             <p className="mt-1 text-sm font-medium text-[var(--muted)]">
               {cards.length} Card
             </p>
@@ -743,8 +751,7 @@ export default function Features() {
 
         <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
           {cards.map((card, index) => {
-            const cardTranslation =
-              card.translations[language] || emptyCardTranslation();
+            const t = card.translations[language] || emptyCardTranslation();
 
             return (
               <div
@@ -755,7 +762,6 @@ export default function Features() {
                   <span className="text-sm font-semibold">
                     Card {index + 1}
                   </span>
-
                   <button
                     type="button"
                     onClick={() => removeCard(card._id, index)}
@@ -770,17 +776,17 @@ export default function Features() {
                     icon={card.icon}
                     onChange={(icon) => setCardIcon(index, icon)}
                     cloudinaryReady={cloudinaryReady}
+                    theme={theme}
                   />
 
                   <div>
                     <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                       Title
                     </label>
-
                     <input
                       dir={language === "en" ? "ltr" : "rtl"}
                       type="text"
-                      value={cardTranslation.title}
+                      value={t.title}
                       onChange={(e) =>
                         setCardTranslation(index, "title", e.target.value)
                       }
@@ -793,11 +799,10 @@ export default function Features() {
                     <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                       Description
                     </label>
-
                     <textarea
                       dir={language === "en" ? "ltr" : "rtl"}
                       rows={5}
-                      value={cardTranslation.description}
+                      value={t.description}
                       onChange={(e) =>
                         setCardTranslation(index, "description", e.target.value)
                       }
@@ -831,7 +836,6 @@ export default function Features() {
             <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
               Ready to save your changes?
             </p>
-
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Save all three language drafts and the selected Cloudinary image
               references.

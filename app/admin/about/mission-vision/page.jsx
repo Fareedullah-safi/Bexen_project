@@ -12,6 +12,7 @@ import {
   Eye,
   ImagePlus,
   Link as LinkIcon,
+  Loader2,
   Save,
   Target,
   Type,
@@ -44,6 +45,56 @@ const FieldError = ({ message }) => {
   if (!message) return null;
   return <p className="mt-1.5 text-xs font-medium text-red-500">{message}</p>;
 };
+
+// --- Theme helper for Cloudinary widget (dark / light) ---
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
+// --- Permission check helper ---
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    return res.ok && data?.success === true;
+  } catch {
+    return false;
+  }
+}
 
 // --- DATA STRUCTURES ---
 const emptyTranslation = () => ({
@@ -95,12 +146,40 @@ export default function AboutSectionAdmin() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [theme, setTheme] = useState("light");
 
   // Error tracking state
   const [errors, setErrors] = useState({ shared: {}, en: {}, ps: {}, fa: {} });
 
   const widgetRef = useRef(null);
   const inputDirection = language === "en" ? "ltr" : "rtl";
+
+  // --- Watch dark / light mode ---
+  useEffect(() => {
+    const update = () => {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  // --- Rebuild widget when theme flips ---
+  useEffect(() => {
+    if (widgetRef.current) {
+      widgetRef.current.destroy?.();
+      widgetRef.current = null;
+    }
+  }, [theme]);
 
   // --- DATA LOADING ---
   useEffect(() => {
@@ -191,9 +270,16 @@ export default function AboutSectionAdmin() {
   }
 
   // --- IMAGE UPLOAD ---
-  function uploadImage() {
-    if (!cloudinaryReady || !window.cloudinary)
-      return toast.error("Uploader not ready.");
+  async function uploadImage() {
+    // --- Permission check before opening widget ---
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
     if (!widgetRef.current) {
       widgetRef.current = window.cloudinary.createUploadWidget(
         {
@@ -202,6 +288,7 @@ export default function AboutSectionAdmin() {
           folder: "bexon/about",
           multiple: false,
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+          styles: cloudinaryStyles(theme),
         },
         (error, result) => {
           if (error) return toast.error("Upload failed.");
@@ -429,9 +516,15 @@ export default function AboutSectionAdmin() {
             <FieldError message={errors.shared.image} />
             <button
               onClick={uploadImage}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] transition-all hover:bg-[#1e8a8a] hover:text-white"
+              disabled={checking}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] transition-all hover:bg-[#1e8a8a] hover:text-white disabled:opacity-50"
             >
-              <ImagePlus size={16} /> Replace Image
+              {checking ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <ImagePlus size={16} />
+              )}
+              {checking ? "Checking..." : "Replace Image"}
             </button>
           </div>
 
