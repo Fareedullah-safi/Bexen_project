@@ -1,12 +1,21 @@
 import FrontEndLayout from "@/app/Components/HelperHooks/FrontEndLayout";
 import WowAnimation from "@/app/Components/WowAnimation";
 import "@/app/globals.css";
-import { Mona_Sans } from "next/font/google";
+import { Mona_Sans, Noto_Sans_Arabic } from "next/font/google";
 import NextTopLoader from "nextjs-toploader";
 import { Toaster } from "sonner";
 
 const monaSans = Mona_Sans({
   subsets: ["latin"],
+  variable: "--font-mona",
+  display: "swap",
+});
+
+const arabicFont = Noto_Sans_Arabic({
+  subsets: ["arabic"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-arabic",
+  display: "swap",
 });
 
 export const metadata = {
@@ -21,11 +30,15 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" dir="ltr" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/project-logo.jpg?v=1" sizes="any" />
       </head>
-      <body className={monaSans.className} suppressHydrationWarning>
+
+      <body
+        className={`${monaSans.variable} ${arabicFont.variable}`}
+        suppressHydrationWarning
+      >
         <NextTopLoader
           color="#1D8B8A"
           initialPosition={0.08}

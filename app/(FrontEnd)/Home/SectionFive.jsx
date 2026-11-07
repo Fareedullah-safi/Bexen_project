@@ -15,7 +15,9 @@ export default function SectionFive() {
   const [solutions, setSolutions] = useState([]);
   const [language, setLanguage] = useState("en");
 
-  // Get text for the currently selected language.
+  const isRTL = language === "fa" || language === "ps";
+
+  // Get localized text
   const getLocalizedText = (value, selectedLanguage = language) => {
     if (typeof value === "string") return value;
 
@@ -26,7 +28,7 @@ export default function SectionFive() {
     return "";
   };
 
-  // Load services and reload them whenever the language changes
+  // Load services and handle language changes
   useEffect(() => {
     let active = true;
     let requestId = 0;
@@ -52,16 +54,20 @@ export default function SectionFive() {
           if (active && !res.ok) {
             console.error("Failed to load services:", res.status);
           }
+
           return;
         }
 
         setBadge(getLocalizedText(result.data.badge, selectedLanguage));
+
         setHeadingOne(
           getLocalizedText(result.data.headingOne, selectedLanguage),
         );
+
         setHeadingTwo(
           getLocalizedText(result.data.headingTwo, selectedLanguage),
         );
+
         setHighlight(getLocalizedText(result.data.highlight, selectedLanguage));
 
         setSolutions(
@@ -128,6 +134,7 @@ export default function SectionFive() {
 
     return () => {
       active = false;
+
       window.removeEventListener("site-language-change", handleLanguageChange);
     };
   }, []);
@@ -135,6 +142,7 @@ export default function SectionFive() {
   const sliderItems =
     solutions.length > 1 ? [...solutions, ...solutions] : solutions;
 
+  // Next slide
   const nextSlide = () => {
     if (solutions.length <= 1) return;
 
@@ -142,6 +150,7 @@ export default function SectionFive() {
     setCurrent((prev) => prev + 1);
   };
 
+  // Previous slide
   const prevSlide = () => {
     if (solutions.length <= 1) return;
 
@@ -159,6 +168,7 @@ export default function SectionFive() {
     }
   };
 
+  // Automatic slider
   useEffect(() => {
     if (solutions.length <= 1) return;
 
@@ -169,6 +179,7 @@ export default function SectionFive() {
     return () => clearInterval(interval);
   }, [solutions.length]);
 
+  // Infinite slider reset
   useEffect(() => {
     if (solutions.length > 0 && current === solutions.length) {
       const timeout = setTimeout(() => {
@@ -185,8 +196,11 @@ export default function SectionFive() {
   }, [current, solutions.length]);
 
   return (
-    <main className="w-full px-3 sm:px-4">
-      <section className="relative min-h-screen w-full overflow-hidden rounded-2xl bg-slate-950">
+    <main dir={isRTL ? "rtl" : "ltr"} className="w-full px-3 sm:px-4">
+      <section
+        dir={isRTL ? "rtl" : "ltr"}
+        className="relative min-h-screen w-full overflow-hidden rounded-2xl bg-slate-950"
+      >
         {/* Grid Background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#10b98133_1px,transparent_1px),linear-gradient(to_bottom,#10b98133_1px,transparent_1px)] mask-[radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] bg-size-[14px_24px]" />
 
@@ -198,6 +212,7 @@ export default function SectionFive() {
           {badge && (
             <div className="flex justify-center">
               <span
+                dir={isRTL ? "rtl" : "ltr"}
                 className="wow animate__animated animate__fadeInDown group inline-flex items-center gap-2 rounded-full border border-white/20 bg-zinc-900 px-3 py-1.5 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:border-[#1E8A8A]/50 hover:bg-cyan-950 sm:px-4"
                 data-wow-duration="0.8s"
               >
@@ -216,6 +231,7 @@ export default function SectionFive() {
           {/* Heading */}
           {(headingOne || headingTwo || highlight) && (
             <h1
+              dir={isRTL ? "rtl" : "ltr"}
               className="wow animate__animated animate__fadeInUp mx-auto mt-5 max-w-3xl text-center text-3xl leading-tight font-medium text-zinc-200 sm:text-4xl md:text-5xl lg:text-[50px]"
               data-wow-duration="1s"
               data-wow-delay="0.2s"
@@ -229,32 +245,40 @@ export default function SectionFive() {
 
           {/* Slider */}
           {sliderItems.length > 0 && (
-            <div className="mx-auto mt-10 max-w-7xl overflow-hidden sm:mt-14">
+            <div
+              dir="ltr"
+              className="mx-auto mt-10 max-w-7xl overflow-hidden sm:mt-14"
+            >
               <div
+                dir="ltr"
                 className={`flex ${
                   animate ? "transition-transform duration-700 ease-in-out" : ""
                 }`}
                 style={{
+                  direction: "ltr",
                   transform: `translateX(-${
                     current *
                     (typeof window !== "undefined" && window.innerWidth < 1024
                       ? 100
                       : 100 / 3)
                   }%)`,
+                  willChange: "transform",
                 }}
               >
                 {sliderItems.map((solution, index) => (
                   <div
                     key={`${solution._id || solution.title}-${index}`}
+                    dir={isRTL ? "rtl" : "ltr"}
                     className="w-full shrink-0 px-2 lg:w-1/3"
                   >
                     {/* Card */}
                     <div
+                      dir={isRTL ? "rtl" : "ltr"}
                       className="wow animate__animated animate__fadeInUp group relative h-105 overflow-hidden rounded-2xl border border-white/10 bg-[#102326] shadow-lg transition-all duration-500 hover:-translate-y-2 hover:border-[#1E8A8A]/40 hover:shadow-2xl hover:shadow-[#1E8A8A]/10"
                       data-wow-duration="0.8s"
                       data-wow-delay={`${0.1 + (index % 3) * 0.15}s`}
                     >
-                      {/* Image: visible on mobile/tablet, hover reveal on desktop */}
+                      {/* Image */}
                       <Image
                         src={solution.image}
                         alt={solution.title || "Service"}
@@ -277,20 +301,27 @@ export default function SectionFive() {
                         </span>
 
                         {/* Title */}
-                        <h2 className="mt-2 max-w-75 text-xl leading-7 font-semibold text-white transition-transform duration-500 group-hover:-translate-y-1 sm:text-2xl">
+                        <h2
+                          dir={isRTL ? "rtl" : "ltr"}
+                          className="mt-2 max-w-75 text-xl leading-7 font-semibold text-white transition-transform duration-500 group-hover:-translate-y-1 sm:text-2xl"
+                        >
                           {solution.title}
                         </h2>
 
-                        {/* Description and Learn More: always visible on mobile/tablet */}
+                        {/* Description and Learn More */}
                         <div className="max-h-48 overflow-hidden opacity-100 transition-all duration-500 lg:max-h-0 lg:opacity-0 lg:group-hover:max-h-48 lg:group-hover:opacity-100">
                           {solution.description && (
-                            <p className="mt-4 text-sm leading-6 text-zinc-300">
+                            <p
+                              dir={isRTL ? "rtl" : "ltr"}
+                              className="mt-4 text-sm leading-6 text-zinc-300"
+                            >
                               {solution.description}
                             </p>
                           )}
 
                           <button
                             type="button"
+                            dir={isRTL ? "rtl" : "ltr"}
                             className="group/button mt-5 inline-flex items-center gap-2 text-sm font-semibold text-white"
                           >
                             <span className="overflow-hidden leading-none">
@@ -321,6 +352,7 @@ export default function SectionFive() {
           {/* Controls */}
           {solutions.length > 1 && (
             <div
+              dir="ltr"
               className="wow animate__animated animate__fadeInUp mt-8 flex justify-center gap-3"
               data-wow-duration="0.8s"
               data-wow-delay="0.6s"
