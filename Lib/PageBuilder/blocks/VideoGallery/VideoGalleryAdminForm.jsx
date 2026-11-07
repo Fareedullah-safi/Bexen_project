@@ -7,6 +7,7 @@ import {
   ArrowRight,
   CheckCircle2,
   LayoutGrid,
+  LoaderCircle,
   Play,
   Plus,
   Trash2,
@@ -15,12 +16,77 @@ import {
   Video,
 } from "lucide-react";
 import Script from "next/script";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const isYouTube = (url = "") =>
-  /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/i.test(url?.trim() || "");
+  /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/i.test(
+    url?.trim() || "",
+  );
 
-export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors }) {
+// ==========================================
+// HELPERS: Permission check + unified theme
+// ==========================================
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
+export default function VideoGalleryAdminForm({
+  data,
+  lang,
+  onChange,
+  showErrors,
+}) {
+  const [dark, setDark] = useState(true);
+  const [checking, setChecking] = useState(false);
+
   const currentData = data || {};
   const translations = currentData.translations || {};
   const t = translations[lang] || {};
@@ -28,6 +94,19 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
 
   const isRtl = lang === "ps" || lang === "fa";
   const dir = isRtl ? "rtl" : "ltr";
+
+  /* ---------- Dark mode detection ---------- */
+  useEffect(() => {
+    const updateTheme = () =>
+      setDark(document.documentElement.classList.contains("dark"));
+    updateTheme();
+    const obs = new MutationObserver(updateTheme);
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => obs.disconnect();
+  }, []);
 
   // Helpers
   const updatePageField = (field, value) => {
@@ -79,7 +158,9 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
     const vid = videos[idx];
     if (vid.thumbnail?.publicId) {
       axios
-        .post("/api/admin/cloudinary/delete", { publicId: vid.thumbnail.publicId })
+        .post("/api/admin/cloudinary/delete", {
+          publicId: vid.thumbnail.publicId,
+        })
         .catch(() => {});
     }
     const newVideos = [...videos];
@@ -95,13 +176,25 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
     onChange({ ...currentData, videos: newVideos });
   };
 
-  const uploadThumb = (idx) => {
-    if (!window.cloudinary) return toast.error("Cloudinary script not loaded yet.");
+  /* ---------- Upload thumbnail (permission-gated + unified theme) ---------- */
+  const uploadThumb = async (idx) => {
+    if (!window.cloudinary)
+      return toast.error("Cloudinary script not loaded yet.");
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     if (!cloudName || !uploadPreset) {
       return toast.error("Cloudinary environment variables missing.");
+    }
+
+    // --- Permission check before opening widget ---
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
     }
 
     window.cloudinary
@@ -113,6 +206,7 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
           folder: "bexon/pages/video-gallery",
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
           maxFileSize: 5000000,
+          styles: cloudinaryStyles(dark ? "dark" : "light"),
         },
         (error, result) => {
           if (error) {
@@ -123,7 +217,9 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
             const oldThumb = videos[idx].thumbnail;
             if (oldThumb?.publicId) {
               axios
-                .post("/api/admin/cloudinary/delete", { publicId: oldThumb.publicId })
+                .post("/api/admin/cloudinary/delete", {
+                  publicId: oldThumb.publicId,
+                })
                 .catch(() => {});
             }
             updateVideo(idx, {
@@ -134,13 +230,14 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
             });
             toast.success("Thumbnail uploaded successfully.");
           }
-        }
+        },
       )
       .open();
   };
 
   // Status Banner validation prep
-  const { enMissing, psMissing, faMissing, invalidVideos } = VideoGalleryAdminForm.validate(currentData);
+  const { enMissing, psMissing, faMissing, invalidVideos } =
+    VideoGalleryAdminForm.validate(currentData);
   const langStatus = [
     { code: "en", label: "English", hasErr: enMissing },
     { code: "ps", label: "Pashto", hasErr: psMissing },
@@ -156,11 +253,16 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
 
   return (
     <div className="space-y-6">
-      <Script src="https://upload-widget.cloudinary.com/latest/global/all.js" strategy="lazyOnload" />
+      <Script
+        src="https://upload-widget.cloudinary.com/latest/global/all.js"
+        strategy="lazyOnload"
+      />
 
       {/* STATUS BANNER */}
       <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4 sm:px-6">
-        <h3 className="text-sm font-bold text-[var(--foreground)]">Completion Status:</h3>
+        <h3 className="text-sm font-bold text-[var(--foreground)]">
+          Completion Status:
+        </h3>
         <div className="flex flex-wrap items-center gap-2">
           {langStatus.map((l) => (
             <div
@@ -171,7 +273,11 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
                   : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
               }`}
             >
-              {l.hasErr ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
+              {l.hasErr ? (
+                <AlertCircle size={14} />
+              ) : (
+                <CheckCircle2 size={14} />
+              )}
               {l.label}
             </div>
           ))}
@@ -182,7 +288,11 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
                 : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
             }`}
           >
-            {invalidVideos ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
+            {invalidVideos ? (
+              <AlertCircle size={14} />
+            ) : (
+              <CheckCircle2 size={14} />
+            )}
             Videos Configuration
           </div>
         </div>
@@ -192,11 +302,15 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
       <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
           <Type size={18} className="text-[var(--accent)]" />
-          <h2 className="font-bold">Presentation Text ({lang.toUpperCase()})</h2>
+          <h2 className="font-bold">
+            Presentation Text ({lang.toUpperCase()})
+          </h2>
         </div>
         <div className="grid gap-5 p-4 sm:grid-cols-2 sm:p-6">
           <div className="sm:col-span-2">
-            <label className="mb-1.5 block text-sm font-semibold text-[var(--foreground)]">Top Tag</label>
+            <label className="mb-1.5 block text-sm font-semibold text-[var(--foreground)]">
+              Top Tag
+            </label>
             <input
               dir={dir}
               value={t.tag || ""}
@@ -206,7 +320,9 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-[var(--foreground)]">Page Title</label>
+            <label className="mb-1.5 block text-sm font-semibold text-[var(--foreground)]">
+              Page Title
+            </label>
             <input
               dir={dir}
               value={t.title || ""}
@@ -216,7 +332,9 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-[var(--foreground)]">Page Subtitle</label>
+            <label className="mb-1.5 block text-sm font-semibold text-[var(--foreground)]">
+              Page Subtitle
+            </label>
             <input
               dir={dir}
               value={t.subtitle || ""}
@@ -247,8 +365,13 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
         <div className="bg-[var(--surface-soft)]/50 p-4 sm:p-6">
           {videos.length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-[var(--border)] py-16 text-center">
-              <Video className="mx-auto mb-3 text-[var(--muted)] opacity-50" size={40} />
-              <p className="text-base text-[var(--muted)]">No videos added yet.</p>
+              <Video
+                className="mx-auto mb-3 text-[var(--muted)] opacity-50"
+                size={40}
+              />
+              <p className="text-base text-[var(--muted)]">
+                No videos added yet.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2">
@@ -259,7 +382,10 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
                   <article
                     key={vid._uid || vid.id || idx}
                     className={`group overflow-hidden rounded-2xl border bg-[var(--surface)] shadow-sm transition hover:shadow-md ${
-                      showErrors && (!vid.youtubeUrl || !isYouTube(vid.youtubeUrl) || !vid.thumbnail?.url)
+                      showErrors &&
+                      (!vid.youtubeUrl ||
+                        !isYouTube(vid.youtubeUrl) ||
+                        !vid.thumbnail?.url)
                         ? "border-red-500"
                         : "border-[var(--border)] hover:border-[var(--accent)]/40"
                     }`}
@@ -275,7 +401,9 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
                       ) : (
                         <div className="flex h-full items-center justify-center text-sm text-white/50">
                           {showErrors ? (
-                            <span className="font-bold text-red-400">Thumbnail Required</span>
+                            <span className="font-bold text-red-400">
+                              Thumbnail Required
+                            </span>
                           ) : (
                             "No thumbnail"
                           )}
@@ -293,10 +421,19 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
                       <button
                         type="button"
                         onClick={() => uploadThumb(idx)}
-                        className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-lg bg-black/70 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-[var(--accent)]"
+                        disabled={checking}
+                        className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-lg bg-black/70 px-3 py-2 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-[var(--accent)] disabled:opacity-50"
                       >
-                        <Upload size={14} />
-                        {vid.thumbnail?.url ? "Change" : "Upload Image"}
+                        {checking ? (
+                          <LoaderCircle size={14} className="animate-spin" />
+                        ) : (
+                          <Upload size={14} />
+                        )}
+                        {checking
+                          ? "Checking..."
+                          : vid.thumbnail?.url
+                            ? "Change"
+                            : "Upload Image"}
                       </button>
                       <span className="absolute top-3 right-3 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-xs font-bold text-white">
                         {idx + 1}
@@ -311,8 +448,12 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
                         <input
                           dir="ltr"
                           value={vid.youtubeUrl || ""}
-                          onChange={(e) => updateVideo(idx, { youtubeUrl: e.target.value })}
-                          className={inputClass(!vid.youtubeUrl || !isYouTube(vid.youtubeUrl))}
+                          onChange={(e) =>
+                            updateVideo(idx, { youtubeUrl: e.target.value })
+                          }
+                          className={inputClass(
+                            !vid.youtubeUrl || !isYouTube(vid.youtubeUrl),
+                          )}
                           placeholder="https://www.youtube.com/watch?v=..."
                         />
                       </div>
@@ -324,7 +465,9 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
                         <input
                           dir={dir}
                           value={vidT.title || ""}
-                          onChange={(e) => updateVideoText(idx, "title", e.target.value)}
+                          onChange={(e) =>
+                            updateVideoText(idx, "title", e.target.value)
+                          }
                           className={inputClass(!vidT.title?.trim())}
                           placeholder="Video title"
                         />
@@ -338,7 +481,9 @@ export default function VideoGalleryAdminForm({ data, lang, onChange, showErrors
                           dir={dir}
                           rows={3}
                           value={vidT.subtitle || ""}
-                          onChange={(e) => updateVideoText(idx, "subtitle", e.target.value)}
+                          onChange={(e) =>
+                            updateVideoText(idx, "subtitle", e.target.value)
+                          }
                           className={`${inputClass(!vidT.subtitle?.trim())} min-h-[90px] resize-y`}
                           placeholder="Detailed description..."
                         />

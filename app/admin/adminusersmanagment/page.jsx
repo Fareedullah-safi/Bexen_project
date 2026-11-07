@@ -8,6 +8,7 @@ import {
   KeyRound,
   Loader2,
   Shield,
+  ShieldAlert,
   Trash2,
   Users,
   X,
@@ -38,12 +39,47 @@ const roleBadge = (role) => {
   }
 };
 
+// ==========================================
+// Permission check helper
+// ==========================================
+async function verifyAdminPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
 export default function AdminsManager() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [admins, setAdmins] = useState([]);
-  const [reset, setReset] = useState(null); // null = closed, { id, name, email, password, show, loading }
+  const [reset, setReset] = useState(null);
+  const [authorized, setAuthorized] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // --- Verify permission on mount ---
+  useEffect(() => {
+    const checkPermission = async () => {
+      setCheckingAuth(true);
+      const allowed = await verifyAdminPermission();
+      setAuthorized(allowed);
+      setCheckingAuth(false);
+
+      if (!allowed) {
+        toast.error("You don't have permission to manage admins.");
+      }
+    };
+    checkPermission();
+  }, []);
 
   const loadAdmins = async () => {
     try {
@@ -63,6 +99,10 @@ export default function AdminsManager() {
   }, []);
 
   const handleRoleChange = async (id, newRole) => {
+    if (!authorized) {
+      toast.error("You don't have permission to edit admins.");
+      return;
+    }
     setSavingId(id);
     try {
       const res = await axios.patch(API_URL, { id, role: newRole });
@@ -84,6 +124,10 @@ export default function AdminsManager() {
   };
 
   const handleDelete = async (id, name) => {
+    if (!authorized) {
+      toast.error("You don't have permission to delete admins.");
+      return;
+    }
     setDeletingId(id);
     try {
       const res = await axios.delete(`${API_URL}?id=${id}`);
@@ -100,6 +144,10 @@ export default function AdminsManager() {
   };
 
   const submitReset = async () => {
+    if (!authorized) {
+      toast.error("You don't have permission to reset passwords.");
+      return;
+    }
     if (!reset?.password || reset.password.length < 6)
       return toast.error("Min 6 characters.");
     setReset((r) => ({ ...r, loading: true }));
@@ -119,10 +167,35 @@ export default function AdminsManager() {
     }
   };
 
-  if (loading) {
+  if (checkingAuth || loading) {
     return (
       <div className="flex min-h-96 items-center justify-center bg-[var(--background)]">
         <Spinner />
+      </div>
+    );
+  }
+
+  // --- Not authorized: show blocked view ---
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+        <div className="mx-auto max-w-6xl space-y-6">
+          <header>
+            <p className="mb-1 text-[11px] font-bold tracking-[0.2em] text-[var(--accent)] uppercase">
+              Access Control
+            </p>
+            <h1 className="text-2xl font-bold sm:text-3xl">Admins Manager</h1>
+          </header>
+
+          <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-red-500/30 bg-red-500/5 px-6 py-20 text-center">
+            <ShieldAlert size={48} className="text-red-500 opacity-70" />
+            <h2 className="text-lg font-bold text-red-500">Access Denied</h2>
+            <p className="max-w-md text-sm text-[var(--muted)]">
+              You don&apos;t have permission to manage admin users. Only
+              authorized administrators can view and edit this page.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -197,7 +270,7 @@ export default function AdminsManager() {
                             <div className="relative">
                               <select
                                 value={currentRole}
-                                disabled={savingId === user._id}
+                                disabled={savingId === user._id || !authorized}
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   if (val !== currentRole)
@@ -233,6 +306,7 @@ export default function AdminsManager() {
                           <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
+                              disabled={!authorized}
                               onClick={() =>
                                 setReset({
                                   id: user._id,
@@ -243,16 +317,16 @@ export default function AdminsManager() {
                                   loading: false,
                                 })
                               }
-                              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)]/10"
+                              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <KeyRound size={15} />
                               <span className="hidden sm:inline">Reset</span>
                             </button>
                             <button
                               type="button"
-                              disabled={deletingId === user._id}
+                              disabled={deletingId === user._id || !authorized}
                               onClick={() => handleDelete(user._id, user.name)}
-                              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {deletingId === user._id ? (
                                 <Loader2 size={15} className="animate-spin" />
@@ -339,7 +413,9 @@ export default function AdminsManager() {
               <button
                 type="button"
                 onClick={submitReset}
-                disabled={reset.loading || reset.password.length < 6}
+                disabled={
+                  reset.loading || reset.password.length < 6 || !authorized
+                }
                 className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {reset.loading ? (

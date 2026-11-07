@@ -123,6 +123,7 @@ export async function PATCH(req) {
     if (!permission.authorized) {
       return permission.response;
     }
+    
     await connectDB();
     const { id, role, password } = await req.json();
 

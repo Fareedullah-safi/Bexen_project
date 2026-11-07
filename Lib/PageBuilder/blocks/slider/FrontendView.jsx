@@ -12,10 +12,27 @@ export default function SliderFrontendView({ data }) {
       ?.map((slide) => slide?.image?.url)
       .filter((src) => typeof src === "string" && src.trim().length > 0) || [];
 
+  // Keep full slide objects in the same order (for title/description)
+  const validSlides = (data?.slides || []).filter(
+    (s) => typeof s?.image?.url === "string" && s.image.url.trim().length > 0,
+  );
+
   const [image, setImage] = useState(images[0] || null);
   const [imageKey, setImageKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
+
+  // Detect current language from the page
+  const [lang, setLang] = useState("en");
+  useEffect(() => {
+    const htmlLang = document.documentElement.lang || "en";
+    const short = htmlLang.split("-")[0].toLowerCase();
+    if (short === "en" || short === "ps" || short === "fa") {
+      setLang(short);
+    }
+  }, []);
+
+  const isRtl = lang === "ps" || lang === "fa";
 
   // Sync when block data changes
   useEffect(() => {
@@ -75,8 +92,18 @@ export default function SliderFrontendView({ data }) {
 
   const handleMouseLeave = () => setShowControls(false);
 
+  // ── Get current slide's title & description ──
+  const currentSlideIndex = Math.max(images.indexOf(image), 0);
+  const currentSlide = validSlides[currentSlideIndex];
+  const slideT = currentSlide?.translations?.[lang] || {};
+  const slideTitle = slideT.title || "";
+  const slideDesc = slideT.description || "";
+  const hasText =
+    slideTitle.trim().length > 0 ||
+    slideDesc.replace(/<[^>]*>/g, "").trim().length > 0;
+
   return (
-    <main className="z-7 h-full w-full px-4 py-3">
+    <main className="z-7 h-full w-full px-4 py-3" dir={isRtl ? "rtl" : "ltr"}>
       <div
         className="relative mx-auto h-125 w-full overflow-hidden rounded-lg"
         onMouseEnter={handleMouseEnter}
@@ -90,12 +117,45 @@ export default function SliderFrontendView({ data }) {
           >
             <Image
               src={image}
-              alt="Slider Image"
+              alt={slideTitle || "Slider Image"}
               fill
               priority
               sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 32px), calc(100vw - 32px)"
               className="rounded-lg object-cover"
             />
+          </div>
+        )}
+
+        {/* ── TITLE & DESCRIPTION OVERLAY ── */}
+        {image && hasText && (
+          <div
+            key={`text-${imageKey}`}
+            className="animate__animated animate__fadeInUp absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end rounded-b-lg px-5 pt-20 pb-16 sm:px-8 sm:pt-28 sm:pb-20 md:px-12"
+            style={{
+              background:
+                "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0) 100%)",
+              animationDuration: "0.8s",
+            }}
+            dir={isRtl ? "rtl" : "ltr"}
+          >
+            {/* Title */}
+            {slideTitle.trim().length > 0 && (
+              <h2
+                className="mb-2 max-w-3xl text-xl leading-tight font-extrabold tracking-tight text-white drop-shadow-lg sm:text-2xl md:text-3xl lg:text-4xl"
+                style={{ textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}
+              >
+                {slideTitle}
+              </h2>
+            )}
+
+            {/* Description (HTML from RichTextEditor) */}
+            {slideDesc.replace(/<[^>]*>/g, "").trim().length > 0 && (
+              <div
+                className="slider-desc max-w-2xl text-sm leading-relaxed text-white/90 drop-shadow-md sm:text-base md:text-lg"
+                style={{ textShadow: "0 1px 6px rgba(0,0,0,0.4)" }}
+                dangerouslySetInnerHTML={{ __html: slideDesc }}
+              />
+            )}
           </div>
         )}
 
@@ -109,7 +169,7 @@ export default function SliderFrontendView({ data }) {
 
         {images.length > 1 && (
           <div
-            className={`absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/25 bg-black/20 p-1.5 shadow-lg backdrop-blur-md transition-all duration-500 ${
+            className={`absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/25 bg-black/20 p-1.5 shadow-lg backdrop-blur-md transition-all duration-500 ${
               showControls
                 ? "translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-3 opacity-0"
@@ -147,6 +207,41 @@ export default function SliderFrontendView({ data }) {
           </div>
         )}
       </div>
+
+      {/* ── Scoped styles for RichText HTML inside description ── */}
+      <style jsx global>{`
+        .slider-desc p {
+          margin: 0 0 0.4em 0;
+        }
+        .slider-desc p:last-child {
+          margin-bottom: 0;
+        }
+        .slider-desc strong,
+        .slider-desc b {
+          color: #ffffff;
+          font-weight: 700;
+        }
+        .slider-desc em,
+        .slider-desc i {
+          font-style: italic;
+        }
+        .slider-desc a {
+          color: #5eead4;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+        }
+        .slider-desc a:hover {
+          color: #99f6e4;
+        }
+        .slider-desc ul,
+        .slider-desc ol {
+          margin: 0.3em 0;
+          padding-inline-start: 1.2em;
+        }
+        .slider-desc li {
+          margin-bottom: 0.2em;
+        }
+      `}</style>
     </main>
   );
 }

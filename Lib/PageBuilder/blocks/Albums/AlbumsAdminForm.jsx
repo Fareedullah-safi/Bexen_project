@@ -74,6 +74,60 @@ export function validateAlbums(data = {}) {
 }
 
 // ==========================================
+// HELPERS: Permission check + unified theme
+// ==========================================
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
+// ==========================================
 // 2. MAIN COMPONENT
 // ==========================================
 export default function AlbumsAdminForm({
@@ -86,6 +140,7 @@ export default function AlbumsAdminForm({
   const [ready, setReady] = useState(false);
   const [uploadingAlbumIdx, setUploadingAlbumIdx] = useState(null);
   const [deletingAlbumIdx, setDeletingAlbumIdx] = useState(null);
+  const [checking, setChecking] = useState(false);
   const widgetRef = useRef(null);
 
   // Fresh data ref for Cloudinary callbacks
@@ -224,14 +279,24 @@ export default function AlbumsAdminForm({
     toast.success("Album removed.");
   };
 
-  /* ---------- Cloudinary Widget (Exact match to your snippet behavior) ---------- */
-  const uploadAlbumImages = (albumIdx) => {
+  /* ---------- Cloudinary Widget (permission-gated + unified theme) ---------- */
+  const uploadAlbumImages = async (albumIdx) => {
     if (!window.cloudinary) return toast.error("Cloudinary widget loading...");
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     if (!cloudName || !uploadPreset)
       return toast.error("Cloudinary keys missing.");
+
+    // --- Permission check before opening widget ---
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
 
     setUploadingAlbumIdx(albumIdx);
     let newlyUploaded = [];
@@ -241,22 +306,11 @@ export default function AlbumsAdminForm({
         {
           cloudName,
           uploadPreset,
-          sources: ["local", "url"],
+          // sources: ["local", "url"],
           multiple: true,
           folder: "bexon/albums",
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
-          styles: {
-            palette: {
-              window: dark ? "#111a23" : "#ffffff",
-              windowBorder: dark ? "#263442" : "#e4e7ec",
-              tabIcon: "#1e8a8a",
-              action: "#1e8a8a",
-              link: "#1e8a8a",
-              textDark: dark ? "#f2f4f7" : "#101828",
-              textLight: dark ? "#98a2b3" : "#667085",
-              sourceBg: dark ? "#16212c" : "#f7f9fc",
-            },
-          },
+          styles: cloudinaryStyles(dark ? "dark" : "light"),
         },
         (err, result) => {
           if (err) {
@@ -558,16 +612,20 @@ export default function AlbumsAdminForm({
                         </label>
                         <button
                           type="button"
-                          disabled={!ready || isUploading || isDeleting}
+                          disabled={
+                            !ready || isUploading || isDeleting || checking
+                          }
                           onClick={() => uploadAlbumImages(albumIdx)}
                           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)] hover:text-white disabled:opacity-50"
                         >
-                          {isUploading ? (
+                          {checking ? (
+                            <LoaderCircle size={14} className="animate-spin" />
+                          ) : isUploading ? (
                             <LoaderCircle size={14} className="animate-spin" />
                           ) : (
                             <Upload size={14} />
                           )}{" "}
-                          Add Photos
+                          {checking ? "Checking..." : "Add Photos"}
                         </button>
                       </div>
 

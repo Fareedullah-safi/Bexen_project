@@ -175,6 +175,24 @@ function validateNews(data) {
 }
 
 /* ─────────────────────────────────────────────
+   Permission check helper
+   ───────────────────────────────────────────── */
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+/* ─────────────────────────────────────────────
    Cloudinary theme
    ───────────────────────────────────────────── */
 function cloudinaryStyles(theme) {
@@ -228,6 +246,7 @@ export default function NewsAdminForm({
   const [uploadingUid, setUploadingUid] = useState(null);
   const [deletingUid, setDeletingUid] = useState(null);
   const [removingUid, setRemovingUid] = useState(null);
+  const [checking, setChecking] = useState(false);
   const [theme, setTheme] = useState("light");
 
   const widgetRef = useRef(null);
@@ -402,15 +421,25 @@ export default function NewsAdminForm({
     [normalized, emit],
   );
 
-  /* ── Image upload ── */
+  /* ── Image upload (permission-gated) ── */
   const openUpload = useCallback(
-    (uid) => {
+    async (uid) => {
       if (!CLOUD_NAME || !UPLOAD_PRESET) {
         toast.error("Cloudinary is not configured.");
         return;
       }
       if (!cloudinaryReady || !window.cloudinary?.createUploadWidget) {
         toast.message("Uploader is still loading…");
+        return;
+      }
+
+      // --- Permission check before opening widget ---
+      setChecking(true);
+      const allowed = await verifyUploadPermission();
+      setChecking(false);
+
+      if (!allowed) {
+        toast.error("You don't have permission to upload images.");
         return;
       }
 
@@ -428,7 +457,7 @@ export default function NewsAdminForm({
           uploadPreset: UPLOAD_PRESET,
           folder: UPLOAD_FOLDER,
           multiple: false,
-          sources: ["local", "url", "camera"],
+          // sources: ["local", "url", "camera"],
           clientAllowedFormats: ALLOWED_FORMATS,
           maxFileSize: MAX_FILE_SIZE,
           styles: cloudinaryStyles(theme),
@@ -664,10 +693,17 @@ export default function NewsAdminForm({
                     <button
                       type="button"
                       onClick={() => openUpload(uid)}
-                      disabled={uploadingUid === uid || !cloudinaryReady}
+                      disabled={
+                        uploadingUid === uid || !cloudinaryReady || checking
+                      }
                       className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {uploadingUid === uid ? (
+                      {checking ? (
+                        <>
+                          <LoaderCircle size={14} className="animate-spin" />{" "}
+                          Checking
+                        </>
+                      ) : uploadingUid === uid ? (
                         <>
                           <LoaderCircle size={14} className="animate-spin" />{" "}
                           Uploading

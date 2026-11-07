@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import RichTextEditor from "../shared/RichTextEditor";
 
 const CLOUDINARY_SCRIPT_SELECTOR = "script[data-cloudinary-widget]";
 const CLOUDINARY_SCRIPT_SRC =
@@ -20,6 +21,29 @@ const UPLOAD_FOLDER = "bexon/pages/sliders";
 const ALLOWED_FORMATS = ["jpg", "jpeg", "png", "webp"];
 const MAX_FILE_SIZE = 5_000_000;
 
+const RTL_LANGUAGES = new Set(["ps", "fa"]);
+
+/* ─────────────────────────────────────────────
+   Permission check helper
+   ───────────────────────────────────────────── */
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Cloudinary theme
+   ───────────────────────────────────────────── */
 function cloudinaryStyles(theme) {
   const palettes = {
     dark: {
@@ -56,7 +80,14 @@ function cloudinaryStyles(theme) {
   return { palette: palettes[theme] || palettes.light };
 }
 
-export default function SliderAdminForm({ data, onChange }) {
+export default function SliderAdminForm({
+  data,
+  lang = "en",
+  onChange,
+  showErrors = false,
+}) {
+  const isRtl = RTL_LANGUAGES.has(lang);
+
   // Filter out any broken slides that have no ID or image URL to prevent empty cards
   const slides = (data?.slides || []).filter(
     (s) => s.id && (s.image?.url || s.image?.publicId),
@@ -68,9 +99,13 @@ export default function SliderAdminForm({ data, onChange }) {
   const [uploading, setUploading] = useState(false);
   const [replacingId, setReplacingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [checking, setChecking] = useState(false);
 
   const widgetRef = useRef(null);
   const isMountedRef = useRef(true);
+
+  // Ref to collect multiple uploads during a single widget session
+  const pendingUploadsRef = useRef([]);
 
   /* ── Mount tracker (Strict Mode safe) ── */
   useEffect(() => {
@@ -137,8 +172,29 @@ export default function SliderAdminForm({ data, onChange }) {
     }
   };
 
-  /* ── ADD NEW SLIDE ── */
-  const handleAddSlide = useCallback(() => {
+  /* ── Slide text update helper ── */
+  const updateSlideText = useCallback(
+    (slideId, field, value) => {
+      const allSlides = data?.slides || [];
+      const updatedSlides = allSlides.map((s) => {
+        if (s.id !== slideId) return s;
+        const translations = s.translations || {};
+        const langData = translations[lang] || {};
+        return {
+          ...s,
+          translations: {
+            ...translations,
+            [lang]: { ...langData, [field]: value },
+          },
+        };
+      });
+      onChange({ ...data, slides: updatedSlides });
+    },
+    [data, lang, onChange],
+  );
+
+  /* ── ADD NEW SLIDES — MULTIPLE UPLOAD (permission-gated) ── */
+  const handleAddSlide = useCallback(async () => {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
       toast.error("Cloudinary is not configured.");
       return;
@@ -148,7 +204,18 @@ export default function SliderAdminForm({ data, onChange }) {
       return;
     }
 
+    // --- Permission check before opening widget ---
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
     setUploading(true);
+    pendingUploadsRef.current = [];
 
     try {
       widgetRef.current?.destroy?.();
@@ -159,50 +226,62 @@ export default function SliderAdminForm({ data, onChange }) {
         cloudName: CLOUD_NAME,
         uploadPreset: UPLOAD_PRESET,
         folder: UPLOAD_FOLDER,
-        multiple: false,
+        multiple: true,
         clientAllowedFormats: ALLOWED_FORMATS,
         maxFileSize: MAX_FILE_SIZE,
         styles: cloudinaryStyles(theme),
       },
       (err, res) => {
-        const clear = () => setUploading(false);
-
         if (err) {
-          clear();
+          setUploading(false);
           toast.error(err?.statusText || "Upload failed");
           return;
         }
 
         if (!res?.event) return;
 
+        // Collect each successful upload
         if (res.event === "success" && res.info?.secure_url) {
-          if (isMountedRef.current) {
-            const newSlide = {
-              id:
-                typeof crypto !== "undefined" && crypto.randomUUID
-                  ? crypto.randomUUID()
-                  : `slide_${Date.now()}`,
-              image: {
-                url: res.info.secure_url,
-                publicId: res.info.public_id,
-              },
-            };
-            onChange({ ...data, slides: [...slides, newSlide] });
-            toast.success("Slide added!");
-          }
-          clear();
-          try {
-            widgetRef.current?.close?.();
-          } catch {}
-          return;
+          pendingUploadsRef.current.push({
+            url: res.info.secure_url,
+            publicId: res.info.public_id,
+          });
         }
 
+        // When widget closes, add all collected images as new slides
         if (
           res.event === "close" ||
           res.event === "abort" ||
           res.event === "queues-end"
         ) {
-          clear();
+          const uploaded = pendingUploadsRef.current;
+
+          if (uploaded.length > 0 && isMountedRef.current) {
+            const newSlides = uploaded.map((img) => ({
+              id:
+                typeof crypto !== "undefined" && crypto.randomUUID
+                  ? crypto.randomUUID()
+                  : `slide_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              image: {
+                url: img.url,
+                publicId: img.publicId,
+              },
+              translations: {
+                en: { title: "", description: "" },
+                ps: { title: "", description: "" },
+                fa: { title: "", description: "" },
+              },
+            }));
+
+            const allSlides = data?.slides || [];
+            onChange({ ...data, slides: [...allSlides, ...newSlides] });
+            toast.success(
+              `${uploaded.length} slide${uploaded.length > 1 ? "s" : ""} added!`,
+            );
+          }
+
+          pendingUploadsRef.current = [];
+          setUploading(false);
         }
       },
     );
@@ -213,13 +292,23 @@ export default function SliderAdminForm({ data, onChange }) {
       setUploading(false);
       toast.error("Could not open uploader");
     }
-  }, [cloudinaryReady, theme, slides, data, onChange]);
+  }, [cloudinaryReady, theme, data, onChange]);
 
-  /* ── REPLACE SLIDE ── */
+  /* ── REPLACE SLIDE (single, permission-gated) ── */
   const handleReplaceSlide = useCallback(
-    (slide) => {
+    async (slide) => {
       if (!cloudinaryReady || !window.cloudinary?.createUploadWidget) {
         toast.message("Uploader is still loading…");
+        return;
+      }
+
+      // --- Permission check before opening widget ---
+      setChecking(true);
+      const allowed = await verifyUploadPermission();
+      setChecking(false);
+
+      if (!allowed) {
+        toast.error("You don't have permission to upload images.");
         return;
       }
 
@@ -253,7 +342,8 @@ export default function SliderAdminForm({ data, onChange }) {
 
           if (res.event === "success" && res.info?.secure_url) {
             if (isMountedRef.current) {
-              const updatedSlides = slides.map((s) =>
+              const allSlides = data?.slides || [];
+              const updatedSlides = allSlides.map((s) =>
                 s.id === slide.id
                   ? {
                       ...s,
@@ -295,7 +385,7 @@ export default function SliderAdminForm({ data, onChange }) {
         toast.error("Could not open uploader");
       }
     },
-    [cloudinaryReady, theme, slides, data, onChange],
+    [cloudinaryReady, theme, data, onChange],
   );
 
   /* ── REMOVE SLIDE ── */
@@ -312,7 +402,8 @@ export default function SliderAdminForm({ data, onChange }) {
       if (slide.image?.publicId) {
         await destroyCloudinaryImage(slide.image.publicId);
       }
-      const updatedSlides = slides.filter((s) => s.id !== slide.id);
+      const allSlides = data?.slides || [];
+      const updatedSlides = allSlides.filter((s) => s.id !== slide.id);
       onChange({ ...data, slides: updatedSlides });
       toast.success("Slide removed");
     } finally {
@@ -320,8 +411,12 @@ export default function SliderAdminForm({ data, onChange }) {
     }
   };
 
+  /* ── Shared input class ── */
+  const inputClass =
+    "w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)]";
+
   return (
-    <div className="mx-auto w-full max-w-[1400px]">
+    <div className="mx-auto w-full max-w-[1400px]" dir={isRtl ? "rtl" : "ltr"}>
       {/* HEADER */}
       <div className="mb-6">
         <p className="text-sm font-semibold text-[var(--accent)]">
@@ -331,31 +426,37 @@ export default function SliderAdminForm({ data, onChange }) {
           Hero Slider
         </h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Manage your slider images here.
+          Manage your slider images, titles, and descriptions here. (
+          {lang.toUpperCase()})
         </p>
       </div>
 
-      {/* UPLOAD SECTION (Cleaned up, no empty preview box) */}
+      {/* UPLOAD SECTION */}
       <div className="mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--background)] p-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">
             <CloudUpload size={28} />
           </div>
           <h3 className="mb-2 text-base font-bold text-[var(--foreground)]">
-            Add New Slide
+            Add New Slides
           </h3>
           <p className="mb-6 max-w-md text-sm text-[var(--muted)]">
-            Upload an image directly to Cloudinary. It will instantly appear in
-            the gallery below.
+            Upload one or more images directly to Cloudinary. They will
+            instantly appear in the gallery below.
           </p>
 
           <button
             type="button"
             onClick={handleAddSlide}
-            disabled={uploading || !cloudinaryReady}
+            disabled={uploading || !cloudinaryReady || checking}
             className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {uploading ? (
+            {checking ? (
+              <>
+                <LoaderCircle size={18} className="animate-spin" />
+                Checking...
+              </>
+            ) : uploading ? (
               <>
                 <LoaderCircle size={18} className="animate-spin" />
                 Uploading...
@@ -368,7 +469,7 @@ export default function SliderAdminForm({ data, onChange }) {
             ) : (
               <>
                 <Plus size={18} />
-                Upload Image
+                Upload Images
               </>
             )}
           </button>
@@ -387,82 +488,151 @@ export default function SliderAdminForm({ data, onChange }) {
         </div>
 
         {slides.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {slides.map((slide, index) => (
-              <div
-                key={slide.id}
-                className="group overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)]"
-              >
-                <div className="flex aspect-video items-center justify-center overflow-hidden bg-[var(--background)]">
-                  {slide.image?.url ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={slide.image.url}
-                      alt={`Slide ${index + 1}`}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-xs text-[var(--muted)]">
-                      <ImagePlus
-                        size={28}
-                        className="mb-1 text-[var(--accent)]"
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {slides.map((slide, index) => {
+              const slideT = slide.translations?.[lang] || {};
+              const titleVal = slideT.title || "";
+              const descVal = slideT.description || "";
+
+              // ── Validation: check if title is empty ──
+              const titleErr = showErrors && !titleVal.trim();
+
+              // ── Validation: strip HTML tags, then check if description is empty ──
+              const descErr =
+                showErrors && !descVal.replace(/<[^>]*>/g, "").trim();
+
+              return (
+                <div
+                  key={slide.id}
+                  className="group overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)]"
+                >
+                  <div className="flex aspect-video items-center justify-center overflow-hidden bg-[var(--background)]">
+                    {slide.image?.url ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={slide.image.url}
+                        alt={`Slide ${index + 1}`}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       />
-                      No Image Available
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-xs text-[var(--muted)]">
+                        <ImagePlus
+                          size={28}
+                          className="mb-1 text-[var(--accent)]"
+                        />
+                        No Image Available
+                      </div>
+                    )}
+                  </div>
+
+                  {/* TITLE + DESCRIPTION FIELDS */}
+                  <div className="space-y-3 border-t border-[var(--border)] p-3 sm:p-4">
+                    {/* ── Title ── */}
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">
+                        Title ({lang.toUpperCase()})
+                      </label>
+                      <input
+                        type="text"
+                        dir={isRtl ? "rtl" : "ltr"}
+                        value={titleVal}
+                        onChange={(e) =>
+                          updateSlideText(slide.id, "title", e.target.value)
+                        }
+                        placeholder="e.g. Welcome to Bexon"
+                        maxLength={120}
+                        className={`${inputClass} ${titleErr ? "border-red-500" : ""}`}
+                      />
+                      {titleErr && (
+                        <p className="mt-1 text-xs text-red-500">
+                          Title is required
+                        </p>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <div className="flex items-center justify-between gap-2 p-3 sm:p-4">
-                  <span className="text-sm font-semibold">
-                    Slide {index + 1}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    {/* REPLACE */}
-                    <button
-                      type="button"
-                      onClick={() => handleReplaceSlide(slide)}
-                      disabled={
-                        replacingId === slide.id || deletingId === slide.id
-                      }
-                      className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--accent)]/30 px-3 py-1.5 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {replacingId === slide.id ? (
-                        <>
-                          <LoaderCircle size={14} className="animate-spin" />
-                          Replacing
-                        </>
-                      ) : (
-                        <>
-                          <Upload size={14} /> Replace
-                        </>
+                    {/* ── Description ── */}
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">
+                        Description ({lang.toUpperCase()})
+                      </label>
+                      <div
+                        className={`overflow-hidden rounded-xl border transition-colors ${
+                          descErr ? "border-red-500" : "border-[var(--border)]"
+                        }`}
+                      >
+                        <RichTextEditor
+                          value={descVal}
+                          onChange={(html) =>
+                            updateSlideText(slide.id, "description", html)
+                          }
+                          isRtl={isRtl}
+                          placeholder="Write slide description…"
+                          minHeight={100}
+                        />
+                      </div>
+                      {descErr && (
+                        <p className="mt-1 text-xs text-red-500">
+                          Description is required
+                        </p>
                       )}
-                    </button>
+                    </div>
+                  </div>
 
-                    {/* DELETE */}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSlide(slide)}
-                      disabled={
-                        deletingId === slide.id || replacingId === slide.id
-                      }
-                      className="flex cursor-pointer items-center justify-center rounded-lg border border-red-500/20 p-2 text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {deletingId === slide.id ? (
-                        <LoaderCircle size={15} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={15} />
-                      )}
-                    </button>
+                  {/* ACTION BUTTONS */}
+                  <div className="flex items-center justify-between gap-2 border-t border-[var(--border)] p-3 sm:p-4">
+                    <span className="text-sm font-semibold">
+                      Slide {index + 1}
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                      {/* REPLACE */}
+                      <button
+                        type="button"
+                        onClick={() => handleReplaceSlide(slide)}
+                        disabled={
+                          replacingId === slide.id ||
+                          deletingId === slide.id ||
+                          checking
+                        }
+                        className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--accent)]/30 px-3 py-1.5 text-xs font-semibold text-[var(--accent)] transition hover:bg-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {replacingId === slide.id ? (
+                          <>
+                            <LoaderCircle size={14} className="animate-spin" />
+                            Replacing
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={14} /> Replace
+                          </>
+                        )}
+                      </button>
+
+                      {/* DELETE */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSlide(slide)}
+                        disabled={
+                          deletingId === slide.id || replacingId === slide.id
+                        }
+                        className="flex cursor-pointer items-center justify-center rounded-lg border border-red-500/20 p-2 text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {deletingId === slide.id ? (
+                          <LoaderCircle size={15} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={15} />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="flex min-h-[220px] items-center justify-center rounded-xl border border-dashed border-[var(--border)] text-sm text-[var(--muted)]">
             No images yet. Click the upload button above to add your first
-            slide.
+            slides.
           </div>
         )}
       </div>
