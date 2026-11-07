@@ -5,14 +5,23 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+const SLIDER_STYLES = `
+  .slider-desc p { margin: 0 0 0.4em 0; }
+  .slider-desc p:last-child { margin-bottom: 0; }
+  .slider-desc strong, .slider-desc b { color: #ffffff; font-weight: 700; }
+  .slider-desc em, .slider-desc i { font-style: italic; }
+  .slider-desc a { color: #5eead4; text-decoration: underline; text-underline-offset: 2px; }
+  .slider-desc a:hover { color: #99f6e4; }
+  .slider-desc ul, .slider-desc ol { margin: 0.3em 0; padding-inline-start: 1.2em; }
+  .slider-desc li { margin-bottom: 0.2em; }
+`;
+
 export default function SliderFrontendView({ data }) {
-  // Extract image URLs from CMS block data
   const images =
     data?.slides
       ?.map((slide) => slide?.image?.url)
       .filter((src) => typeof src === "string" && src.trim().length > 0) || [];
 
-  // Keep full slide objects in the same order (for title/description)
   const validSlides = (data?.slides || []).filter(
     (s) => typeof s?.image?.url === "string" && s.image.url.trim().length > 0,
   );
@@ -22,7 +31,6 @@ export default function SliderFrontendView({ data }) {
   const [loading, setLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
 
-  // Detect current language from the page
   const [lang, setLang] = useState("en");
   useEffect(() => {
     const htmlLang = document.documentElement.lang || "en";
@@ -34,17 +42,14 @@ export default function SliderFrontendView({ data }) {
 
   const isRtl = lang === "ps" || lang === "fa";
 
-  // Sync when block data changes
   useEffect(() => {
     setImage(images[0] || null);
     setImageKey(0);
     setLoading(false);
   }, [data]);
 
-  // Auto-slide every 5 seconds
   useEffect(() => {
     if (images.length <= 1) return;
-
     const interval = setInterval(() => {
       setImage((current) => {
         const currentIndex = images.indexOf(current);
@@ -54,11 +59,9 @@ export default function SliderFrontendView({ data }) {
       });
       setImageKey((key) => key + 1);
     }, 5000);
-
     return () => clearInterval(interval);
   }, [images]);
 
-  // Hide controls after 5s of inactivity
   useEffect(() => {
     if (!showControls) return;
     const timeout = setTimeout(() => setShowControls(false), 5000);
@@ -92,7 +95,6 @@ export default function SliderFrontendView({ data }) {
 
   const handleMouseLeave = () => setShowControls(false);
 
-  // ── Get current slide's title & description ──
   const currentSlideIndex = Math.max(images.indexOf(image), 0);
   const currentSlide = validSlides[currentSlideIndex];
   const slideT = currentSlide?.translations?.[lang] || {};
@@ -126,7 +128,6 @@ export default function SliderFrontendView({ data }) {
           </div>
         )}
 
-        {/* ── TITLE & DESCRIPTION OVERLAY ── */}
         {image && hasText && (
           <div
             key={`text-${imageKey}`}
@@ -138,7 +139,6 @@ export default function SliderFrontendView({ data }) {
             }}
             dir={isRtl ? "rtl" : "ltr"}
           >
-            {/* Title */}
             {slideTitle.trim().length > 0 && (
               <h2
                 className="mb-2 max-w-3xl text-xl leading-tight font-extrabold tracking-tight text-white drop-shadow-lg sm:text-2xl md:text-3xl lg:text-4xl"
@@ -148,7 +148,6 @@ export default function SliderFrontendView({ data }) {
               </h2>
             )}
 
-            {/* Description (HTML from RichTextEditor) */}
             {slideDesc.replace(/<[^>]*>/g, "").trim().length > 0 && (
               <div
                 className="slider-desc max-w-2xl text-sm leading-relaxed text-white/90 drop-shadow-md sm:text-base md:text-lg"
@@ -208,40 +207,8 @@ export default function SliderFrontendView({ data }) {
         )}
       </div>
 
-      {/* ── Scoped styles for RichText HTML inside description ── */}
-      <style jsx global>{`
-        .slider-desc p {
-          margin: 0 0 0.4em 0;
-        }
-        .slider-desc p:last-child {
-          margin-bottom: 0;
-        }
-        .slider-desc strong,
-        .slider-desc b {
-          color: #ffffff;
-          font-weight: 700;
-        }
-        .slider-desc em,
-        .slider-desc i {
-          font-style: italic;
-        }
-        .slider-desc a {
-          color: #5eead4;
-          text-decoration: underline;
-          text-underline-offset: 2px;
-        }
-        .slider-desc a:hover {
-          color: #99f6e4;
-        }
-        .slider-desc ul,
-        .slider-desc ol {
-          margin: 0.3em 0;
-          padding-inline-start: 1.2em;
-        }
-        .slider-desc li {
-          margin-bottom: 0.2em;
-        }
-      `}</style>
+      {/* Global styles — plain <style> tag, NO styled-jsx */}
+      <style dangerouslySetInnerHTML={{ __html: SLIDER_STYLES }} />
     </main>
   );
 }

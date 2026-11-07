@@ -6,11 +6,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-// Components
 import Hamburger from "@/app/Components/Hamburger";
 
 // ==========================================
-// CONSTANTS (Styling & Configuration)
+// CONSTANTS
 // ==========================================
 const LANGUAGES = [
   { code: "en", label: "English", short: "EN" },
@@ -18,35 +17,25 @@ const LANGUAGES = [
   { code: "ps", label: "پښتو", short: "پښتو" },
 ];
 
-const DROP =
-  "invisible absolute top-full z-50 translate-y-2 pt-4 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100";
-
-const CARD = "rounded-xl bg-white p-2 shadow-xl ring-1 ring-black/5";
 const TEAL = "text-[#1E8A8A]";
 
 export const NavBar = () => {
   const router = useRouter();
   const pathname = usePathname();
 
-  // ==========================================
-  // 1. STATE MANAGEMENT
-  // ==========================================
-  // UI States
   const [hidden, setHidden] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [lang, setLang] = useState(LANGUAGES[0]);
   const [query, setQuery] = useState("");
   const lastY = useRef(0);
 
-  // Dynamic Data States
   const [navData, setNavData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Helper boolean to check if current language is Right-to-Left
   const isRTL = lang.code === "fa" || lang.code === "ps";
 
   // ==========================================
-  // 2. DATA FETCHING (Load from Database)
+  // DATA FETCHING
   // ==========================================
   useEffect(() => {
     const fetchNavigation = async () => {
@@ -60,60 +49,51 @@ export const NavBar = () => {
         setIsLoading(false);
       }
     };
-
     fetchNavigation();
   }, []);
 
   // ==========================================
-  // 3. EFFECTS (Language & Scroll Setup)
+  // LANGUAGE INIT
   // ==========================================
-
-  // Set initial language from local storage
   useEffect(() => {
     const savedLanguage = localStorage.getItem("site-language");
     const selectedLanguage =
       LANGUAGES.find((item) => item.code === savedLanguage) || LANGUAGES[0];
-
     setLang(selectedLanguage);
     document.documentElement.lang = selectedLanguage.code;
     document.documentElement.dir =
       selectedLanguage.code === "en" ? "ltr" : "rtl";
   }, []);
 
-  // Handle Scroll behavior (Hide/Show Navbar)
+  // ==========================================
+  // SCROLL
+  // ==========================================
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;
-
       setScrolled(y > 50);
-
       if (y > lastY.current && y > 120) {
-        setHidden(true); // Hide when scrolling down
+        setHidden(true);
       } else if (y < lastY.current) {
-        setHidden(false); // Show when scrolling up
+        setHidden(false);
       }
-
       lastY.current = y;
     };
-
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   // ==========================================
-  // 4. ACTION HANDLERS
+  // ACTION HANDLERS
   // ==========================================
   const pickLanguage = (e, l) => {
     setLang(l);
     localStorage.setItem("site-language", l.code);
-
     document.documentElement.lang = l.code;
     document.documentElement.dir = l.code === "en" ? "ltr" : "rtl";
-
     window.dispatchEvent(
       new CustomEvent("site-language-change", { detail: { language: l.code } }),
     );
-
     e.currentTarget.blur();
   };
 
@@ -126,31 +106,32 @@ export const NavBar = () => {
   };
 
   // ==========================================
-  // 5. HELPER VARIABLES FOR RENDER
+  // HELPERS
   // ==========================================
-  // We use fallbacks (||) so the site doesn't break while data is still loading
-
   const logoUrl =
     navData?.logo ||
     "https://themejunction.net/html/bexon/demo/assets/images/logos/logo.webp";
 
-  // Extract Search Texts safely based on current language
   const searchTexts = navData?.search?.translations?.[lang.code] || {};
   const searchHeading = searchTexts.heading || "What are you looking for?";
   const searchSubheading =
     searchTexts.subheading || "Search services, projects and articles.";
   const searchPlaceholder = searchTexts.placeholder || "Search...";
 
-  // Extract CTA safely
   const ctaLabel =
     navData?.cta?.translations?.[lang.code]?.label || "Let's Talk";
   const ctaHref = navData?.cta?.href || "/contact";
-
-  // Menu Items array
   const menuItems = navData?.items || [];
 
+  // Shared dropdown classes
+  const dropdownPanel =
+    "invisible absolute top-full z-50 translate-y-1 pt-3 opacity-0 transition-all duration-200 ease-out group-hover:visible group-hover:translate-y-0 group-hover:opacity-100";
+
+  const dropdownCard =
+    "rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-black/5 border border-gray-100/80";
+
   // ==========================================
-  // 6. RENDER THE NAVBAR
+  // RENDER
   // ==========================================
   return (
     <nav
@@ -176,59 +157,83 @@ export const NavBar = () => {
           />
         </Link>
 
-        {/* DESKTOP LINKS (Mapped from Database) */}
+        {/* DESKTOP LINKS */}
         <ul className="hidden items-center gap-5 lg:flex xl:gap-8">
           {!isLoading &&
             menuItems.map((item) => {
-              // Get the label for the current language, or fallback to English, or show empty
               const label =
                 item.translations?.[lang.code]?.label ||
                 item.translations?.en?.label ||
                 "";
               const hasSubLinks = item.hasDropdown && item.children?.length > 0;
+              const isActive = pathname === item.href;
 
               return (
                 <li key={item.id} className="group relative">
                   <Link
                     href={item.href}
                     className={`flex items-center gap-1.5 text-[15px] font-medium whitespace-nowrap transition-colors group-hover:text-[#1E8A8A] ${
-                      pathname === item.href ? TEAL : "text-[#0C1E21]"
+                      isActive ? TEAL : "text-[#0C1E21]"
                     }`}
                   >
                     {label}
-
                     {hasSubLinks && (
                       <ChevronDown
                         size={16}
-                        className="transition-transform group-hover:rotate-180"
+                        className="transition-transform duration-200 group-hover:rotate-180"
                       />
                     )}
                   </Link>
 
-                  {/* Sub-links Dropdown */}
+                  {/* Sub-links Dropdown (hover) */}
                   {hasSubLinks && (
                     <div
-                      className={`${DROP} ${
+                      className={`${dropdownPanel} ${
                         isRTL
                           ? "right-0 left-auto text-right"
                           : "right-auto left-0 text-left"
-                      } w-52`}
+                      } w-60`}
                     >
-                      <div className={CARD}>
+                      <div className={dropdownCard}>
+                        <div
+                          className={`absolute -top-1.5 h-3 w-3 rotate-45 border-t border-l border-gray-100 bg-white ${
+                            isRTL ? "right-6" : "left-6"
+                          }`}
+                        />
                         {item.children.map((subItem) => {
                           const subLabel =
                             subItem.translations?.[lang.code]?.label ||
                             subItem.translations?.en?.label ||
                             "";
+                          const isSubActive = pathname === subItem.href;
                           return (
                             <Link
                               key={subItem.id}
                               href={subItem.href}
-                              className={`block rounded-lg px-3 py-2 text-sm font-medium text-[#596366] transition-colors hover:bg-gray-50 hover:text-[#1E8A8A] ${
-                                isRTL ? "text-right" : "text-left"
-                              }`}
+                              className={`group/sub relative flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+                                isSubActive
+                                  ? `bg-[#1E8A8A]/10 ${TEAL}`
+                                  : "text-[#596366] hover:bg-[#1E8A8A]/5 hover:text-[#1E8A8A]"
+                              } ${isRTL ? "text-right" : "text-left"}`}
                             >
-                              {subLabel}
+                              <span className="flex items-center gap-2">
+                                <span
+                                  className={`h-1 w-1 rounded-full bg-[#1E8A8A] transition-all duration-200 ${
+                                    isSubActive
+                                      ? "opacity-100"
+                                      : "opacity-0 group-hover/sub:opacity-100"
+                                  }`}
+                                />
+                                {subLabel}
+                              </span>
+                              <ArrowRight
+                                size={14}
+                                className={`opacity-0 transition-all duration-200 group-hover/sub:opacity-100 ${
+                                  isRTL
+                                    ? "rotate-180 group-hover/sub:-translate-x-0.5"
+                                    : "group-hover/sub:translate-x-0.5"
+                                }`}
+                              />
                             </Link>
                           );
                         })}
@@ -240,9 +245,9 @@ export const NavBar = () => {
             })}
         </ul>
 
-        {/* RIGHT CONTROLS (Language, Search, CTA, Hamburger) */}
+        {/* RIGHT CONTROLS */}
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          {/* LANGUAGE PICKER */}
+          {/* LANGUAGE PICKER (hover) */}
           <div className="group relative">
             <button
               type="button"
@@ -254,25 +259,30 @@ export const NavBar = () => {
               {lang.short}
               <ChevronDown
                 size={14}
-                className="transition-transform group-hover:rotate-180"
+                className="transition-transform duration-200 group-hover:rotate-180"
               />
             </button>
 
             <div
-              className={`${DROP} ${
+              className={`${dropdownPanel} ${
                 isRTL ? "right-auto left-0" : "right-0 left-auto"
-              } w-40`}
+              } w-44`}
             >
-              <div className={CARD}>
+              <div className={dropdownCard}>
+                <div
+                  className={`absolute -top-1.5 h-3 w-3 rotate-45 border-t border-l border-gray-100 bg-white ${
+                    isRTL ? "left-6" : "right-6"
+                  }`}
+                />
                 {LANGUAGES.map((l) => (
                   <button
                     key={l.code}
                     type="button"
                     onClick={(e) => pickLanguage(e, l)}
-                    className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-50 ${
+                    className={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
                       l.code === lang.code
                         ? `bg-[#1E8A8A]/10 ${TEAL}`
-                        : "text-[#596366]"
+                        : "text-[#596366] hover:bg-[#1E8A8A]/5 hover:text-[#1E8A8A]"
                     }`}
                   >
                     <span>{l.label}</span>
@@ -283,7 +293,7 @@ export const NavBar = () => {
             </div>
           </div>
 
-          {/* SEARCH BOX POPUP */}
+          {/* SEARCH BOX (hover) */}
           <div className="group relative hidden lg:block">
             <button
               type="button"
@@ -294,19 +304,23 @@ export const NavBar = () => {
             </button>
 
             <div
-              className={`${DROP} ${
+              className={`${dropdownPanel} ${
                 isRTL ? "right-auto left-0" : "right-0 left-auto"
               } w-80 xl:w-96`}
             >
-              <div className={`${CARD} p-5`}>
+              <div className={`${dropdownCard} p-5`}>
+                <div
+                  className={`absolute -top-1.5 h-3 w-3 rotate-45 border-t border-l border-gray-100 bg-white ${
+                    isRTL ? "left-6" : "right-6"
+                  }`}
+                />
                 <h3
-                  className={`font-semibold text-[#0C1E21] ${
+                  className={`font-bold text-[#0C1E21] ${
                     isRTL ? "text-right" : "text-left"
                   }`}
                 >
                   {searchHeading}
                 </h3>
-
                 <p
                   className={`mt-1 text-sm text-[#596366] ${
                     isRTL ? "text-right" : "text-left"
@@ -314,7 +328,6 @@ export const NavBar = () => {
                 >
                   {searchSubheading}
                 </p>
-
                 <form onSubmit={submitSearch} className="mt-4 flex gap-2">
                   <input
                     value={query}
@@ -326,11 +339,10 @@ export const NavBar = () => {
                       isRTL ? "text-right" : "text-left"
                     }`}
                   />
-
                   <button
                     type="submit"
                     aria-label="Submit search"
-                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#1E8A8A] text-white transition-colors hover:bg-[#167272]"
+                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#1E8A8A] text-white transition-all duration-200 hover:bg-[#167272] hover:shadow-lg hover:shadow-[#1E8A8A]/30"
                   >
                     <Search size={18} />
                   </button>
@@ -339,7 +351,7 @@ export const NavBar = () => {
             </div>
           </div>
 
-          {/* DYNAMIC CTA BUTTON ("Let's Talk") */}
+          {/* CTA BUTTON */}
           {!isLoading && (
             <Link
               href={ctaHref}

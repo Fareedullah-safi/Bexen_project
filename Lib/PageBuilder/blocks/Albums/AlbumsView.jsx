@@ -54,7 +54,7 @@ export default function AlbumsView({ data, lang }) {
   return (
     <section
       dir={isRtl ? "rtl" : "ltr"}
-      className="min-h-screen bg-[var(--background,#f9fafb)] px-4 pt-6 pb-20 transition-colors duration-300 sm:px-6 lg:px-8"
+      className="min-h-screen bg-[var(--background,#f9fafb)] px-4 pt-6 pb-8 transition-colors duration-300 sm:px-6 lg:px-8"
     >
       <div className="mx-auto max-w-[90rem]">
         {/* Header — matches screenshot type */}
