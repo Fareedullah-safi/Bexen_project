@@ -27,6 +27,53 @@ const SOCIAL_ICON_MAP = {
   whatsapp: { name: "WhatsApp", icon: <FaWhatsapp size={16} /> },
 };
 
+// ==========================================
+// 2. MANUAL TRANSLATIONS
+// ==========================================
+const UI_TEXT = {
+  en: {
+    description:
+      "Developing personalized customer journeys to increase satisfaction and loyalty, recognized by industry leaders.",
+    quickLinks: "Quick Links",
+    resources: "Resources",
+    noLinks: "No links",
+    newsletterHeading: "Subscribe to Our Newsletter.",
+    newsletterPlaceholder: "Enter email",
+    newsletterTerms: "Agree to our Terms & Conditions?",
+    subscribe: "Subscribe",
+    allRightsReserved: "All rights reserved",
+    websiteCreatedBy: "Website created by",
+  },
+
+  ps: {
+    description:
+      "موږ د پیرودونکو لپاره ځانګړې تجربې رامنځته کوو، ترڅو د هغوی رضایت او وفاداري زیاته کړو؛ هغه خدمتونه چې د صنعت د مخکښو متخصصینو له خوا پېژندل شوي دي.",
+    quickLinks: "چټک لینکونه",
+    resources: "سرچینې",
+    noLinks: "هیڅ لینک نشته",
+    newsletterHeading: "زموږ خبرپاڼې کې ګډون وکړئ.",
+    newsletterPlaceholder: "خپل برېښنالیک دننه کړئ",
+    newsletterTerms: "ایا تاسو زموږ له شرایطو او مقرراتو سره موافق یاست؟",
+    subscribe: "ګډون وکړئ",
+    allRightsReserved: "ټول حقوق خوندي دي",
+    websiteCreatedBy: "وېب‌سایټ جوړ کړی",
+  },
+
+  fa: {
+    description:
+      "ما تجربه‌های شخصی‌سازی‌شده‌ای برای مشتریان ایجاد می‌کنیم تا رضایت و وفاداری آن‌ها را افزایش دهیم؛ خدماتی که مورد تأیید پیشگامان صنعت قرار گرفته‌اند.",
+    quickLinks: "لینک‌های سریع",
+    resources: "منابع",
+    noLinks: "هیچ لینکی موجود نیست",
+    newsletterHeading: "در خبرنامه ما مشترک شوید.",
+    newsletterPlaceholder: "ایمیل خود را وارد کنید",
+    newsletterTerms: "آیا با شرایط و ضوابط ما موافق هستید؟",
+    subscribe: "اشتراک",
+    allRightsReserved: "تمام حقوق محفوظ است",
+    websiteCreatedBy: "طراحی وب‌سایت توسط",
+  },
+};
+
 const isValidSocialUrl = (url) => {
   const value = String(url || "").trim();
   return value !== "" && value !== "#";
@@ -34,7 +81,7 @@ const isValidSocialUrl = (url) => {
 
 export default function Footer() {
   // ==========================================
-  // 2. STATE
+  // 3. STATE
   // ==========================================
   const [lang, setLang] = useState("en");
   const [footerData, setFooterData] = useState(null);
@@ -44,8 +91,10 @@ export default function Footer() {
   const isRTL = lang === "ps" || lang === "fa";
   const currentYear = new Date().getFullYear();
 
+  const t = UI_TEXT[lang] || UI_TEXT.en;
+
   // ==========================================
-  // 3. LOAD LANGUAGE + API DATA
+  // 4. LOAD LANGUAGE + API DATA
   // ==========================================
   useEffect(() => {
     const saved = localStorage.getItem("site-language") || "en";
@@ -83,7 +132,7 @@ export default function Footer() {
         if (data?.items) setNavItems(data.items);
         else if (Array.isArray(data)) setNavItems(data);
 
-        // ✅ Get Navbar Logo
+        // Get Navbar Logo
         if (data?.logo) setNavLogo(data.logo);
       })
       .catch(() => {});
@@ -95,7 +144,7 @@ export default function Footer() {
   }, []);
 
   // ==========================================
-  // 4.DYNAMIC VALUES FROM DB
+  // 5. DYNAMIC VALUES FROM DB
   // ==========================================
   const logo = navLogo || footerData?.logo || "";
   const projectName = footerData?.projectName || "Bexon";
@@ -103,7 +152,7 @@ export default function Footer() {
   const description =
     footerData?.description?.[lang] ||
     footerData?.description?.en ||
-    "Developing personalize our customer journeys to increase satisfaction & loyalty of our expansion.";
+    t.description;
 
   const phone = footerData?.contact?.phone || "";
   const email = footerData?.contact?.email || "";
@@ -111,17 +160,17 @@ export default function Footer() {
   const newsletterHeading =
     footerData?.newsletter?.heading?.[lang] ||
     footerData?.newsletter?.heading?.en ||
-    "Subscribe to Our Newsletter.";
+    t.newsletterHeading;
 
   const newsletterPlaceholder =
     footerData?.newsletter?.placeholder?.[lang] ||
     footerData?.newsletter?.placeholder?.en ||
-    "Enter email";
+    t.newsletterPlaceholder;
 
   const newsletterTerms =
     footerData?.newsletter?.terms?.[lang] ||
     footerData?.newsletter?.terms?.en ||
-    "Agree to our Terms & Condition?";
+    t.newsletterTerms;
 
   // Social icons filtered from DB
   const socials = useMemo(() => {
@@ -181,7 +230,7 @@ export default function Footer() {
   const column2Links = allQuickLinks.slice(middleIndex);
 
   // ==========================================
-  // 5. RENDER
+  // 6. RENDER
   // ==========================================
   return (
     <section
@@ -201,13 +250,12 @@ export default function Footer() {
         {/* Content Wrapper */}
         <div className="relative px-5 pt-20 pb-10 sm:px-8 sm:pt-28 md:pt-36 lg:px-16 lg:pt-60">
           <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-12 lg:flex lg:grid-cols-none lg:flex-row lg:justify-between lg:gap-10">
-            {/* Box 1 - Clean Standalone Logo & Description */}
+            {/* Box 1 - Logo & Description */}
             <div
               className="wow animate__animated animate__fadeInUp flex flex-col items-start gap-5 sm:col-span-2 sm:gap-6 lg:max-w-sm lg:flex-1"
               data-wow-duration="0.8s"
               data-wow-delay="0.1s"
             >
-              {/* Clean Navbar-Style Logo (No background box) */}
               <Link
                 href="/"
                 className="inline-block transition-transform duration-300 hover:scale-105"
@@ -232,15 +280,16 @@ export default function Footer() {
               </p>
             </div>
 
-            {/* Box 2 - Quick Links (Column 1) */}
+            {/* Box 2 - Quick Links */}
             <div
               className="wow animate__animated animate__fadeInUp flex flex-col lg:flex-1"
               data-wow-duration="0.8s"
               data-wow-delay="0.25s"
             >
               <h3 className="mb-5 text-xl font-bold text-[#0C1E21] sm:mb-7 sm:text-2xl">
-                Quick Links
+                {t.quickLinks}
               </h3>
+
               <ul className="flex flex-col gap-3 sm:gap-4">
                 {column1Links.length > 0 ? (
                   column1Links.map((item) => (
@@ -255,21 +304,22 @@ export default function Footer() {
                   ))
                 ) : (
                   <li className="text-sm text-[#0C1E21]/50 sm:text-[17px]">
-                    No links
+                    {t.noLinks}
                   </li>
                 )}
               </ul>
             </div>
 
-            {/* Box 3 - Resources (Column 2) */}
+            {/* Box 3 - Resources */}
             <div
               className="wow animate__animated animate__fadeInUp flex flex-col lg:flex-1"
               data-wow-duration="0.8s"
               data-wow-delay="0.4s"
             >
               <h3 className="mb-5 text-xl font-bold text-[#0C1E21] sm:mb-7 sm:text-2xl">
-                Resources
+                {t.resources}
               </h3>
+
               <ul className="flex flex-col gap-3 sm:gap-4">
                 {column2Links.length > 0 ? (
                   column2Links.map((item) => (
@@ -309,10 +359,12 @@ export default function Footer() {
                   placeholder={newsletterPlaceholder}
                   className="h-full flex-1 bg-transparent text-sm text-[#0C1E21] outline-none placeholder:text-[#0C1E21]/50 sm:text-base"
                 />
+
                 <span className="mx-2 h-6 w-px bg-gray-200 sm:mx-3" />
+
                 <button
                   type="submit"
-                  aria-label="Subscribe"
+                  aria-label={t.subscribe}
                   className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center text-[#1D8B8A] transition-transform duration-300 hover:scale-110"
                 >
                   <Send size={20} fill="#1D8B8A" />
@@ -336,7 +388,7 @@ export default function Footer() {
             data-wow-delay="0.7s"
           />
 
-          {/* Bottom Bar: Contact Info, Socials, Copyright */}
+          {/* Bottom Bar */}
           <div
             className="wow animate__animated animate__fadeInUp mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 pt-8 lg:flex-row"
             data-wow-duration="0.8s"
@@ -385,14 +437,29 @@ export default function Footer() {
               ))}
             </div>
 
-            {/* Copyright with Dynamic Current Year */}
-            <p className="text-center text-sm text-[#0C1E21]/60 sm:text-[15px]">
-              © {currentYear}{" "}
-              <span className="font-semibold text-[#0C1E21]">
-                {projectName}
-              </span>{" "}
-              All right reserved
-            </p>
+            {/* Copyright & NetHub Credit */}
+            <div className="flex flex-col items-center gap-1 text-center text-sm text-[#0C1E21]/60 sm:text-[15px]">
+              <p>
+                © {currentYear}{" "}
+                <span className="font-semibold text-[#0C1E21]">
+                  {projectName}
+                </span>{" "}
+                {t.allRightsReserved}
+              </p>
+
+              <p>
+                {t.websiteCreatedBy}{" "}
+                <a
+                  href="https://nethub.af/en"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[#1D8B8A] transition-colors duration-300 hover:text-[#0C1E21]"
+                  aria-label="NetHub website"
+                >
+                  NetHub
+                </a>
+              </p>
+            </div>
           </div>
         </div>
 

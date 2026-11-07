@@ -25,6 +25,63 @@ const SOCIAL_ICON_MAP = {
   whatsapp: { name: "WhatsApp", icon: <FaWhatsapp size={16} /> },
 };
 
+// Manual UI translations
+const UI_TEXT = {
+  en: {
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
+    search: "Search",
+    searchPlaceholder: "Search here...",
+    searchHeading: "Search Now!",
+    contactInfo: "Contact Info",
+    phone: "Phone",
+    email: "Email",
+    location: "Location",
+    followUs: "Follow Us",
+    noMenuItems: "No menu items",
+    link: "Link",
+  },
+
+  ps: {
+    openMenu: "مینو پرانیزئ",
+    closeMenu: "مینو وتړئ",
+    search: "لټون",
+    searchPlaceholder: "دلته لټون وکړئ...",
+    searchHeading: "همدا اوس لټون وکړئ!",
+    contactInfo: "د اړیکو معلومات",
+    phone: "د تلیفون شمېره",
+    email: "برېښنالیک",
+    location: "پته",
+    followUs: "موږ تعقیب کړئ",
+    noMenuItems: "د مینو هېڅ برخه نشته",
+    link: "لینک",
+  },
+
+  fa: {
+    openMenu: "باز کردن منو",
+    closeMenu: "بستن منو",
+    search: "جستجو",
+    searchPlaceholder: "اینجا جستجو کنید...",
+    searchHeading: "همین حالا جستجو کنید!",
+    contactInfo: "اطلاعات تماس",
+    phone: "شماره تماس",
+    email: "ایمیل",
+    location: "آدرس",
+    followUs: "ما را دنبال کنید",
+    noMenuItems: "هیچ موردی در منو وجود ندارد",
+    link: "پیوند",
+  },
+};
+
+// Manual description translations
+const DESCRIPTION_TEXT = {
+  en: "Developing personalized customer journeys to increase satisfaction and loyalty, recognized by industry leaders.",
+
+  ps: "موږ د پیرودونکو لپاره ځانګړې تجربې رامنځته کوو، ترڅو د هغوی رضایت او وفاداري زیاته کړو؛ هغه خدمتونه چې د صنعت د مخکښو متخصصینو له خوا پېژندل شوي دي.",
+
+  fa: "ما تجربه‌های شخصی‌سازی‌شده‌ای برای مشتریان ایجاد می‌کنیم تا رضایت و وفاداری آن‌ها را افزایش دهیم؛ خدماتی که مورد تأیید پیشگامان صنعت قرار گرفته‌اند.",
+};
+
 const isValidSocialUrl = (url) => {
   const v = String(url || "").trim();
   return v !== "" && v !== "#";
@@ -47,6 +104,7 @@ export default function Hamburger() {
     const onLangChange = (e) => {
       const next =
         e?.detail?.language || localStorage.getItem("site-language") || "en";
+
       setLang(next);
     };
 
@@ -78,26 +136,30 @@ export default function Hamburger() {
   }, []);
 
   // ----------------------------------------
-  // 2. Safe values from DB
+  // 2. Manual translations
+  // ----------------------------------------
+  const translations = UI_TEXT[lang] || UI_TEXT.en;
+
+  // ----------------------------------------
+  // 3. Safe values from DB
   // ----------------------------------------
   const logo =
     navData?.logo ||
     "https://themejunction.net/html/bexon/demo/assets/images/logos/logo-2.webp";
 
   const searchPlaceholder =
-    navData?.search?.placeholder?.[lang] ||
-    navData?.search?.placeholder?.en ||
-    "Search here...";
+    navData?.search?.placeholder?.[lang] || translations.searchPlaceholder;
 
   const searchHeading =
-    navData?.search?.heading?.[lang] ||
-    navData?.search?.heading?.en ||
-    "Search Now!";
+    navData?.search?.heading?.[lang] || translations.searchHeading;
 
+  // Description: Database translation first,
+  // then manual translation, then English fallback.
   const description =
     footerData?.description?.[lang] ||
+    DESCRIPTION_TEXT[lang] ||
     footerData?.description?.en ||
-    "Developing personalize our customer journeys to increase satisfaction & loyalty of our expansion recognized by industry leaders.";
+    DESCRIPTION_TEXT.en;
 
   const phone = footerData?.contact?.phone || "";
   const email = footerData?.contact?.email || "";
@@ -112,7 +174,7 @@ export default function Hamburger() {
         label:
           sub?.translations?.[lang]?.label ||
           sub?.translations?.en?.label ||
-          "Link",
+          translations.link,
       }));
 
       return {
@@ -121,20 +183,23 @@ export default function Hamburger() {
         label:
           item?.translations?.[lang]?.label ||
           item?.translations?.en?.label ||
-          "Link",
+          translations.link,
         hasDropdown: Boolean(item.hasDropdown && children.length > 0),
         children,
       };
     });
-  }, [navData, lang]);
+  }, [navData, lang, translations]);
 
   // Social icons from Footer (hide if empty or #)
   const socials = useMemo(() => {
     const db = footerData?.socials || {};
+
     return Object.keys(SOCIAL_ICON_MAP)
       .map((key) => {
         const href = db?.[key];
+
         if (!isValidSocialUrl(href)) return null;
+
         return {
           key,
           href: href.trim(),
@@ -148,7 +213,7 @@ export default function Hamburger() {
   const isRTL = lang === "ps" || lang === "fa";
 
   // ----------------------------------------
-  // 3. Open / Close helpers
+  // 4. Open / Close helpers
   // ----------------------------------------
   const openMenu = () => {
     setIsMenuOpen(true);
@@ -166,7 +231,7 @@ export default function Hamburger() {
   };
 
   // ----------------------------------------
-  // 4. RENDER
+  // 5. RENDER
   // ----------------------------------------
   return (
     <div className="relative">
@@ -175,7 +240,7 @@ export default function Hamburger() {
         <button
           type="button"
           onClick={openMenu}
-          aria-label="Open menu"
+          aria-label={translations.openMenu}
           className="group relative z-60 flex cursor-pointer flex-col space-y-1.5 rounded-md bg-[#1E8A8A] p-3 text-white lg:bg-white lg:p-0"
         >
           <span className="h-0.5 w-8 bg-gray-100 transition-all duration-300 lg:bg-black lg:group-hover:bg-[#1E8A8A]" />
@@ -184,11 +249,11 @@ export default function Hamburger() {
         </button>
       )}
 
-      {/* Backdrop — click outside to close */}
+      {/* Subtle Backdrop */}
       {isMenuOpen && (
         <div
           onClick={closeMenu}
-          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px] transition-opacity duration-300"
         />
       )}
 
@@ -219,7 +284,7 @@ export default function Hamburger() {
             <button
               type="button"
               onClick={closeMenu}
-              aria-label="Close menu"
+              aria-label={translations.closeMenu}
               className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/10 transition-all duration-300 hover:rotate-90 hover:bg-[#1E8A8A]"
             >
               <X size={22} />
@@ -241,6 +306,7 @@ export default function Hamburger() {
                           className="flex w-full cursor-pointer items-center justify-between py-4 text-left text-lg font-semibold text-white transition-colors duration-300 hover:text-[#1E8A8A]"
                         >
                           <span>{item.label}</span>
+
                           <ChevronDown
                             size={20}
                             className={`transition-transform duration-300 ${
@@ -266,6 +332,7 @@ export default function Hamburger() {
                                 {item.label}
                               </Link>
                             )}
+
                             {item.children.map((sub) => (
                               <Link
                                 key={sub.id}
@@ -291,7 +358,9 @@ export default function Hamburger() {
                   </div>
                 ))
               ) : (
-                <p className="py-4 text-sm text-gray-500">No menu items</p>
+                <p className="py-4 text-sm text-gray-500">
+                  {translations.noMenuItems}
+                </p>
               )}
             </nav>
 
@@ -307,6 +376,7 @@ export default function Hamburger() {
               <h2 className="mb-4 text-2xl font-semibold text-white">
                 {searchHeading}
               </h2>
+
               <form
                 className="flex h-12 overflow-hidden rounded-lg bg-white"
                 onSubmit={(e) => e.preventDefault()}
@@ -316,14 +386,15 @@ export default function Hamburger() {
                   placeholder={searchPlaceholder}
                   className="w-full px-4 text-sm text-[#0C1E21] outline-none placeholder:text-gray-500"
                 />
+
                 <button
                   type="submit"
-                  aria-label="Search"
+                  aria-label={translations.search}
                   className="flex w-14 shrink-0 items-center justify-center bg-[#1E8A8A] text-white transition-colors duration-300 hover:bg-[#167272]"
                 >
                   <Image
                     src="/icons/magnifiying-glass.png"
-                    alt="Search"
+                    alt={translations.search}
                     width={20}
                     height={20}
                     className="h-5 w-5 brightness-0 invert"
@@ -335,12 +406,16 @@ export default function Hamburger() {
             {/* Contact */}
             <div className="mb-8">
               <h2 className="mb-5 text-2xl font-semibold text-white">
-                Contact Info
+                {translations.contactInfo}
               </h2>
+
               <div className="space-y-5">
                 {!!phone && (
                   <div>
-                    <p className="mb-1 text-sm text-gray-400">Phone</p>
+                    <p className="mb-1 text-sm text-gray-400">
+                      {translations.phone}
+                    </p>
+
                     <a
                       href={`tel:${phone.replace(/[^\d+]/g, "")}`}
                       className="text-base text-white transition-colors duration-300 hover:text-[#1E8A8A]"
@@ -349,9 +424,13 @@ export default function Hamburger() {
                     </a>
                   </div>
                 )}
+
                 {!!email && (
                   <div>
-                    <p className="mb-1 text-sm text-gray-400">Email</p>
+                    <p className="mb-1 text-sm text-gray-400">
+                      {translations.email}
+                    </p>
+
                     <a
                       href={`mailto:${email}`}
                       className="text-base text-white transition-colors duration-300 hover:text-[#1E8A8A]"
@@ -360,9 +439,13 @@ export default function Hamburger() {
                     </a>
                   </div>
                 )}
+
                 {!!location && (
                   <div>
-                    <p className="mb-1 text-sm text-gray-400">Location</p>
+                    <p className="mb-1 text-sm text-gray-400">
+                      {translations.location}
+                    </p>
+
                     <p className="text-base leading-6 text-white">{location}</p>
                   </div>
                 )}
@@ -373,8 +456,9 @@ export default function Hamburger() {
             {socials.length > 0 && (
               <div className="pb-3">
                 <h2 className="mb-4 text-2xl font-semibold text-white">
-                  Follow Us
+                  {translations.followUs}
                 </h2>
+
                 <div className="flex flex-wrap gap-3">
                   {socials.map((s) => (
                     <a
