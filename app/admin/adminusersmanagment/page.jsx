@@ -40,11 +40,29 @@ const roleBadge = (role) => {
 };
 
 // ==========================================
-// Permission check helper
+// Permission check helpers
 // ==========================================
+
+// Check if user can VIEW the page (any authorized role)
 async function verifyAdminPermission() {
   try {
     const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+// ★ NEW: Check if user is SUPER ADMIN (for sensitive actions)
+async function verifySuperAdmin() {
+  try {
+    const res = await fetch("/api/admin/check-super-admin", {
       cache: "no-store",
     });
     const data = await res.json();
@@ -64,22 +82,43 @@ export default function AdminsManager() {
   const [admins, setAdmins] = useState([]);
   const [reset, setReset] = useState(null);
   const [authorized, setAuthorized] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false); // ★ NEW
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   // --- Verify permission on mount ---
   useEffect(() => {
     const checkPermission = async () => {
       setCheckingAuth(true);
-      const allowed = await verifyAdminPermission();
-      setAuthorized(allowed);
+
+      // Check if user can view the page
+      const canView = await verifyAdminPermission();
+      setAuthorized(canView);
+
+      // ★ NEW: Also check if user is super admin
+      if (canView) {
+        const isSuper = await verifySuperAdmin();
+        setIsSuperAdmin(isSuper);
+      }
+
       setCheckingAuth(false);
 
-      if (!allowed) {
+      if (!canView) {
         toast.error("You don't have permission to manage admins.");
       }
     };
     checkPermission();
   }, []);
+
+  // ★ Fresh super-admin check before every sensitive action
+  const requireSuperAdmin = async (actionLabel) => {
+    const allowed = await verifySuperAdmin();
+    if (!allowed) {
+      toast.error(`Only Super Admin can ${actionLabel}.`);
+      setIsSuperAdmin(false);
+      return false;
+    }
+    return true;
+  };
 
   const loadAdmins = async () => {
     try {
@@ -98,11 +137,11 @@ export default function AdminsManager() {
     loadAdmins();
   }, []);
 
+  // ★ Only super admin can change roles
   const handleRoleChange = async (id, newRole) => {
-    if (!authorized) {
-      toast.error("You don't have permission to edit admins.");
-      return;
-    }
+    const allowed = await requireSuperAdmin("change roles");
+    if (!allowed) return;
+
     setSavingId(id);
     try {
       const res = await axios.patch(API_URL, { id, role: newRole });
@@ -123,11 +162,11 @@ export default function AdminsManager() {
     }
   };
 
+  // ★ Only super admin can delete
   const handleDelete = async (id, name) => {
-    if (!authorized) {
-      toast.error("You don't have permission to delete admins.");
-      return;
-    }
+    const allowed = await requireSuperAdmin("delete admins");
+    if (!allowed) return;
+
     setDeletingId(id);
     try {
       const res = await axios.delete(`${API_URL}?id=${id}`);
@@ -143,11 +182,11 @@ export default function AdminsManager() {
     }
   };
 
+  // ★ Only super admin can reset passwords
   const submitReset = async () => {
-    if (!authorized) {
-      toast.error("You don't have permission to reset passwords.");
-      return;
-    }
+    const allowed = await requireSuperAdmin("reset passwords");
+    if (!allowed) return;
+
     if (!reset?.password || reset.password.length < 6)
       return toast.error("Min 6 characters.");
     setReset((r) => ({ ...r, loading: true }));
@@ -175,7 +214,7 @@ export default function AdminsManager() {
     );
   }
 
-  // --- Not authorized: show blocked view ---
+  // --- Not authorized at all: show blocked view ---
   if (!authorized) {
     return (
       <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
@@ -211,6 +250,14 @@ export default function AdminsManager() {
           <p className="mt-1 text-sm text-[var(--muted)]">
             Manage admin users, assign roles, or remove access.
           </p>
+          {/* ★ Show warning if not super admin */}
+          {!isSuperAdmin && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-600">
+              <ShieldAlert size={16} />
+              You are viewing in read-only mode. Only Super Admin can make
+              changes.
+            </div>
+          )}
         </header>
 
         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
@@ -270,7 +317,10 @@ export default function AdminsManager() {
                             <div className="relative">
                               <select
                                 value={currentRole}
-                                disabled={savingId === user._id || !authorized}
+                                // ★ Disabled if not super admin
+                                disabled={
+                                  savingId === user._id || !isSuperAdmin
+                                }
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   if (val !== currentRole)
@@ -306,7 +356,8 @@ export default function AdminsManager() {
                           <div className="flex items-center justify-end gap-1">
                             <button
                               type="button"
-                              disabled={!authorized}
+                              // ★ Disabled if not super admin
+                              disabled={!isSuperAdmin}
                               onClick={() =>
                                 setReset({
                                   id: user._id,
@@ -324,7 +375,10 @@ export default function AdminsManager() {
                             </button>
                             <button
                               type="button"
-                              disabled={deletingId === user._id || !authorized}
+                              // ★ Disabled if not super admin
+                              disabled={
+                                deletingId === user._id || !isSuperAdmin
+                              }
                               onClick={() => handleDelete(user._id, user.name)}
                               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                             >
@@ -414,7 +468,7 @@ export default function AdminsManager() {
                 type="button"
                 onClick={submitReset}
                 disabled={
-                  reset.loading || reset.password.length < 6 || !authorized
+                  reset.loading || reset.password.length < 6 || !isSuperAdmin
                 }
                 className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >

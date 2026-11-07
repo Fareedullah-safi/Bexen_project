@@ -15,6 +15,7 @@ import {
   MessageCircle,
   Phone,
   Save,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Text,
@@ -30,11 +31,27 @@ import { toast } from "sonner";
 import Spinner from "../../Components/Admin/Spinner";
 
 /* ==========================================================================
-   PERMISSION HELPER
+   PERMISSION HELPERS
    ========================================================================== */
 async function verifyUploadPermission() {
   try {
     const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+// ★ NEW: Check if user is super admin
+async function verifySuperAdmin() {
+  try {
+    const res = await fetch("/api/admin/check-super-admin", {
       cache: "no-store",
     });
     const data = await res.json();
@@ -174,7 +191,7 @@ const CLASSES = {
 };
 
 /* ==========================================================================
-   SUB-COMPONENTS (Defined outside main component to preserve DOM focus)
+   SUB-COMPONENTS
    ========================================================================== */
 function PwdInput({
   id,
@@ -277,6 +294,10 @@ export default function AdminUsersPage() {
   const [theme, setTheme] = useState("light");
   const [checking, setChecking] = useState(false);
 
+  // ★ NEW: Super admin state
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [checkingSuperAdmin, setCheckingSuperAdmin] = useState(true);
+
   // Forms
   const [addAdmin, setAddAdmin] = useState(initialAdmin);
   const [changePassword, setChangePassword] = useState(initialPassword);
@@ -327,6 +348,28 @@ export default function AdminUsersPage() {
       widgetRef.current = null;
     }
   }, [theme]);
+
+  /* ★ NEW: Check super admin on mount */
+  useEffect(() => {
+    const checkSuperAdmin = async () => {
+      setCheckingSuperAdmin(true);
+      const isSuper = await verifySuperAdmin();
+      setIsSuperAdmin(isSuper);
+      setCheckingSuperAdmin(false);
+    };
+    checkSuperAdmin();
+  }, []);
+
+  /* ★ NEW: Fresh super-admin check before creating admin */
+  const requireSuperAdmin = async (actionLabel) => {
+    const allowed = await verifySuperAdmin();
+    if (!allowed) {
+      toast.error(`Only Super Admin can ${actionLabel}.`);
+      setIsSuperAdmin(false);
+      return false;
+    }
+    return true;
+  };
 
   /* --------------------------- EFFECTS ------------------------- */
   useEffect(() => {
@@ -626,8 +669,14 @@ export default function AdminUsersPage() {
     }
   };
 
+  // ★ CHANGED: Fresh super-admin check before creating admin
   const handleAddSubmit = async (e) => {
     e.preventDefault();
+
+    // Super admin check FIRST
+    const allowed = await requireSuperAdmin("create admin accounts");
+    if (!allowed) return;
+
     if (
       !addAdmin.name.trim() ||
       !addAdmin.email.trim() ||
@@ -636,13 +685,9 @@ export default function AdminUsersPage() {
     )
       return toast.error("Fill all fields.");
     if (addAdmin.password.length < 8) return toast.error("Password too short.");
+
     toggleLoad("creating", true);
     try {
-      const s = await axios.get("/api/admin/adminusers/session", {
-        withCredentials: true,
-      });
-      if ((s.data?.admin?.role ?? s.data?.role) !== "super-admin")
-        return toast.error("Only Super Admin can create accounts.");
       const res = await axios.post(
         "/api/admin/adminusers/addAdmin",
         {
@@ -781,6 +826,10 @@ export default function AdminUsersPage() {
                 <t.icon className="h-4 w-4 shrink-0" />
                 <span className="hidden sm:inline">{t.label}</span>
                 <span className="sm:hidden">{t.shortLabel}</span>
+                {/* ★ Show lock icon on Add tab if not super admin */}
+                {t.id === "add" && !checkingSuperAdmin && !isSuperAdmin && (
+                  <ShieldAlert size={13} className="text-amber-500" />
+                )}
                 {t.id === "contact" && hasContactErrs && (
                   <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-[var(--surface)]" />
                 )}
@@ -789,7 +838,7 @@ export default function AdminUsersPage() {
           </div>
         </div>
 
-        {/* Dynamic Grid: Removes right sidebar for Password & Contact Info tabs */}
+        {/* Dynamic Grid */}
         <div
           className={`grid items-start gap-6 transition-all duration-300 ${
             activeTab === "profile" || activeTab === "add"
@@ -812,9 +861,8 @@ export default function AdminUsersPage() {
                     </div>
                   </div>
                   <form onSubmit={handleProfileSubmit} className="space-y-7">
-                    {/* -------- POLISHED PROFILE PICTURE BLOCK -------- */}
+                    {/* -------- PROFILE PICTURE BLOCK -------- */}
                     <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-gradient-to-br from-[var(--surface-soft)] via-[var(--surface)] to-[var(--surface-soft)] p-6 sm:p-7">
-                      {/* Decorative glow */}
                       <div
                         aria-hidden="true"
                         className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-[var(--accent)]/10 blur-3xl"
@@ -825,9 +873,7 @@ export default function AdminUsersPage() {
                       />
 
                       <div className="relative flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:gap-7">
-                        {/* Avatar */}
                         <div className="group relative shrink-0">
-                          {/* Accent ring */}
                           <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-[var(--accent)] via-[#35B5B5] to-[var(--accent)] opacity-80 blur-[2px]" />
                           <div className="relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-[var(--surface)] bg-[var(--accent-soft)] shadow-xl sm:h-36 sm:w-36">
                             {profileData.image ? (
@@ -846,13 +892,11 @@ export default function AdminUsersPage() {
                               </div>
                             )}
                           </div>
-                          {/* Camera badge */}
                           <div className="absolute right-1 bottom-1 flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--surface)] bg-[var(--accent)] text-white shadow-md">
                             <Camera size={16} />
                           </div>
                         </div>
 
-                        {/* Info + actions */}
                         <div className="w-full flex-1 text-center sm:text-left">
                           <h3 className="text-base font-bold text-[var(--foreground)]">
                             Profile Picture
@@ -910,7 +954,6 @@ export default function AdminUsersPage() {
                         </div>
                       </div>
                     </div>
-                    {/* -------- END PROFILE PICTURE BLOCK -------- */}
 
                     <div>
                       <label className={CLASSES.label}>Profile Name</label>
@@ -961,108 +1004,131 @@ export default function AdminUsersPage() {
                       </h2>
                     </div>
                   </div>
-                  <form onSubmit={handleAddSubmit} className="space-y-5">
-                    <div>
-                      <label className={CLASSES.label}>Full Name</label>
-                      <div className="group relative">
-                        <UserRound
-                          size={18}
-                          className={`${CLASSES.icon} group-focus-within:text-[var(--accent)]`}
-                        />
-                        <input
-                          name="name"
-                          value={addAdmin.name}
-                          onChange={handleAddChange}
-                          placeholder="Enter name"
-                          required
-                          className={CLASSES.input}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={CLASSES.label}>Email Address</label>
-                      <div className="group relative">
-                        <Mail
-                          size={18}
-                          className={`${CLASSES.icon} group-focus-within:text-[var(--accent)]`}
-                        />
-                        <input
-                          name="email"
-                          type="email"
-                          value={addAdmin.email}
-                          onChange={handleAddChange}
-                          placeholder="admin@example.com"
-                          required
-                          className={CLASSES.input}
-                        />
-                      </div>
-                    </div>
-                    <PwdInput
-                      id="admin-password"
-                      label="Password"
-                      name="password"
-                      val={addAdmin.password}
-                      holder="Create password"
-                      onChange={handleAddChange}
-                      showPassword={showPassword}
-                      togglePassword={togglePassword}
-                    />
 
-                    <div className="relative" ref={roleDropdownRef}>
-                      <label className={CLASSES.label}>Admin Role</label>
-                      <button
-                        type="button"
-                        onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                        className={`${CLASSES.input} flex w-full items-center justify-between text-left`}
-                      >
-                        <span>
-                          {roles.find((r) => r.value === addAdmin.role)
-                            ?.label || "Select role"}
-                        </span>
-                        <ChevronDown
-                          size={18}
-                          className={roleDropdownOpen ? "rotate-180" : ""}
-                        />
-                      </button>
-                      {roleDropdownOpen && (
-                        <div className="absolute right-0 bottom-full left-0 z-50 mb-2 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-xl">
-                          {roles.map((r) => (
-                            <button
-                              key={r.value}
-                              type="button"
-                              onClick={() => {
-                                setAddAdmin((p) => ({ ...p, role: r.value }));
-                                setRoleDropdownOpen(false);
-                              }}
-                              className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm hover:bg-[var(--accent-soft)] ${
-                                addAdmin.role === r.value
-                                  ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]"
-                                  : ""
-                              }`}
-                            >
-                              <span>{r.label}</span>
-                              {addAdmin.role === r.value && (
-                                <Check
-                                  size={17}
-                                  className="text-[var(--accent)]"
-                                />
-                              )}
-                            </button>
-                          ))}
+                  {/* ★ NEW: Access Denied view for non-super-admins */}
+                  {checkingSuperAdmin ? (
+                    <div className="flex min-h-64 items-center justify-center">
+                      <Spinner />
+                    </div>
+                  ) : !isSuperAdmin ? (
+                    <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-red-500/30 bg-red-500/5 px-6 py-16 text-center">
+                      <ShieldAlert
+                        size={48}
+                        className="text-red-500 opacity-70"
+                      />
+                      <h3 className="text-lg font-bold text-red-500">
+                        Access Denied
+                      </h3>
+                      <p className="max-w-md text-sm text-[var(--muted)]">
+                        Only <b className="text-red-500">Super Admin</b> can
+                        create new administrator accounts. Please contact your
+                        Super Admin if you need to add a new user.
+                      </p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleAddSubmit} className="space-y-5">
+                      <div>
+                        <label className={CLASSES.label}>Full Name</label>
+                        <div className="group relative">
+                          <UserRound
+                            size={18}
+                            className={`${CLASSES.icon} group-focus-within:text-[var(--accent)]`}
+                          />
+                          <input
+                            name="name"
+                            value={addAdmin.name}
+                            onChange={handleAddChange}
+                            placeholder="Enter name"
+                            required
+                            className={CLASSES.input}
+                          />
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col-reverse gap-3 border-t border-[var(--border)] pt-6 sm:flex-row sm:justify-end">
-                      <button
-                        type="submit"
-                        disabled={loadState.creating}
-                        className={CLASSES.btn}
-                      >
-                        <UserPlus size={17} />{" "}
-                        {loadState.creating ? "Creating..." : "Create Admin"}
-                      </button>
-                    </div>
-                  </form>
+                      </div>
+                      <div>
+                        <label className={CLASSES.label}>Email Address</label>
+                        <div className="group relative">
+                          <Mail
+                            size={18}
+                            className={`${CLASSES.icon} group-focus-within:text-[var(--accent)]`}
+                          />
+                          <input
+                            name="email"
+                            type="email"
+                            value={addAdmin.email}
+                            onChange={handleAddChange}
+                            placeholder="admin@example.com"
+                            required
+                            className={CLASSES.input}
+                          />
+                        </div>
+                      </div>
+                      <PwdInput
+                        id="admin-password"
+                        label="Password"
+                        name="password"
+                        val={addAdmin.password}
+                        holder="Create password"
+                        onChange={handleAddChange}
+                        showPassword={showPassword}
+                        togglePassword={togglePassword}
+                      />
+
+                      <div className="relative" ref={roleDropdownRef}>
+                        <label className={CLASSES.label}>Admin Role</label>
+                        <button
+                          type="button"
+                          onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+                          className={`${CLASSES.input} flex w-full items-center justify-between text-left`}
+                        >
+                          <span>
+                            {roles.find((r) => r.value === addAdmin.role)
+                              ?.label || "Select role"}
+                          </span>
+                          <ChevronDown
+                            size={18}
+                            className={roleDropdownOpen ? "rotate-180" : ""}
+                          />
+                        </button>
+                        {roleDropdownOpen && (
+                          <div className="absolute right-0 bottom-full left-0 z-50 mb-2 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1 shadow-xl">
+                            {roles.map((r) => (
+                              <button
+                                key={r.value}
+                                type="button"
+                                onClick={() => {
+                                  setAddAdmin((p) => ({ ...p, role: r.value }));
+                                  setRoleDropdownOpen(false);
+                                }}
+                                className={`flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm hover:bg-[var(--accent-soft)] ${
+                                  addAdmin.role === r.value
+                                    ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]"
+                                    : ""
+                                }`}
+                              >
+                                <span>{r.label}</span>
+                                {addAdmin.role === r.value && (
+                                  <Check
+                                    size={17}
+                                    className="text-[var(--accent)]"
+                                  />
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col-reverse gap-3 border-t border-[var(--border)] pt-6 sm:flex-row sm:justify-end">
+                        <button
+                          type="submit"
+                          disabled={loadState.creating}
+                          className={CLASSES.btn}
+                        >
+                          <UserPlus size={17} />{" "}
+                          {loadState.creating ? "Creating..." : "Create Admin"}
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               )}
 
@@ -1381,7 +1447,7 @@ export default function AdminUsersPage() {
             </div>
           </section>
 
-          {/* Right Sidebar - Shown only for Profile & Add Admin */}
+          {/* Right Sidebar */}
           {(activeTab === "profile" || activeTab === "add") && (
             <aside className="animate-in slide-in-from-right-4 space-y-5 duration-300">
               <div className={CLASSES.card}>

@@ -1,6 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import {
+  AlertCircle,
+  CheckCircle2,
   CloudUpload,
   ImagePlus,
   LoaderCircle,
@@ -22,6 +25,77 @@ const ALLOWED_FORMATS = ["jpg", "jpeg", "png", "webp"];
 const MAX_FILE_SIZE = 5_000_000;
 
 const RTL_LANGUAGES = new Set(["ps", "fa"]);
+const ALL_LANGS = ["en", "ps", "fa"];
+
+// Translated text fields for each slide
+const SLIDE_TEXT_FIELDS = [
+  { id: "title", label: "Title" },
+  { id: "description", label: "Description" },
+];
+
+/* ─────────────────────────────────────────────
+   HELPERS: get value + check missing fields
+   ───────────────────────────────────────────── */
+
+// Get a translated field value from a slide
+export const getSlideField = (slide, langKey, fieldId) => {
+  const val = slide?.translations?.[langKey]?.[fieldId] || "";
+  // For description (HTML from RichTextEditor), strip tags before checking
+  if (fieldId === "description") {
+    return val.replace(/<[^>]*>/g, "").trim();
+  }
+  return String(val).trim();
+};
+
+// Check missing translated fields across ALL slides for one language
+export const checkMissingSlideFields = (data = {}, langKey = "en") => {
+  const missing = [];
+  const slides = data?.slides || [];
+
+  for (let i = 0; i < slides.length; i++) {
+    const slide = slides[i];
+    // Skip broken slides (no id or image)
+    if (!slide.id || (!slide.image?.url && !slide.image?.publicId)) continue;
+
+    for (let j = 0; j < SLIDE_TEXT_FIELDS.length; j++) {
+      const field = SLIDE_TEXT_FIELDS[j];
+      const val = getSlideField(slide, langKey, field.id);
+      if (!val) {
+        missing.push(`Slide ${i + 1} — ${field.label}`);
+      }
+    }
+  }
+  return missing;
+};
+
+// Check if there is at least one slide with an image
+export const checkMissingSlides = (data = {}) => {
+  const slides = (data?.slides || []).filter(
+    (s) => s.id && (s.image?.url || s.image?.publicId),
+  );
+  if (slides.length === 0) return ["At least one slide image is required"];
+  return [];
+};
+
+// Complete Validation Function
+export function validateSlider(data = {}) {
+  const missingSlides = checkMissingSlides(data);
+  const enMissing = checkMissingSlideFields(data, "en");
+  const psMissing = checkMissingSlideFields(data, "ps");
+  const faMissing = checkMissingSlideFields(data, "fa");
+
+  return {
+    isValid:
+      missingSlides.length === 0 &&
+      enMissing.length === 0 &&
+      psMissing.length === 0 &&
+      faMissing.length === 0,
+    missingSlides,
+    enMissing,
+    psMissing,
+    faMissing,
+  };
+}
 
 /* ─────────────────────────────────────────────
    Permission check helper
@@ -88,7 +162,6 @@ export default function SliderAdminForm({
 }) {
   const isRtl = RTL_LANGUAGES.has(lang);
 
-  // Filter out any broken slides that have no ID or image URL to prevent empty cards
   const slides = (data?.slides || []).filter(
     (s) => s.id && (s.image?.url || s.image?.publicId),
   );
@@ -103,11 +176,22 @@ export default function SliderAdminForm({
 
   const widgetRef = useRef(null);
   const isMountedRef = useRef(true);
-
-  // Ref to collect multiple uploads during a single widget session
   const pendingUploadsRef = useRef([]);
 
-  /* ── Mount tracker (Strict Mode safe) ── */
+  // ── Validation checks ──
+  const missingSlides = checkMissingSlides(data);
+  const enMissing = checkMissingSlideFields(data, "en");
+  const psMissing = checkMissingSlideFields(data, "ps");
+  const faMissing = checkMissingSlideFields(data, "fa");
+
+  const hasAnyError =
+    showErrors &&
+    (missingSlides.length > 0 ||
+      enMissing.length > 0 ||
+      psMissing.length > 0 ||
+      faMissing.length > 0);
+
+  /* ── Mount tracker ── */
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -193,7 +277,7 @@ export default function SliderAdminForm({
     [data, lang, onChange],
   );
 
-  /* ── ADD NEW SLIDES — MULTIPLE UPLOAD (permission-gated) ── */
+  /* ── ADD NEW SLIDES ── */
   const handleAddSlide = useCallback(async () => {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
       toast.error("Cloudinary is not configured.");
@@ -204,7 +288,6 @@ export default function SliderAdminForm({
       return;
     }
 
-    // --- Permission check before opening widget ---
     setChecking(true);
     const allowed = await verifyUploadPermission();
     setChecking(false);
@@ -240,7 +323,6 @@ export default function SliderAdminForm({
 
         if (!res?.event) return;
 
-        // Collect each successful upload
         if (res.event === "success" && res.info?.secure_url) {
           pendingUploadsRef.current.push({
             url: res.info.secure_url,
@@ -248,7 +330,6 @@ export default function SliderAdminForm({
           });
         }
 
-        // When widget closes, add all collected images as new slides
         if (
           res.event === "close" ||
           res.event === "abort" ||
@@ -294,7 +375,7 @@ export default function SliderAdminForm({
     }
   }, [cloudinaryReady, theme, data, onChange]);
 
-  /* ── REPLACE SLIDE (single, permission-gated) ── */
+  /* ── REPLACE SLIDE ── */
   const handleReplaceSlide = useCallback(
     async (slide) => {
       if (!cloudinaryReady || !window.cloudinary?.createUploadWidget) {
@@ -302,7 +383,6 @@ export default function SliderAdminForm({
         return;
       }
 
-      // --- Permission check before opening widget ---
       setChecking(true);
       const allowed = await verifyUploadPermission();
       setChecking(false);
@@ -412,8 +492,12 @@ export default function SliderAdminForm({
   };
 
   /* ── Shared input class ── */
-  const inputClass =
-    "w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)]";
+  const inputClass = (hasError) =>
+    `w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${
+      hasError
+        ? "border-red-500 bg-red-500/10 focus:border-red-500"
+        : "border-[var(--border)]"
+    }`;
 
   return (
     <div className="mx-auto w-full max-w-[1400px]" dir={isRtl ? "rtl" : "ltr"}>
@@ -429,6 +513,76 @@ export default function SliderAdminForm({
           Manage your slider images, titles, and descriptions here. (
           {lang.toUpperCase()})
         </p>
+      </div>
+
+      {/* ==================== STATUS BANNER ==================== */}
+      <div
+        className={`mb-4 rounded-2xl border p-4 transition-colors ${
+          hasAnyError
+            ? "border-red-500/40 bg-red-500/10"
+            : "border-[var(--border)] bg-[var(--surface)]"
+        }`}
+      >
+        <h3 className="mb-2 text-xs font-bold tracking-wider text-[var(--text-muted)] uppercase">
+          Completion Status
+        </h3>
+        <div className="flex flex-wrap gap-2 text-xs font-semibold">
+          {/* Slides */}
+          <span
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
+              missingSlides.length === 0
+                ? "bg-emerald-500/10 text-emerald-600"
+                : showErrors
+                  ? "bg-red-500/20 text-red-500"
+                  : "bg-[var(--border)] text-[var(--text-muted)]"
+            }`}
+          >
+            {missingSlides.length === 0 ? (
+              <CheckCircle2 size={14} />
+            ) : (
+              <AlertCircle size={14} />
+            )}
+            Slides (
+            {missingSlides.length === 0
+              ? `${slides.length} added`
+              : "none added"}
+            )
+          </span>
+
+          {/* Per-language chips */}
+          {[
+            ["EN", enMissing],
+            ["PS", psMissing],
+            ["FA", faMissing],
+          ].map(([code, missing]) => (
+            <span
+              key={code}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
+                missing.length === 0
+                  ? "bg-emerald-500/10 text-emerald-600"
+                  : showErrors
+                    ? "bg-red-500/20 text-red-500"
+                    : "bg-[var(--border)] text-[var(--text-muted)]"
+              }`}
+            >
+              {missing.length === 0 ? (
+                <CheckCircle2 size={14} />
+              ) : (
+                <AlertCircle size={14} />
+              )}
+              {code} (
+              {missing.length === 0 ? "Complete" : `${missing.length} missing`})
+            </span>
+          ))}
+        </div>
+
+        {hasAnyError && (
+          <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-red-500">
+            <AlertCircle size={14} />
+            Please add at least one slide and fill title + description in EN,
+            PS, FA for every slide before publishing.
+          </p>
+        )}
       </div>
 
       {/* UPLOAD SECTION */}
@@ -494,12 +648,26 @@ export default function SliderAdminForm({
               const titleVal = slideT.title || "";
               const descVal = slideT.description || "";
 
-              // ── Validation: check if title is empty ──
-              const titleErr = showErrors && !titleVal.trim();
+              // ── Validation: check ALL languages (en, ps, fa) ──
+              let titleMissingLangs = [];
+              let descMissingLangs = [];
 
-              // ── Validation: strip HTML tags, then check if description is empty ──
-              const descErr =
-                showErrors && !descVal.replace(/<[^>]*>/g, "").trim();
+              if (showErrors) {
+                for (let i = 0; i < ALL_LANGS.length; i++) {
+                  const l = ALL_LANGS[i];
+                  const t = slide.translations?.[l] || {};
+                  const tTitle = (t.title || "").trim();
+                  const tDesc = (t.description || "")
+                    .replace(/<[^>]*>/g, "")
+                    .trim();
+
+                  if (!tTitle) titleMissingLangs.push(l.toUpperCase());
+                  if (!tDesc) descMissingLangs.push(l.toUpperCase());
+                }
+              }
+
+              const titleErr = titleMissingLangs.length > 0;
+              const descErr = descMissingLangs.length > 0;
 
               return (
                 <div
@@ -508,7 +676,6 @@ export default function SliderAdminForm({
                 >
                   <div className="flex aspect-video items-center justify-center overflow-hidden bg-[var(--background)]">
                     {slide.image?.url ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={slide.image.url}
                         alt={`Slide ${index + 1}`}
@@ -541,11 +708,11 @@ export default function SliderAdminForm({
                         }
                         placeholder="e.g. Welcome to Bexon"
                         maxLength={120}
-                        className={`${inputClass} ${titleErr ? "border-red-500" : ""}`}
+                        className={inputClass(titleErr)}
                       />
                       {titleErr && (
                         <p className="mt-1 text-xs text-red-500">
-                          Title is required
+                          Title is required in: {titleMissingLangs.join(", ")}
                         </p>
                       )}
                     </div>
@@ -557,7 +724,9 @@ export default function SliderAdminForm({
                       </label>
                       <div
                         className={`overflow-hidden rounded-xl border transition-colors ${
-                          descErr ? "border-red-500" : "border-[var(--border)]"
+                          descErr
+                            ? "border-red-500 bg-red-500/5"
+                            : "border-[var(--border)]"
                         }`}
                       >
                         <RichTextEditor
@@ -572,7 +741,8 @@ export default function SliderAdminForm({
                       </div>
                       {descErr && (
                         <p className="mt-1 text-xs text-red-500">
-                          Description is required
+                          Description is required in:{" "}
+                          {descMissingLangs.join(", ")}
                         </p>
                       )}
                     </div>
@@ -585,7 +755,6 @@ export default function SliderAdminForm({
                     </span>
 
                     <div className="flex items-center gap-2">
-                      {/* REPLACE */}
                       <button
                         type="button"
                         onClick={() => handleReplaceSlide(slide)}
@@ -608,7 +777,6 @@ export default function SliderAdminForm({
                         )}
                       </button>
 
-                      {/* DELETE */}
                       <button
                         type="button"
                         onClick={() => handleRemoveSlide(slide)}
@@ -630,12 +798,22 @@ export default function SliderAdminForm({
             })}
           </div>
         ) : (
-          <div className="flex min-h-[220px] items-center justify-center rounded-xl border border-dashed border-[var(--border)] text-sm text-[var(--muted)]">
-            No images yet. Click the upload button above to add your first
-            slides.
+          <div
+            className={`flex min-h-[220px] items-center justify-center rounded-xl border border-dashed text-sm ${
+              showErrors && missingSlides.length > 0
+                ? "border-red-500 bg-red-500/5 text-red-500"
+                : "border-[var(--border)] text-[var(--muted)]"
+            }`}
+          >
+            {showErrors && missingSlides.length > 0
+              ? "At least one slide is required before publishing."
+              : "No images yet. Click the upload button above to add your first slides."}
           </div>
         )}
       </div>
     </div>
   );
 }
+
+// Attach static validate method directly to component so FlatEditorPage can find it automatically!
+SliderAdminForm.validate = validateSlider;

@@ -192,14 +192,14 @@ export default function BannerAdminForm({
   }, []);
 
   /* ---------- Delete helper ---------- */
-  const deleteRemote = (publicId) => {
-    if (!publicId) return;
-    fetch("/api/admin/cloudinary/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ publicId }),
-    }).catch(() => {});
-  };
+  // const deleteRemote = (publicId) => {
+  //   if (!publicId) return;
+  //   fetch("/api/admin/cloudinary/delete", {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify({ publicId }),
+  //   }).catch(() => {});
+  // };
 
   /* ---------- Upload widget ---------- */
   const openWidget = async () => {
@@ -261,14 +261,6 @@ export default function BannerAdminForm({
 
             // Replace against FRESH data — never stale closure
             const fresh = dataRef.current || {};
-            const prevPublicId =
-              fresh?.image?.publicId || fresh?.publicId || "";
-
-            // Delete previous asset after successful replace
-            if (prevPublicId && prevPublicId !== publicId) {
-              deleteRemote(prevPublicId);
-            }
-
             emit({
               ...fresh,
               image: { url, publicId },
@@ -300,23 +292,21 @@ export default function BannerAdminForm({
   };
 
   /* ---------- Remove banner ---------- */
+  /* ---------- Remove banner ---------- */
   const removeBanner = () => {
     if (uploading || deleting) return;
-    if (!confirm("Remove this banner image?")) return;
 
     setDeleting(true);
     const fresh = dataRef.current || {};
-    const publicId = fresh?.image?.publicId || fresh?.publicId || "";
 
-    deleteRemote(publicId);
-
+    // Only clear from UI — do NOT delete from Cloudinary
     emit({
       ...fresh,
       image: emptyImage(),
     });
 
     if (isMountedRef.current) setDeleting(false);
-    toast.success("Banner removed.");
+    toast.success("Banner removed from UI view.");
   };
 
   return (

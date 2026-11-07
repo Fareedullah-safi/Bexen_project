@@ -753,3 +753,4 @@ export default function AboutUsAdminForm({
 
 // Attach static validate method directly to component so FlatEditorPage can find it automatically!
 AboutUsAdminForm.validate = validateAboutUs;
+  
