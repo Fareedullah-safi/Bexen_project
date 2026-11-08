@@ -12,6 +12,24 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+/* Helper to strip HTML tags for empty checks */
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
+const ALBUMS_STYLES = `
+  .rt-inline p { display: inline; margin: 0; }
+  .rt-desc p { margin: 0 0 0.5em 0; }
+  .rt-desc p:last-child { margin-bottom: 0; }
+  .rt-desc strong, .rt-desc b { font-weight: 700; color: inherit; }
+  .rt-desc em, .rt-desc i { font-style: italic; }
+  .rt-desc a { color: #1e8a8a; text-decoration: underline; text-underline-offset: 2px; }
+  .rt-desc ul, .rt-desc ol { margin: 0.4em 0; padding-inline-start: 1.2em; }
+  .rt-desc li { margin-bottom: 0.2em; }
+`;
+
 export default function AlbumsView({ data, lang }) {
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [lightboxIdx, setLightboxIdx] = useState(null);
@@ -51,13 +69,33 @@ export default function AlbumsView({ data, lang }) {
     };
   }, [lightboxIdx]);
 
+  const selectedAlbumTitle =
+    selectedAlbum?.translations?.[lang]?.title ||
+    selectedAlbum?.translations?.en?.title ||
+    "Album";
+  const selectedAlbumSubtitle =
+    selectedAlbum?.translations?.[lang]?.subtitle ||
+    selectedAlbum?.translations?.en?.subtitle ||
+    "";
+
+  const selectedAlbumTitleText = stripHtml(selectedAlbumTitle);
+  const selectedAlbumSubtitleText = stripHtml(selectedAlbumSubtitle);
+
+  const pageTitle = pageT.title || "Photo Albums";
+  const pageSubtitle =
+    pageT.subtitle ||
+    "Explore our curated photo collections and event highlights.";
+
+  const pageTitleText = stripHtml(pageTitle);
+  const pageSubtitleText = stripHtml(pageSubtitle);
+
   return (
     <section
       dir={isRtl ? "rtl" : "ltr"}
       className="min-h-screen bg-[var(--background,#f9fafb)] px-4 pt-6 pb-8 transition-colors duration-300 sm:px-6 lg:px-8"
     >
       <div className="mx-auto max-w-[90rem]">
-        {/* Header — matches screenshot type */}
+        {/* Header */}
         <header className="mb-12 text-center sm:mb-14">
           {selectedAlbum ? (
             <div className="flex flex-col items-center">
@@ -72,26 +110,33 @@ export default function AlbumsView({ data, lang }) {
                 <ArrowLeft size={16} className={isRtl ? "rotate-180" : ""} />
                 {isRtl ? "بیرته ټول البومونه" : "Back to All Albums"}
               </button>
-              <h2 className="mb-3 text-3xl font-extrabold tracking-tight text-[var(--foreground,#0f172a)] sm:text-4xl md:text-5xl">
-                {selectedAlbum.translations?.[lang]?.title ||
-                  selectedAlbum.translations?.en?.title ||
-                  "Album"}
-              </h2>
-              <p className="mx-auto max-w-2xl text-base text-[var(--muted,#64748b)] sm:text-lg">
-                {selectedAlbum.translations?.[lang]?.subtitle ||
-                  selectedAlbum.translations?.en?.subtitle ||
-                  ""}
-              </p>
+              {selectedAlbumTitleText && (
+                <h2
+                  className="rt-inline mb-3 text-3xl font-extrabold tracking-tight text-[var(--foreground,#0f172a)] sm:text-4xl md:text-5xl"
+                  dangerouslySetInnerHTML={{ __html: selectedAlbumTitle }}
+                />
+              )}
+              {selectedAlbumSubtitleText && (
+                <div
+                  className="rt-desc mx-auto max-w-2xl text-base text-[var(--muted,#64748b)] sm:text-lg"
+                  dangerouslySetInnerHTML={{ __html: selectedAlbumSubtitle }}
+                />
+              )}
             </div>
           ) : (
             <div>
-              <h2 className="mb-3 text-3xl font-extrabold tracking-tight text-[var(--foreground,#0f172a)] sm:text-4xl md:text-5xl">
-                {pageT.title || "Photo Albums"}
-              </h2>
-              <p className="mx-auto max-w-2xl text-base text-[var(--muted,#64748b)] sm:text-lg">
-                {pageT.subtitle ||
-                  "Explore our curated photo collections and event highlights."}
-              </p>
+              {pageTitleText && (
+                <h2
+                  className="rt-inline mb-3 text-3xl font-extrabold tracking-tight text-[var(--foreground,#0f172a)] sm:text-4xl md:text-5xl"
+                  dangerouslySetInnerHTML={{ __html: pageTitle }}
+                />
+              )}
+              {pageSubtitleText && (
+                <div
+                  className="rt-desc mx-auto max-w-2xl text-base text-[var(--muted,#64748b)] sm:text-lg"
+                  dangerouslySetInnerHTML={{ __html: pageSubtitle }}
+                />
+              )}
             </div>
           )}
         </header>
@@ -105,7 +150,7 @@ export default function AlbumsView({ data, lang }) {
               </h3>
             </div>
           ) : (
-            /* Album cards — screenshot type */
+            /* Album cards */
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:gap-8">
               {albums.map((album, idx) => {
                 const albT =
@@ -116,6 +161,11 @@ export default function AlbumsView({ data, lang }) {
                   album.images?.[0]?.url ||
                   "";
                 const photoCount = album.images?.length || 0;
+
+                const albTitle = albT.title || "Untitled Album";
+                const albSubtitle = albT.subtitle || "";
+                const albTitleText = stripHtml(albTitle);
+                const albSubtitleText = stripHtml(albSubtitle);
 
                 return (
                   <article
@@ -144,7 +194,7 @@ export default function AlbumsView({ data, lang }) {
                       {cover ? (
                         <img
                           src={cover}
-                          alt={albT.title || "Album"}
+                          alt={albTitleText || "Album"}
                           className="relative z-10 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                           loading="lazy"
                         />
@@ -174,12 +224,18 @@ export default function AlbumsView({ data, lang }) {
 
                       {/* Title overlay */}
                       <div className="absolute inset-x-0 bottom-0 z-30 p-5 sm:p-6">
-                        <h3 className="text-xl font-bold tracking-tight text-white drop-shadow-md sm:text-2xl">
-                          {albT.title || "Untitled Album"}
-                        </h3>
-                        <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-white/80">
-                          {albT.subtitle || ""}
-                        </p>
+                        {albTitleText && (
+                          <h3
+                            className="rt-inline text-xl font-bold tracking-tight text-white drop-shadow-md sm:text-2xl"
+                            dangerouslySetInnerHTML={{ __html: albTitle }}
+                          />
+                        )}
+                        {albSubtitleText && (
+                          <div
+                            className="rt-desc mt-1 line-clamp-2 text-sm leading-relaxed text-white/80"
+                            dangerouslySetInnerHTML={{ __html: albSubtitle }}
+                          />
+                        )}
                       </div>
                     </div>
                   </article>
@@ -281,6 +337,9 @@ export default function AlbumsView({ data, lang }) {
           </div>
         </div>
       )}
+
+      {/* Global CSS styles */}
+      <style dangerouslySetInnerHTML={{ __html: ALBUMS_STYLES }} />
     </section>
   );
 }

@@ -4,6 +4,24 @@ import { ArrowRight, Box, Play, Star } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+/* Helper to strip HTML tags for empty checks */
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
+const ABOUT_US_STYLES = `
+  .rt-inline p { display: inline; margin: 0; }
+  .rt-desc p { margin: 0 0 0.5em 0; }
+  .rt-desc p:last-child { margin-bottom: 0; }
+  .rt-desc strong, .rt-desc b { font-weight: 700; color: inherit; }
+  .rt-desc em, .rt-desc i { font-style: italic; }
+  .rt-desc a { color: #1E8A8A; text-decoration: underline; text-underline-offset: 2px; }
+  .rt-desc ul, .rt-desc ol { margin: 0.4em 0; padding-inline-start: 1.2em; }
+  .rt-desc li { margin-bottom: 0.2em; }
+`;
+
 export default function AboutUsView({ data, lang = "en" }) {
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -37,6 +55,16 @@ export default function AboutUsView({ data, lang = "en" }) {
       /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&/]+)/,
     )?.[1] || "";
 
+  const experienceLabelText = stripHtml(t.experienceLabel);
+  const experienceNumberText = stripHtml(t.experienceNumber);
+  const experienceTextText = stripHtml(t.experienceText);
+  const sectionLabelText = stripHtml(t.sectionLabel);
+  const titleText = stripHtml(t.title);
+  const buttonTextText = stripHtml(t.buttonText);
+  const descriptionText = stripHtml(t.description);
+  const clientNameText = stripHtml(t.clientName);
+  const clientRoleText = stripHtml(t.clientRole);
+
   return (
     <main className="w-full bg-[#eef2f2] px-4 py-10 sm:px-6 md:px-10 lg:px-12 xl:px-16">
       <div className="mx-auto grid w-full grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-10">
@@ -57,25 +85,40 @@ export default function AboutUsView({ data, lang = "en" }) {
           )}
 
           {/* Experience Card */}
-          <div
-            className="wow animate__animated animate__fadeInUp absolute bottom-0 left-0 bg-[#eef2f2] pt-3 pr-3 sm:pt-4 sm:pr-4"
-            data-wow-duration="0.8s"
-            data-wow-delay="0.5s"
-          >
-            <div className="w-52.5 rounded-tr-2xl bg-white p-5 sm:w-62.5 sm:p-6 md:w-70 md:p-7">
-              <p className="text-sm font-medium text-[#229393] sm:text-base md:text-lg">
-                {t.experienceLabel}
-              </p>
+          {(experienceLabelText ||
+            experienceNumberText ||
+            experienceTextText) && (
+            <div
+              className="wow animate__animated animate__fadeInUp absolute bottom-0 left-0 bg-[#eef2f2] pt-3 pr-3 sm:pt-4 sm:pr-4"
+              data-wow-duration="0.8s"
+              data-wow-delay="0.5s"
+            >
+              <div className="w-52.5 rounded-tr-2xl bg-white p-5 sm:w-62.5 sm:p-6 md:w-70 md:p-7">
+                {experienceLabelText && (
+                  <div
+                    className="rt-inline text-sm font-medium text-[#229393] sm:text-base md:text-lg"
+                    dangerouslySetInnerHTML={{ __html: t.experienceLabel }}
+                  />
+                )}
 
-              <h2 className="mt-6 text-4xl leading-none font-bold text-[#102326] sm:mt-8 sm:text-5xl md:mt-10 md:text-6xl">
-                {t.experienceNumber}
-              </h2>
+                {experienceNumberText && (
+                  <div
+                    role="heading"
+                    aria-level={2}
+                    className="rt-inline mt-6 text-4xl leading-none font-bold text-[#102326] sm:mt-8 sm:text-5xl md:mt-10 md:text-6xl"
+                    dangerouslySetInnerHTML={{ __html: t.experienceNumber }}
+                  />
+                )}
 
-              <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base sm:leading-7 md:text-lg">
-                {t.experienceText}
-              </p>
+                {experienceTextText && (
+                  <div
+                    className="rt-desc mt-3 text-sm leading-6 text-slate-600 sm:text-base sm:leading-7 md:text-lg"
+                    dangerouslySetInnerHTML={{ __html: t.experienceText }}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* RIGHT SIDE */}
@@ -87,29 +130,35 @@ export default function AboutUsView({ data, lang = "en" }) {
           {/* MAIN CONTENT CARD */}
           <div className="rounded-2xl bg-white p-4 sm:p-5 md:p-6 lg:p-7">
             {/* Badge */}
-            <span
-              className="wow animate__animated animate__fadeIn group inline-flex items-center gap-2 border border-cyan-100 bg-cyan-50/30 px-3 py-1.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:bg-cyan-100 hover:shadow-md sm:px-4"
-              data-wow-duration="0.8s"
-              data-wow-delay="0.4s"
-            >
-              <Box
-                size={18}
-                className="text-[#1E8A8A] transition-transform duration-300 group-hover:rotate-180"
-              />
+            {sectionLabelText && (
+              <div
+                className="wow animate__animated animate__fadeIn group inline-flex items-center gap-2 border border-cyan-100 bg-cyan-50/30 px-3 py-1.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:bg-cyan-100 hover:shadow-md sm:px-4"
+                data-wow-duration="0.8s"
+                data-wow-delay="0.4s"
+              >
+                <Box
+                  size={18}
+                  className="text-[#1E8A8A] transition-transform duration-300 group-hover:rotate-180"
+                />
 
-              <span className="text-sm font-bold tracking-wide text-zinc-950">
-                {t.sectionLabel}
-              </span>
-            </span>
+                <div
+                  className="rt-inline text-sm font-bold tracking-wide text-zinc-950"
+                  dangerouslySetInnerHTML={{ __html: t.sectionLabel }}
+                />
+              </div>
+            )}
 
             {/* Heading */}
-            <h1
-              className="wow animate__animated animate__fadeInUp mt-5 text-xl leading-[1.15] font-medium text-[#102326] sm:text-2xl md:text-3xl lg:text-[38px] xl:text-[42px]"
-              data-wow-duration="1s"
-              data-wow-delay="0.5s"
-            >
-              {t.title}
-            </h1>
+            {titleText && (
+              <div
+                role="heading"
+                aria-level={1}
+                className="wow animate__animated animate__fadeInUp rt-inline mt-5 text-xl leading-[1.15] font-medium text-[#102326] sm:text-2xl md:text-3xl lg:text-[38px] xl:text-[42px]"
+                data-wow-duration="1s"
+                data-wow-delay="0.5s"
+                dangerouslySetInnerHTML={{ __html: t.title }}
+              />
+            )}
 
             {/* Button */}
             <div
@@ -117,15 +166,16 @@ export default function AboutUsView({ data, lang = "en" }) {
               data-wow-duration="0.8s"
               data-wow-delay="0.7s"
             >
-              {t.buttonText && data?.buttonLink && (
+              {buttonTextText && data?.buttonLink && (
                 <a
                   href={data.buttonLink}
                   className="group/button inline-flex w-35 cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#0C1E21] py-1 pr-1 pl-4 text-xs font-semibold text-white transition-colors duration-300 hover:bg-[#1E8A8A]"
                 >
                   <span className="overflow-hidden leading-none">
-                    <span className="block transition-transform duration-400 ease-in-out [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5">
-                      {t.buttonText}
-                    </span>
+                    <div
+                      className="rt-inline block transition-transform duration-400 ease-in-out [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5"
+                      dangerouslySetInnerHTML={{ __html: t.buttonText }}
+                    />
                   </span>
 
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white">
@@ -160,14 +210,27 @@ export default function AboutUsView({ data, lang = "en" }) {
               </div>
 
               {/* Testimonial */}
-              <p className="mt-5 text-sm leading-6 text-white/90 sm:text-base">
-                {t.description}
-              </p>
+              {descriptionText && (
+                <div
+                  className="rt-desc mt-5 text-sm leading-6 text-white/90 sm:text-base"
+                  dangerouslySetInnerHTML={{ __html: t.description }}
+                />
+              )}
 
               {/* Person */}
               <div className="mt-5">
-                <p className="text-sm font-semibold">{t.clientName}</p>
-                <p className="mt-1 text-xs text-white/70">{t.clientRole}</p>
+                {clientNameText && (
+                  <div
+                    className="rt-inline text-sm font-semibold"
+                    dangerouslySetInnerHTML={{ __html: t.clientName }}
+                  />
+                )}
+                {clientRoleText && (
+                  <div
+                    className="rt-inline mt-1 text-xs text-white/70"
+                    dangerouslySetInnerHTML={{ __html: t.clientRole }}
+                  />
+                )}
               </div>
             </div>
 
@@ -223,6 +286,9 @@ export default function AboutUsView({ data, lang = "en" }) {
           </div>
         </div>
       </div>
+
+      {/* Global CSS styles */}
+      <style dangerouslySetInnerHTML={{ __html: ABOUT_US_STYLES }} />
     </main>
   );
 }

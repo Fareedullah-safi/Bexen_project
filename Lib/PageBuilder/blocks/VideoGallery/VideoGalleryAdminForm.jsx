@@ -1,6 +1,5 @@
 "use client";
 
-import axios from "axios";
 import {
   AlertCircle,
   ArrowLeft,
@@ -18,11 +17,19 @@ import {
 import Script from "next/script";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import RichTextEditor from "../shared/RichTextEditor";
 
 const isYouTube = (url = "") =>
   /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/i.test(
     url?.trim() || "",
   );
+
+// Helper to strip HTML tags (for rich-text validation)
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
 
 // ==========================================
 // HELPERS: Permission check + unified theme
@@ -155,17 +162,12 @@ export default function VideoGalleryAdminForm({
 
   const removeVideo = (idx) => {
     if (!confirm("Remove this video?")) return;
-    const vid = videos[idx];
-    if (vid.thumbnail?.publicId) {
-      axios
-        .post("/api/admin/cloudinary/delete", {
-          publicId: vid.thumbnail.publicId,
-        })
-        .catch(() => {});
-    }
+    // Only remove from UI — do NOT delete from Cloudinary
+    // Thumbnail stays in Cloudinary so backup/restore always works
     const newVideos = [...videos];
     newVideos.splice(idx, 1);
     onChange({ ...currentData, videos: newVideos });
+    toast.success("Video removed from view.");
   };
 
   const moveVideo = (idx, direction) => {
@@ -214,14 +216,7 @@ export default function VideoGalleryAdminForm({
             return;
           }
           if (result.event === "success") {
-            const oldThumb = videos[idx].thumbnail;
-            if (oldThumb?.publicId) {
-              axios
-                .post("/api/admin/cloudinary/delete", {
-                  publicId: oldThumb.publicId,
-                })
-                .catch(() => {});
-            }
+            // Old thumbnail stays in Cloudinary for backup/restore safety
             updateVideo(idx, {
               thumbnail: {
                 url: result.info.secure_url,
@@ -244,11 +239,20 @@ export default function VideoGalleryAdminForm({
     { code: "fa", label: "Farsi", hasErr: faMissing },
   ];
 
+  // For plain inputs (YouTube URL)
   const inputClass = (isInvalid) =>
     `w-full rounded-xl border bg-[var(--surface)] px-4 py-3 text-sm outline-none transition focus:ring-4 ${
       showErrors && isInvalid
         ? "border-red-500 focus:border-red-500 focus:ring-red-500/10"
         : "border-[var(--border)] focus:border-[var(--accent)] focus:ring-[var(--accent)]/10"
+    }`;
+
+  // For rich text editors
+  const richWrapperClass = (hasError) =>
+    `overflow-hidden rounded-xl border transition focus-within:ring-4 ${
+      showErrors && hasError
+        ? "border-red-500 focus-within:border-red-500 focus-within:ring-red-500/10"
+        : "border-[var(--border)] focus-within:border-[var(--accent)] focus-within:ring-[var(--accent)]/10"
     }`;
 
   return (
@@ -298,7 +302,7 @@ export default function VideoGalleryAdminForm({
         </div>
       </div>
 
-      {/* PAGE PRESENTATION TEXT */}
+      {/* PAGE PRESENTATION TEXT (Rich Text) */}
       <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
         <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
           <Type size={18} className="text-[var(--accent)]" />
@@ -311,37 +315,46 @@ export default function VideoGalleryAdminForm({
             <label className="mb-1.5 block text-sm font-semibold text-[var(--foreground)]">
               Top Tag
             </label>
-            <input
-              dir={dir}
-              value={t.tag || ""}
-              onChange={(e) => updatePageField("tag", e.target.value)}
-              className={inputClass(!t.tag?.trim())}
-              placeholder="e.g. Media Library"
-            />
+            <div className={richWrapperClass(!stripHtml(t.tag))}>
+              <RichTextEditor
+                value={t.tag || ""}
+                onChange={(html) => updatePageField("tag", html)}
+                isRtl={isRtl}
+                error={showErrors && !stripHtml(t.tag)}
+                placeholder="e.g. Media Library"
+                minHeight={80}
+              />
+            </div>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-[var(--foreground)]">
               Page Title
             </label>
-            <input
-              dir={dir}
-              value={t.title || ""}
-              onChange={(e) => updatePageField("title", e.target.value)}
-              className={inputClass(!t.title?.trim())}
-              placeholder="e.g. Video Gallery"
-            />
+            <div className={richWrapperClass(!stripHtml(t.title))}>
+              <RichTextEditor
+                value={t.title || ""}
+                onChange={(html) => updatePageField("title", html)}
+                isRtl={isRtl}
+                error={showErrors && !stripHtml(t.title)}
+                placeholder="e.g. Video Gallery"
+                minHeight={80}
+              />
+            </div>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-[var(--foreground)]">
               Page Subtitle
             </label>
-            <input
-              dir={dir}
-              value={t.subtitle || ""}
-              onChange={(e) => updatePageField("subtitle", e.target.value)}
-              className={inputClass(!t.subtitle?.trim())}
-              placeholder="Short description..."
-            />
+            <div className={richWrapperClass(!stripHtml(t.subtitle))}>
+              <RichTextEditor
+                value={t.subtitle || ""}
+                onChange={(html) => updatePageField("subtitle", html)}
+                isRtl={isRtl}
+                error={showErrors && !stripHtml(t.subtitle)}
+                placeholder="Short description..."
+                minHeight={80}
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -441,6 +454,7 @@ export default function VideoGalleryAdminForm({
                     </div>
 
                     <div className="space-y-4 p-5">
+                      {/* YouTube URL — stays as plain input */}
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                           YouTube URL
@@ -458,35 +472,48 @@ export default function VideoGalleryAdminForm({
                         />
                       </div>
 
+                      {/* Video Title (Rich Text) */}
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                           Title ({lang.toUpperCase()})
                         </label>
-                        <input
-                          dir={dir}
-                          value={vidT.title || ""}
-                          onChange={(e) =>
-                            updateVideoText(idx, "title", e.target.value)
-                          }
-                          className={inputClass(!vidT.title?.trim())}
-                          placeholder="Video title"
-                        />
+                        <div
+                          className={richWrapperClass(!stripHtml(vidT.title))}
+                        >
+                          <RichTextEditor
+                            value={vidT.title || ""}
+                            onChange={(html) =>
+                              updateVideoText(idx, "title", html)
+                            }
+                            isRtl={isRtl}
+                            error={showErrors && !stripHtml(vidT.title)}
+                            placeholder="Video title"
+                            minHeight={80}
+                          />
+                        </div>
                       </div>
 
+                      {/* Video Description (Rich Text) */}
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                           Description ({lang.toUpperCase()})
                         </label>
-                        <textarea
-                          dir={dir}
-                          rows={3}
-                          value={vidT.subtitle || ""}
-                          onChange={(e) =>
-                            updateVideoText(idx, "subtitle", e.target.value)
-                          }
-                          className={`${inputClass(!vidT.subtitle?.trim())} min-h-[90px] resize-y`}
-                          placeholder="Detailed description..."
-                        />
+                        <div
+                          className={richWrapperClass(
+                            !stripHtml(vidT.subtitle),
+                          )}
+                        >
+                          <RichTextEditor
+                            value={vidT.subtitle || ""}
+                            onChange={(html) =>
+                              updateVideoText(idx, "subtitle", html)
+                            }
+                            isRtl={isRtl}
+                            error={showErrors && !stripHtml(vidT.subtitle)}
+                            placeholder="Detailed description..."
+                            minHeight={120}
+                          />
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between border-t border-[var(--border)] pt-4">
@@ -537,18 +564,19 @@ export default function VideoGalleryAdminForm({
   );
 }
 
-// Static validator for the parent builder
+// Static validator for the parent builder (strip HTML first)
 VideoGalleryAdminForm.validate = function (data = {}) {
   const translations = data.translations || {};
   const videos = data.videos || [];
 
   const checkLang = (code) => {
     const t = translations[code] || {};
-    if (!t.tag?.trim() || !t.title?.trim() || !t.subtitle?.trim()) return true; // has missing
+    if (!stripHtml(t.tag) || !stripHtml(t.title) || !stripHtml(t.subtitle))
+      return true;
 
     for (const v of videos) {
       const vt = v.translations?.[code] || {};
-      if (!vt.title?.trim() || !vt.subtitle?.trim()) return true;
+      if (!stripHtml(vt.title) || !stripHtml(vt.subtitle)) return true;
     }
     return false;
   };

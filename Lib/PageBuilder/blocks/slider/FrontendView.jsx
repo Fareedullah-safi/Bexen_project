@@ -5,7 +5,22 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+/* Strip HTML tags — used for empty checks and image alt text */
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
 const SLIDER_STYLES = `
+  .slider-title p { margin: 0; display: inline; }
+  .slider-title p:last-child { margin-bottom: 0; }
+  .slider-title strong, .slider-title b { color: #ffffff; font-weight: 800; }
+  .slider-title em, .slider-title i { font-style: italic; }
+  .slider-title a { color: #5eead4; text-decoration: underline; text-underline-offset: 2px; }
+  .slider-title a:hover { color: #99f6e4; }
+  .slider-title span { color: inherit; }
+
   .slider-desc p { margin: 0 0 0.4em 0; }
   .slider-desc p:last-child { margin-bottom: 0; }
   .slider-desc strong, .slider-desc b { color: #ffffff; font-weight: 700; }
@@ -14,9 +29,40 @@ const SLIDER_STYLES = `
   .slider-desc a:hover { color: #99f6e4; }
   .slider-desc ul, .slider-desc ol { margin: 0.3em 0; padding-inline-start: 1.2em; }
   .slider-desc li { margin-bottom: 0.2em; }
+  .slider-desc span { color: inherit; }
 `;
 
-export default function SliderFrontendView({ data }) {
+export default function SliderFrontendView({ data, lang: propLang = "en" }) {
+  const [activeLang, setActiveLang] = useState(propLang);
+
+  /* 1) Sync with incoming propLang from parent */
+  useEffect(() => {
+    if (propLang) {
+      setActiveLang(propLang);
+    }
+  }, [propLang]);
+
+  /* 2) Listen for custom event from NavBar for instant client update */
+  useEffect(() => {
+    function handleLanguageChange(event) {
+      const selectedLanguage = event?.detail?.language;
+      if (
+        selectedLanguage === "en" ||
+        selectedLanguage === "ps" ||
+        selectedLanguage === "fa"
+      ) {
+        setActiveLang(selectedLanguage);
+      }
+    }
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+    return function () {
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
+  }, []);
+
+  const isRtl = activeLang === "ps" || activeLang === "fa";
+
   const images =
     data?.slides
       ?.map((slide) => slide?.image?.url)
@@ -30,17 +76,6 @@ export default function SliderFrontendView({ data }) {
   const [imageKey, setImageKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
-
-  const [lang, setLang] = useState("en");
-  useEffect(() => {
-    const htmlLang = document.documentElement.lang || "en";
-    const short = htmlLang.split("-")[0].toLowerCase();
-    if (short === "en" || short === "ps" || short === "fa") {
-      setLang(short);
-    }
-  }, []);
-
-  const isRtl = lang === "ps" || lang === "fa";
 
   useEffect(() => {
     setImage(images[0] || null);
@@ -97,12 +132,19 @@ export default function SliderFrontendView({ data }) {
 
   const currentSlideIndex = Math.max(images.indexOf(image), 0);
   const currentSlide = validSlides[currentSlideIndex];
-  const slideT = currentSlide?.translations?.[lang] || {};
+
+  /* Fallback to active language translation, or default to English */
+  const slideT =
+    currentSlide?.translations?.[activeLang] ||
+    currentSlide?.translations?.en ||
+    {};
   const slideTitle = slideT.title || "";
   const slideDesc = slideT.description || "";
-  const hasText =
-    slideTitle.trim().length > 0 ||
-    slideDesc.replace(/<[^>]*>/g, "").trim().length > 0;
+
+  // Strip HTML before checking if text is really empty
+  const titleText = stripHtml(slideTitle);
+  const descText = stripHtml(slideDesc);
+  const hasText = titleText.length > 0 || descText.length > 0;
 
   return (
     <main className="z-7 h-full w-full px-4 py-3" dir={isRtl ? "rtl" : "ltr"}>
@@ -119,7 +161,7 @@ export default function SliderFrontendView({ data }) {
           >
             <Image
               src={image}
-              alt={slideTitle || "Slider Image"}
+              alt={titleText || "Slider Image"}
               fill
               priority
               sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 32px), calc(100vw - 32px)"
@@ -130,7 +172,7 @@ export default function SliderFrontendView({ data }) {
 
         {image && hasText && (
           <div
-            key={`text-${imageKey}`}
+            key={`text-${imageKey}-${activeLang}`}
             className="animate__animated animate__fadeInUp absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end rounded-b-lg px-5 pt-20 pb-16 sm:px-8 sm:pt-28 sm:pb-20 md:px-12"
             style={{
               background:
@@ -139,16 +181,17 @@ export default function SliderFrontendView({ data }) {
             }}
             dir={isRtl ? "rtl" : "ltr"}
           >
-            {slideTitle.trim().length > 0 && (
-              <h2
-                className="mb-2 max-w-3xl text-xl leading-tight font-extrabold tracking-tight text-white drop-shadow-lg sm:text-2xl md:text-3xl lg:text-4xl"
+            {titleText.length > 0 && (
+              <div
+                role="heading"
+                aria-level={2}
+                className="slider-title mb-2 max-w-3xl text-xl leading-tight font-extrabold tracking-tight text-white drop-shadow-lg sm:text-2xl md:text-3xl lg:text-4xl"
                 style={{ textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}
-              >
-                {slideTitle}
-              </h2>
+                dangerouslySetInnerHTML={{ __html: slideTitle }}
+              />
             )}
 
-            {slideDesc.replace(/<[^>]*>/g, "").trim().length > 0 && (
+            {descText.length > 0 && (
               <div
                 className="slider-desc max-w-2xl text-sm leading-relaxed text-white/90 drop-shadow-md sm:text-base md:text-lg"
                 style={{ textShadow: "0 1px 6px rgba(0,0,0,0.4)" }}
@@ -207,7 +250,7 @@ export default function SliderFrontendView({ data }) {
         )}
       </div>
 
-      {/* Global styles — plain <style> tag, NO styled-jsx */}
+      {/* Global CSS styles */}
       <style dangerouslySetInnerHTML={{ __html: SLIDER_STYLES }} />
     </main>
   );

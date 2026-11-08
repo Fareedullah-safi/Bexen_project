@@ -16,44 +16,76 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import RichTextEditor from "../shared/RichTextEditor";
 
 const SCRIPT = "script[data-cloudinary-widget]";
 
-// ONE list used for translated inputs + validation
+// Helper to strip HTML tags (for rich-text validation)
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
+// ONE list used for translated inputs + validation (all rich text now)
 const TEXT_FIELDS = [
   {
     id: "experienceNumber",
     label: "Experience Number",
     placeholder: "e.g. 13+",
+    minHeight: 80,
   },
   {
     id: "experienceLabel",
     label: "Experience Label",
     placeholder: "e.g. Years of Experience",
+    minHeight: 80,
   },
   {
     id: "experienceText",
     label: "Experience Text",
     placeholder: "e.g. Decades of Experience...",
+    minHeight: 100,
   },
   {
     id: "sectionLabel",
     label: "Section Label",
     placeholder: "e.g. Get to Know Us",
+    minHeight: 80,
   },
-  { id: "title", label: "Title", placeholder: "Enter section title" },
+  {
+    id: "title",
+    label: "Title",
+    placeholder: "Enter section title",
+    minHeight: 80,
+  },
   {
     id: "description",
     label: "Description",
-    type: "textarea",
     placeholder: "Write your About Us description...",
+    minHeight: 150,
   },
-  { id: "buttonText", label: "Button Text", placeholder: "e.g. Learn More" },
-  { id: "clientName", label: "Client Name", placeholder: "Enter client name" },
-  { id: "clientRole", label: "Client Role", placeholder: "Enter client role" },
+  {
+    id: "buttonText",
+    label: "Button Text",
+    placeholder: "e.g. Learn More",
+    minHeight: 80,
+  },
+  {
+    id: "clientName",
+    label: "Client Name",
+    placeholder: "Enter client name",
+    minHeight: 80,
+  },
+  {
+    id: "clientRole",
+    label: "Client Role",
+    placeholder: "Enter client role",
+    minHeight: 80,
+  },
 ];
 
-// Shared (non-translated) fields
+// Shared (non-translated) fields — URLs stay as plain inputs
 const SHARED_FIELDS = [
   { id: "buttonLink", label: "Button Link", placeholder: "/about" },
   {
@@ -74,18 +106,18 @@ export const getTranslatedField = (data, langKey, fieldId) => {
   return data?.translations?.[langKey]?.[fieldId] || "";
 };
 
-// Check missing translated fields for a specific language
+// Check missing translated fields for a specific language (strip HTML first)
 export const checkMissingFields = (data = {}, langKey = "en") => {
   const missing = [];
   TEXT_FIELDS.forEach((field) => {
-    if (!String(getTranslatedField(data, langKey, field.id)).trim()) {
+    if (!stripHtml(getTranslatedField(data, langKey, field.id))) {
       missing.push(field.label);
     }
   });
   return missing;
 };
 
-// Check missing shared fields
+// Check missing shared fields (plain text, no HTML stripping needed)
 export const checkMissingShared = (data = {}) => {
   const missing = [];
   SHARED_FIELDS.forEach((field) => {
@@ -195,7 +227,7 @@ export default function AboutUsAdminForm({
   const [checking, setChecking] = useState(false);
   const widget = useRef(null);
 
-  // --- NEW: Safe Refs for Data & Mounting ---
+  // --- Safe Refs for Data & Mounting ---
   const dataRef = useRef(data);
   const isMountedRef = useRef(true);
 
@@ -213,7 +245,6 @@ export default function AboutUsAdminForm({
       } catch {}
     };
   }, []);
-  // ------------------------------------------
 
   const translations = data?.translations || {};
   const content = translations[lang] || {};
@@ -226,7 +257,11 @@ export default function AboutUsAdminForm({
   const missingImages = checkMissingImages(data);
   const missingShared = checkMissingShared(data);
 
-  const isErr = (val) => showErrors && !String(val || "").trim();
+  // Error check for rich text (strips HTML first)
+  const isErr = (val) => showErrors && !stripHtml(val);
+
+  // Error check for plain inputs (URLs, no HTML stripping)
+  const isPlainErr = (val) => showErrors && !String(val || "").trim();
 
   /* ---------- Dark mode detection ---------- */
   useEffect(() => {
@@ -263,19 +298,6 @@ export default function AboutUsAdminForm({
     return () => script?.removeEventListener("load", checkReady);
   }, []);
 
-  const destroyCloudinaryImage = async (publicId) => {
-    if (!publicId) return;
-    try {
-      await fetch("/api/admin/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId }),
-      });
-    } catch (e) {
-      console.error("Failed to delete image from Cloudinary:", e);
-    }
-  };
-
   /* ---------- Translated text update (SAFE) ---------- */
   const updateTranslatedField = (fieldId, value) => {
     const fresh = dataRef.current || {};
@@ -302,18 +324,17 @@ export default function AboutUsAdminForm({
     onChange({ ...fresh, [field]: { url, publicId } });
   };
 
-  /* ---------- Remove image (SAFE) ---------- */
-  const removeImage = async (field) => {
+  /* ---------- Remove image (SAFE — keeps image in Cloudinary) ---------- */
+  const removeImage = (field) => {
     if (deletingField || uploadingField) return;
-    const fresh = dataRef.current || {};
-    const publicId = fresh?.[field]?.publicId;
 
     setDeletingField(field);
-    if (publicId) await destroyCloudinaryImage(publicId);
 
+    // Only clear from UI — do NOT delete from Cloudinary
     onChange({ ...dataRef.current, [field]: { url: "", publicId: "" } });
+
     if (isMountedRef.current) setDeletingField("");
-    toast.success("Image removed.");
+    toast.success("Image removed from view.");
   };
 
   /* ---------- Open Cloudinary widget (permission-gated + unified theme) ---------- */
@@ -353,7 +374,6 @@ export default function AboutUsAdminForm({
         {
           cloudName,
           uploadPreset,
-          // sources: ["local", "url"],
           multiple: false,
           maxFiles: 1,
           maxFileSize: 5_000_000,
@@ -363,7 +383,7 @@ export default function AboutUsAdminForm({
           cropping: false,
           styles: cloudinaryStyles(dark ? "dark" : "light"),
         },
-        async (error, result) => {
+        (error, result) => {
           const clear = () => {
             if (isMountedRef.current) setUploadingField("");
           };
@@ -387,9 +407,7 @@ export default function AboutUsAdminForm({
               [field]: { url: newUrl, publicId: newPublicId },
             });
 
-            if (oldPublicId && oldPublicId !== newPublicId) {
-              await destroyCloudinaryImage(oldPublicId);
-            }
+            // Old image stays in Cloudinary for backup/restore safety
 
             if (isMountedRef.current) {
               toast.success(
@@ -418,11 +436,18 @@ export default function AboutUsAdminForm({
   };
 
   /* ---------- Shared classes ---------- */
+  // For plain inputs (URLs)
   const getInputClass = (hasError) =>
     `w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--accent)] ${
       hasError
         ? "border-red-500 bg-red-500/10 focus:border-red-500"
         : "border-[var(--border)]"
+    }`;
+
+  // For rich text editors
+  const richWrapperClass = (hasError) =>
+    `overflow-hidden rounded-xl border transition-colors ${
+      hasError ? "border-red-500 bg-red-500/5" : "border-[var(--border)]"
     }`;
 
   const sectionClass =
@@ -627,7 +652,7 @@ export default function AboutUsAdminForm({
         </div>
       </section>
 
-      {/* ==================== SHARED LINKS ==================== */}
+      {/* ==================== SHARED LINKS (plain inputs — URLs) ==================== */}
       <section className={sectionClass}>
         <h2 className="flex items-center gap-2 font-bold">
           <LinkIcon size={18} className="text-[var(--accent)]" /> Links (Shared)
@@ -637,6 +662,7 @@ export default function AboutUsAdminForm({
           {SHARED_FIELDS.map((field) => {
             const val = data?.[field.id] || "";
             const Icon = field.id === "videoLink" ? PlayCircle : LinkIcon;
+            const hasError = isPlainErr(val);
 
             return (
               <div key={field.id}>
@@ -655,10 +681,10 @@ export default function AboutUsAdminForm({
                   dir="ltr"
                   value={val}
                   onChange={(e) => updateSharedField(field.id, e.target.value)}
-                  className={getInputClass(isErr(val))}
+                  className={getInputClass(hasError)}
                   placeholder={field.placeholder}
                 />
-                {isErr(val) && (
+                {hasError && (
                   <p className="mt-1 text-xs text-red-500">
                     {field.label} is required
                   </p>
@@ -669,7 +695,7 @@ export default function AboutUsAdminForm({
         </div>
       </section>
 
-      {/* ==================== TRANSLATED CONTENT ==================== */}
+      {/* ==================== TRANSLATED CONTENT (Rich Text) ==================== */}
       <section className={sectionClass}>
         <h2 className="flex items-center gap-2 font-bold">
           <Text size={18} className="text-[var(--accent)]" /> Section Content (
@@ -681,25 +707,29 @@ export default function AboutUsAdminForm({
             (f) => f.id !== "clientName" && f.id !== "clientRole",
           ).map((field) => {
             const val = content[field.id] || "";
-            const isTextarea = field.type === "textarea";
-            const InputTag = isTextarea ? "textarea" : "input";
+            const hasError = isErr(val);
+            // Description takes full width
+            const isFullWidth = field.id === "description";
 
             return (
-              <div key={field.id} className={isTextarea ? "sm:col-span-2" : ""}>
+              <div
+                key={field.id}
+                className={isFullWidth ? "sm:col-span-2" : ""}
+              >
                 <label className="mb-1.5 block text-sm font-medium">
                   {field.label}
                 </label>
-                <InputTag
-                  rows={isTextarea ? 4 : undefined}
-                  dir={isRtl ? "rtl" : "ltr"}
-                  value={val}
-                  onChange={(e) =>
-                    updateTranslatedField(field.id, e.target.value)
-                  }
-                  className={getInputClass(isErr(val))}
-                  placeholder={field.placeholder || ""}
-                />
-                {isErr(val) && (
+                <div className={richWrapperClass(hasError)}>
+                  <RichTextEditor
+                    value={val}
+                    onChange={(html) => updateTranslatedField(field.id, html)}
+                    isRtl={isRtl}
+                    error={hasError}
+                    placeholder={field.placeholder || ""}
+                    minHeight={field.minHeight || 80}
+                  />
+                </div>
+                {hasError && (
                   <p className="mt-1 text-xs text-red-500">
                     {field.label} is required in {lang.toUpperCase()}
                   </p>
@@ -710,7 +740,7 @@ export default function AboutUsAdminForm({
         </div>
       </section>
 
-      {/* ==================== CLIENT INFO ==================== */}
+      {/* ==================== CLIENT INFO (Rich Text) ==================== */}
       <section className={sectionClass}>
         <h2 className="flex items-center gap-2 font-bold">
           <User size={18} className="text-[var(--accent)]" /> Client Information
@@ -722,22 +752,24 @@ export default function AboutUsAdminForm({
             (f) => f.id === "clientName" || f.id === "clientRole",
           ).map((field) => {
             const val = content[field.id] || "";
+            const hasError = isErr(val);
 
             return (
               <div key={field.id}>
                 <label className="mb-1.5 flex items-center gap-2 text-sm font-medium">
                   <Type size={12} /> {field.label}
                 </label>
-                <input
-                  dir={isRtl ? "rtl" : "ltr"}
-                  value={val}
-                  onChange={(e) =>
-                    updateTranslatedField(field.id, e.target.value)
-                  }
-                  className={getInputClass(isErr(val))}
-                  placeholder={field.placeholder || ""}
-                />
-                {isErr(val) && (
+                <div className={richWrapperClass(hasError)}>
+                  <RichTextEditor
+                    value={val}
+                    onChange={(html) => updateTranslatedField(field.id, html)}
+                    isRtl={isRtl}
+                    error={hasError}
+                    placeholder={field.placeholder || ""}
+                    minHeight={field.minHeight || 80}
+                  />
+                </div>
+                {hasError && (
                   <p className="mt-1 text-xs text-red-500">
                     {field.label} is required in {lang.toUpperCase()}
                   </p>
@@ -753,4 +785,3 @@ export default function AboutUsAdminForm({
 
 // Attach static validate method directly to component so FlatEditorPage can find it automatically!
 AboutUsAdminForm.validate = validateAboutUs;
-  

@@ -3,6 +3,25 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
+/* Helper to strip HTML tags for empty checks */
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
+const BRAND_LOGOS_STYLES = `
+  .brand-title p { margin: 0; display: inline; }
+  .brand-title strong, .brand-title b { font-weight: 700; }
+  .brand-title em, .brand-title i { font-style: italic; }
+  .brand-title mark.ql-hl {
+    border-radius: 9999px;
+    padding: 2px 8px;
+    color: #ffffff !important;
+  }
+  .brand-title a { color: #1E8A8A; text-decoration: underline; }
+`;
+
 export default function BrandLogosView({ data, lang = "en" }) {
   if (!data) return null;
 
@@ -12,6 +31,7 @@ export default function BrandLogosView({ data, lang = "en" }) {
     .filter((url) => typeof url === "string" && url.trim());
 
   const title = t.title || "";
+  const titleText = stripHtml(title);
   const isRTL = lang === "ps" || lang === "fa";
 
   if (logos.length === 0) return null;
@@ -24,13 +44,17 @@ export default function BrandLogosView({ data, lang = "en" }) {
       <div className="relative z-0 mx-auto flex max-w-7xl flex-col items-center px-4">
         {/* Center circle title */}
         <div
-          className="wow animate__animated animate__fadeIn pointer-events-none absolute top-1/2 left-1/2 z-9 mt-6 flex h-50 w-50 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-gray-300 bg-white/20 leading-loose backdrop-blur-md lg:h-80 lg:w-80"
+          className="wow animate__animated animate__fadeIn pointer-events-none absolute top-1/2 left-1/2 z-9 mt-6 flex h-50 w-50 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-gray-300 bg-white/20 px-4 text-center leading-loose backdrop-blur-md lg:h-80 lg:w-80"
           dir={isRTL ? "rtl" : "ltr"}
           data-wow-duration="1s"
         >
-          <h2 className="max-w-80 text-center text-lg leading-7 font-semibold text-[#102124] lg:text-xl">
-            <FormattedTitle text={title} />
-          </h2>
+          <div className="brand-title max-w-80 text-center text-lg leading-7 font-semibold text-[#102124] lg:text-xl">
+            {titleText ? (
+              <div dangerouslySetInnerHTML={{ __html: title }} />
+            ) : (
+              <FormattedTitle text="" />
+            )}
+          </div>
         </div>
 
         {/* Infinite scroll track */}
@@ -43,11 +67,14 @@ export default function BrandLogosView({ data, lang = "en" }) {
           <MarqueeTrack logos={logos} />
         </div>
       </div>
+
+      {/* Global CSS styles */}
+      <style dangerouslySetInnerHTML={{ __html: BRAND_LOGOS_STYLES }} />
     </section>
   );
 }
 
-/* ==================== FORMATTED TITLE ==================== */
+/* ==================== FALLBACK FORMATTED TITLE ==================== */
 
 function FormattedTitle({ text }) {
   if (!text) {

@@ -30,12 +30,12 @@ async function registerBlots() {
         const level = value?.level || "3";
         node.dataset.level = level;
         const map = {
-          "1": { size: "2rem", weight: "700" },
-          "2": { size: "1.5rem", weight: "700" },
-          "3": { size: "1.25rem", weight: "600" },
-          "4": { size: "1.1rem", weight: "600" },
-          "5": { size: "1rem", weight: "600" },
-          "6": { size: "0.875rem", weight: "600" },
+          1: { size: "2rem", weight: "700" },
+          2: { size: "1.5rem", weight: "700" },
+          3: { size: "1.25rem", weight: "600" },
+          4: { size: "1.1rem", weight: "600" },
+          5: { size: "1rem", weight: "600" },
+          6: { size: "0.875rem", weight: "600" },
         };
         const s = map[level] || map["3"];
         node.style.fontSize = s.size;
@@ -110,6 +110,7 @@ const FORMATS = [
   "link",
   "highlight",
   "inlineHeader",
+  "break",
 ];
 
 /* ══════════════════════════════════════════════════
@@ -128,6 +129,7 @@ export default function RichTextEditor({
   const quillRef = useRef(null);
   const lastEmittedRef = useRef(value);
   const isSyncingRef = useRef(false);
+  const enterBoundRef = useRef(false);
 
   const [ready, setReady] = useState(false);
 
@@ -146,7 +148,10 @@ export default function RichTextEditor({
   }, []);
 
   const modules = useMemo(
-    () => ({ toolbar: TOOLBAR, clipboard: { matchVisual: false } }),
+    () => ({
+      toolbar: TOOLBAR,
+      clipboard: { matchVisual: false },
+    }),
     [],
   );
 
@@ -159,6 +164,72 @@ export default function RichTextEditor({
     el.style.textAlign = isRtl ? "right" : "left";
     el.style.minHeight = `${minHeight}px`;
   }, [isRtl, minHeight]);
+
+  /*
+    Enter     → insert <br>  (soft line break, same paragraph)
+    Shift+Enter → new <p>   (real paragraph split)
+    Must run AFTER Quill mounts, and our binding must be FIRST
+    so it wins over Quill's default Enter handler.
+  */
+  useEffect(() => {
+    if (!ready) return;
+    if (enterBoundRef.current) return;
+
+    let tries = 0;
+
+    function bindEnterKey() {
+      const quill = quillRef.current?.getEditor?.();
+      if (!quill) {
+        tries = tries + 1;
+        if (tries < 20) {
+          setTimeout(bindEnterKey, 50);
+        }
+        return;
+      }
+
+      if (enterBoundRef.current) return;
+      enterBoundRef.current = true;
+
+      // Enter = <br>
+      quill.keyboard.addBinding({
+        key: "Enter",
+        shiftKey: false,
+        handler: function (range) {
+          if (!range) return false;
+
+          quill.insertEmbed(range.index, "break", true, "user");
+          quill.setSelection(range.index + 1, "silent");
+          return false;
+        },
+      });
+
+      // Shift+Enter = new paragraph
+      quill.keyboard.addBinding({
+        key: "Enter",
+        shiftKey: true,
+        handler: function (range) {
+          if (!range) return false;
+
+          quill.insertText(range.index, "\n", "user");
+          quill.setSelection(range.index + 1, "silent");
+          return false;
+        },
+      });
+
+      // Move our Enter bindings to the FRONT so they run before Quill defaults
+      const enterKeyCode = 13;
+      const bindings = quill.keyboard.bindings[enterKeyCode];
+
+      if (bindings && bindings.length > 2) {
+        const shiftEnterBinding = bindings.pop();
+        const enterBinding = bindings.pop();
+        bindings.unshift(enterBinding);
+        bindings.unshift(shiftEnterBinding);
+      }
+    }
+
+    bindEnterKey();
+  }, [ready]);
 
   /* External value sync */
   useEffect(() => {
@@ -374,7 +445,8 @@ export default function RichTextEditor({
             </button>
 
             <span className="text-[10px] text-[var(--muted)]">
-              (select text first)
+              (select text first) · Enter = line break · Shift+Enter = new
+              paragraph
             </span>
           </div>
 

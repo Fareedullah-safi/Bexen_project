@@ -24,14 +24,14 @@ const SECTION_FIELDS = [
   {
     key: "sectionTitle",
     label: "Section Title",
-    type: "input",
+    type: "rich",
     required: true,
     maxLength: 120,
   },
   {
     key: "sectionSubtitle",
     label: "Section Subtitle",
-    type: "textarea",
+    type: "rich",
     required: true,
     maxLength: 240,
   },
@@ -41,14 +41,14 @@ const ITEM_FIELDS = [
   {
     key: "title",
     label: "Title",
-    type: "input",
+    type: "rich",
     required: true,
     maxLength: 140,
   },
   {
     key: "subtitle",
     label: "Subtitle",
-    type: "input",
+    type: "rich",
     required: true,
     maxLength: 200,
   },
@@ -122,6 +122,16 @@ function formatDateHuman(iso, lang) {
   } catch {
     return iso;
   }
+}
+
+/* ─────────────────────────────────────────────
+   Rich text wrapper class
+   ───────────────────────────────────────────── */
+function richWrapperClass(hasError) {
+  if (hasError) {
+    return "overflow-hidden rounded-xl border border-red-500 bg-red-500/5 transition-colors";
+  }
+  return "overflow-hidden rounded-xl border border-[var(--border)] transition-colors";
 }
 
 /* ─────────────────────────────────────────────
@@ -385,21 +395,8 @@ export default function NewsAdminForm({
     });
   }, [normalized, emit]);
 
-  const deleteCloudinaryAsset = async (publicId) => {
-    if (!publicId) return;
-    try {
-      await fetch("/api/admin/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId }),
-      });
-    } catch (err) {
-      console.warn("Cloudinary delete failed:", publicId, err);
-    }
-  };
-
   const removeItemByUid = useCallback(
-    async (uid) => {
+    (uid) => {
       const item = normalized.items.find((n) => n._uid === uid);
       if (!item) return;
       const confirmed = window.confirm(
@@ -408,15 +405,12 @@ export default function NewsAdminForm({
       if (!confirmed) return;
 
       setRemovingUid(uid);
-      try {
-        if (item.image?.publicId)
-          await deleteCloudinaryAsset(item.image.publicId);
-        const items = normalized.items.filter((n) => n._uid !== uid);
-        emit({ ...normalized, items });
-        toast.success("News removed");
-      } finally {
-        if (isMountedRef.current) setRemovingUid(null);
-      }
+      // Only remove from UI — do NOT delete from Cloudinary
+      // Images stay in Cloudinary so backup/restore always works
+      const items = normalized.items.filter((n) => n._uid !== uid);
+      emit({ ...normalized, items });
+      toast.success("News removed from view.");
+      if (isMountedRef.current) setRemovingUid(null);
     },
     [normalized, emit],
   );
@@ -483,9 +477,6 @@ export default function NewsAdminForm({
                   publicId: res.info.public_id,
                 },
               });
-              if (oldPublicId && oldPublicId !== res.info.public_id) {
-                deleteCloudinaryAsset(oldPublicId);
-              }
               toast.success("Image uploaded");
             }
             clear();
@@ -516,19 +507,14 @@ export default function NewsAdminForm({
   );
 
   const removeImageByUid = useCallback(
-    async (uid) => {
+    (uid) => {
       const item = normalized.items.find((n) => n._uid === uid);
       if (!item?.image?.url) return;
       setDeletingUid(uid);
-      try {
-        await deleteCloudinaryAsset(item.image.publicId);
-        updateItemByUid(uid, { image: { url: "", publicId: "" } });
-        toast.success("Image removed");
-      } catch {
-        toast.error("Failed to remove image");
-      } finally {
-        if (isMountedRef.current) setDeletingUid(null);
-      }
+      // Only clear from UI — image stays in Cloudinary for backup/restore
+      updateItemByUid(uid, { image: { url: "", publicId: "" } });
+      toast.success("Image removed from view");
+      if (isMountedRef.current) setDeletingUid(null);
     },
     [normalized, updateItemByUid],
   );
@@ -588,41 +574,22 @@ export default function NewsAdminForm({
         {SECTION_FIELDS.map((field) => {
           const val = normalized.translations[lang]?.[field.key] ?? "";
           const err = isFieldError(field, val);
-          const borderClass = err ? "border-red-500" : "border-[var(--border)]";
 
           return (
             <div key={field.key}>
-              <label
-                className="mb-1.5 block text-sm font-medium"
-                htmlFor={`section-${field.key}`}
-              >
+              <label className="mb-1.5 block text-sm font-medium">
                 {field.label}
               </label>
-              {field.type === "textarea" ? (
-                <textarea
-                  id={`section-${field.key}`}
+              <div className={richWrapperClass(err)}>
+                <RichTextEditor
                   value={val}
-                  onChange={(e) =>
-                    updateSectionTranslation(field.key, e.target.value)
-                  }
-                  rows={2}
-                  maxLength={field.maxLength}
-                  aria-invalid={err}
-                  className={`w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${borderClass}`}
+                  onChange={(html) => updateSectionTranslation(field.key, html)}
+                  isRtl={isRtl}
+                  error={err}
+                  placeholder={`Write ${field.label.toLowerCase()}…`}
+                  minHeight={field.key === "sectionTitle" ? 60 : 80}
                 />
-              ) : (
-                <input
-                  id={`section-${field.key}`}
-                  type="text"
-                  value={val}
-                  onChange={(e) =>
-                    updateSectionTranslation(field.key, e.target.value)
-                  }
-                  maxLength={field.maxLength}
-                  aria-invalid={err}
-                  className={`w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${borderClass}`}
-                />
-              )}
+              </div>
               {err && (
                 <p className="mt-1 text-xs text-red-500">
                   {field.label} is required
@@ -800,13 +767,10 @@ export default function NewsAdminForm({
                 </div>
               </div>
 
-              {/* TRANSLATED FIELDS */}
+              {/* TRANSLATED FIELDS — all rich text */}
               {ITEM_FIELDS.map((field) => {
                 const val = itemT[field.key] ?? "";
                 const err = isFieldError(field, val);
-                const borderClass = err
-                  ? "border-red-500"
-                  : "border-[var(--border)]";
                 const inputId = `item-${uid}-${field.key}`;
 
                 return (
@@ -818,7 +782,7 @@ export default function NewsAdminForm({
                       {field.label} ({lang.toUpperCase()})
                     </label>
 
-                    {field.type === "rich" ? (
+                    <div className={richWrapperClass(err)}>
                       <RichTextEditor
                         value={val}
                         onChange={(html) =>
@@ -827,41 +791,9 @@ export default function NewsAdminForm({
                         isRtl={isRtl}
                         error={err}
                         placeholder={`Write ${field.label.toLowerCase()}…`}
-                        minHeight={200}
+                        minHeight={field.key === "description" ? 200 : 60}
                       />
-                    ) : field.type === "textarea" ? (
-                      <textarea
-                        id={inputId}
-                        value={val}
-                        onChange={(e) =>
-                          updateItemTranslationByUid(
-                            uid,
-                            field.key,
-                            e.target.value,
-                          )
-                        }
-                        rows={3}
-                        maxLength={field.maxLength}
-                        aria-invalid={err}
-                        className={`w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${borderClass}`}
-                      />
-                    ) : (
-                      <input
-                        id={inputId}
-                        type="text"
-                        value={val}
-                        onChange={(e) =>
-                          updateItemTranslationByUid(
-                            uid,
-                            field.key,
-                            e.target.value,
-                          )
-                        }
-                        maxLength={field.maxLength}
-                        aria-invalid={err}
-                        className={`w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${borderClass}`}
-                      />
-                    )}
+                    </div>
 
                     {err && (
                       <p className="mt-1 text-xs text-red-500">
@@ -892,12 +824,18 @@ export default function NewsAdminForm({
         </h3>
 
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 text-center">
-          <h2 className="text-xl font-bold text-[var(--foreground)]">
-            {normalized.translations[lang]?.sectionTitle || "—"}
-          </h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            {normalized.translations[lang]?.sectionSubtitle || "—"}
-          </p>
+          <h2
+            className="text-xl font-bold text-[var(--foreground)]"
+            dangerouslySetInnerHTML={{
+              __html: normalized.translations[lang]?.sectionTitle || "—",
+            }}
+          />
+          <div
+            className="mt-1 text-sm text-[var(--muted)]"
+            dangerouslySetInnerHTML={{
+              __html: normalized.translations[lang]?.sectionSubtitle || "—",
+            }}
+          />
         </div>
 
         {normalized.items.length > 0 && (
@@ -928,12 +866,18 @@ export default function NewsAdminForm({
                         <Calendar size={12} />
                         <span>{formatDateHuman(n.date, lang)}</span>
                       </div>
-                      <h4 className="text-base font-bold text-[var(--foreground)]">
-                        {t.title || "—"}
-                      </h4>
-                      <p className="text-sm text-[var(--muted)]">
-                        {t.subtitle || "—"}
-                      </p>
+                      <h4
+                        className="text-base font-bold text-[var(--foreground)]"
+                        dangerouslySetInnerHTML={{
+                          __html: t.title || "—",
+                        }}
+                      />
+                      <div
+                        className="text-sm text-[var(--muted)]"
+                        dangerouslySetInnerHTML={{
+                          __html: t.subtitle || "—",
+                        }}
+                      />
                       {desc ? (
                         <div
                           className="rt-preview text-sm text-[var(--foreground)]"

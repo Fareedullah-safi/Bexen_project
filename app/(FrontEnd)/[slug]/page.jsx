@@ -1,23 +1,47 @@
-import dbConnect from "@/Lib/mongoDB"; // or your connect path
+import dbConnect from "@/Lib/mongoDB";
 import { BLOCK_REGISTRY } from "@/Lib/PageBuilder/blocks";
 import Page from "@/Models/Pages/Page";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
+function normalizeLang(value) {
+  if (value === "ps" || value === "fa" || value === "en") {
+    return value;
+  }
+  return "en";
+}
+
 export default async function DynamicFrontendPage({ params }) {
-  const { slug } = await params;
+  const resolvedParams = await params;
+  const slug = resolvedParams.slug;
 
   await dbConnect();
-  const page = await Page.findOne({ slug }).lean();
+  const page = await Page.findOne({ slug: slug }).lean();
 
-  if (!page) notFound();
+  if (!page) {
+    notFound();
+  }
 
-  // Optional: only show published to public
-  // if (page.status !== "published") notFound();
+  // Get active language from cookie set by NavBar
+  const cookieStore = await cookies();
+  const langCookie = cookieStore.get("site-language");
+  let lang = "en";
 
-  const sortedBlocks = [...(page.blocks || [])].sort(
-    (a, b) => a.order - b.order,
-  );
-  const lang = "en";
+  if (langCookie && langCookie.value) {
+    lang = normalizeLang(langCookie.value);
+  }
+
+  // Sort blocks by order
+  const sortedBlocks = [];
+  const blocks = page.blocks || [];
+
+  for (let i = 0; i < blocks.length; i++) {
+    sortedBlocks.push(blocks[i]);
+  }
+
+  sortedBlocks.sort(function (a, b) {
+    return a.order - b.order;
+  });
 
   return (
     <main className="min-h-screen">
@@ -27,14 +51,19 @@ export default async function DynamicFrontendPage({ params }) {
         </div>
       )}
 
-      {sortedBlocks.map((block) => {
+      {sortedBlocks.map(function (block) {
         const def = BLOCK_REGISTRY[block.type];
-        if (!def) return null;
+        if (!def) {
+          return null;
+        }
+
         const View = def.FrontendView;
-        if(!View) return null;
+        if (!View) {
+          return null;
+        }
 
         return (
-          <div key={block.blockId} id={`block-${block.blockId}`}>
+          <div key={block.blockId} id={"block-" + block.blockId}>
             <View
               data={block.data}
               lang={lang}

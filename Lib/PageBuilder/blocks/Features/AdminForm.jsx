@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import RichTextEditor from "../shared/RichTextEditor";
 
 // ==========================================
 // 0. PERMISSION HELPER
@@ -70,86 +71,131 @@ function cloudinaryStyles(theme) {
       sourceBg: "#F9FAFB",
     },
   };
-  return { palette: palettes[theme] || palettes.light };
+  if (theme === "dark") return { palette: palettes.dark };
+  return { palette: palettes.light };
 }
 
 const SCRIPT = "script[data-cloudinary-widget]";
 
-// ONE list used for section inputs + validation
+// Helper to strip HTML tags (for rich-text validation)
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
+// ==========================================
+// FIELD DEFINITIONS
+// ==========================================
 const SECTION_FIELDS = [
-  { id: "tagline", label: "Tagline", placeholder: "e.g. Our Features" },
+  {
+    id: "tagline",
+    label: "Tagline",
+    placeholder: "e.g. Our Features",
+    minHeight: 80,
+  },
   {
     id: "title",
     label: "Section Heading",
     placeholder: "e.g. Why choose us",
+    minHeight: 80,
   },
 ];
 
-// ONE list used for card inputs + validation
 const CARD_FIELDS = [
-  { id: "title", label: "Card Title", placeholder: "e.g. Fast Delivery" },
+  {
+    id: "title",
+    label: "Card Title",
+    placeholder: "e.g. Fast Delivery",
+    minHeight: 80,
+  },
   {
     id: "description",
     label: "Card Description",
-    type: "textarea",
     placeholder: "Short description...",
+    minHeight: 120,
   },
 ];
 
-// Helper: safely pull a card field value for a language
-export const getCardField = (card, langKey, fieldId) => {
+// ==========================================
+// HELPERS
+// ==========================================
+export function getCardField(card, langKey, fieldId) {
   if (!card) return "";
-  return card?.translations?.[langKey]?.[fieldId] || "";
-};
+  if (!card.translations) return "";
+  if (!card.translations[langKey]) return "";
+  return card.translations[langKey][fieldId] || "";
+}
 
-// Check missing fields for a specific language
-export const checkMissingFields = (data = {}, langKey = "en") => {
-  const content = data?.translations?.[langKey] || {};
-  const cards = data?.cards || [];
+// Check missing translated fields (section + cards) for one language
+// Strips HTML first since all fields are rich text now
+export function checkMissingFields(data = {}, langKey = "en") {
   const missing = [];
 
-  SECTION_FIELDS.forEach((field) => {
-    if (!String(content[field.id] || "").trim()) {
+  // Section fields
+  let content = {};
+  if (data.translations && data.translations[langKey]) {
+    content = data.translations[langKey];
+  }
+
+  for (let i = 0; i < SECTION_FIELDS.length; i++) {
+    const field = SECTION_FIELDS[i];
+    const value = content[field.id] || "";
+    if (!stripHtml(value)) {
       missing.push(field.label);
     }
-  });
+  }
 
-  cards.forEach((card, index) => {
-    CARD_FIELDS.forEach((field) => {
-      if (!String(getCardField(card, langKey, field.id)).trim()) {
-        missing.push(`Card ${index + 1} ${field.label}`);
+  // Card fields
+  const cards = data.cards || [];
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    for (let j = 0; j < CARD_FIELDS.length; j++) {
+      const field = CARD_FIELDS[j];
+      const value = getCardField(card, langKey, field.id);
+      if (!stripHtml(value)) {
+        missing.push(`Card ${i + 1} ${field.label}`);
       }
-    });
-  });
+    }
+  }
 
   return missing;
-};
+}
 
-// Check missing icons across all cards
-export const checkMissingIcons = (data = {}) => {
-  const cards = data?.cards || [];
+// Check which cards are missing icons
+export function checkMissingIcons(data = {}) {
   const missing = [];
-  cards.forEach((card, i) => {
-    if (!card?.icon?.url?.trim()) missing.push(`Card ${i + 1} icon`);
-  });
-  return missing;
-};
+  const cards = data.cards || [];
 
-// Complete Validation Function
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    const iconUrl = card && card.icon && card.icon.url ? card.icon.url : "";
+    if (!iconUrl.trim()) {
+      missing.push(`Card ${i + 1} icon`);
+    }
+  }
+
+  return missing;
+}
+
+// Main validation
 export function validateFeatures(data = {}) {
-  const noCards = (data?.cards || []).length === 0;
+  const cards = data.cards || [];
+  const noCards = cards.length === 0;
   const missingIcons = checkMissingIcons(data);
   const enMissing = checkMissingFields(data, "en");
   const psMissing = checkMissingFields(data, "ps");
   const faMissing = checkMissingFields(data, "fa");
 
+  let isValid = true;
+  if (noCards) isValid = false;
+  if (missingIcons.length > 0) isValid = false;
+  if (enMissing.length > 0) isValid = false;
+  if (psMissing.length > 0) isValid = false;
+  if (faMissing.length > 0) isValid = false;
+
   return {
-    isValid:
-      !noCards &&
-      missingIcons.length === 0 &&
-      enMissing.length === 0 &&
-      psMissing.length === 0 &&
-      faMissing.length === 0,
+    isValid,
     noCards,
     missingIcons,
     enMissing,
@@ -158,6 +204,9 @@ export function validateFeatures(data = {}) {
   };
 }
 
+// ==========================================
+// MAIN COMPONENT
+// ==========================================
 export default function FeaturesAdminForm({
   data = {},
   lang = "en",
@@ -171,11 +220,15 @@ export default function FeaturesAdminForm({
   const [checking, setChecking] = useState(false);
   const widget = useRef(null);
 
-  const translations = data?.translations || {};
+  // Read current data safely
+  const translations = data.translations || {};
   const content = translations[lang] || {};
-  const cards = data?.cards || [];
-  const isRtl = lang === "ps" || lang === "fa";
+  const cards = data.cards || [];
 
+  let isRtl = false;
+  if (lang === "ps" || lang === "fa") isRtl = true;
+
+  // Validation results
   const currentMissing = checkMissingFields(data, lang);
   const enMissing = checkMissingFields(data, "en");
   const psMissing = checkMissingFields(data, "ps");
@@ -183,13 +236,22 @@ export default function FeaturesAdminForm({
   const missingIcons = checkMissingIcons(data);
   const noCards = cards.length === 0;
 
-  const isErr = (val) => showErrors && !String(val || "").trim();
+  // Helper: is this value empty when we should show errors?
+  // Strips HTML first since all fields are rich text now
+  function isErr(val) {
+    if (!showErrors) return false;
+    if (!stripHtml(val)) return true;
+    return false;
+  }
 
   /* ---------- Dark mode detection ---------- */
   useEffect(() => {
-    const updateTheme = () =>
-      setDark(document.documentElement.classList.contains("dark"));
+    function updateTheme() {
+      const isDark = document.documentElement.classList.contains("dark");
+      setDark(isDark);
+    }
     updateTheme();
+
     const obs = new MutationObserver(updateTheme);
     obs.observe(document.documentElement, {
       attributes: true,
@@ -201,11 +263,14 @@ export default function FeaturesAdminForm({
   /* ---------- Cloudinary script loader ---------- */
   useEffect(() => {
     let script = document.querySelector(SCRIPT);
-    const checkReady = () => {
-      if (window.cloudinary?.createUploadWidget) setReady(true);
-    };
 
-    if (window.cloudinary?.createUploadWidget) {
+    function checkReady() {
+      if (window.cloudinary && window.cloudinary.createUploadWidget) {
+        setReady(true);
+      }
+    }
+
+    if (window.cloudinary && window.cloudinary.createUploadWidget) {
       setReady(true);
     } else {
       if (!script) {
@@ -217,131 +282,133 @@ export default function FeaturesAdminForm({
       }
       script.addEventListener("load", checkReady);
     }
-    return () => script?.removeEventListener("load", checkReady);
+
+    return () => {
+      if (script) script.removeEventListener("load", checkReady);
+    };
   }, []);
 
-  const destroyCloudinaryImage = async (publicId) => {
-    if (!publicId) return;
-    try {
-      await fetch("/api/admin/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId }),
-      });
-    } catch (e) {
-      console.error("Failed to delete image from Cloudinary:", e);
-    }
-  };
-
   /* ---------- Section text update ---------- */
-  const updateSectionText = (fieldId, value) => {
-    onChange({
-      ...data,
-      translations: {
-        ...translations,
-        [lang]: { ...content, [fieldId]: value },
-      },
-    });
-  };
+  function updateSectionText(fieldId, value) {
+    const newContent = { ...content };
+    newContent[fieldId] = value;
+
+    const newTranslations = { ...translations };
+    newTranslations[lang] = newContent;
+
+    onChange({ ...data, translations: newTranslations });
+  }
 
   /* ---------- Card text update ---------- */
-  const updateCardText = (cardIndex, fieldId, value) => {
-    const nextCards = [...cards];
-    const target = { ...nextCards[cardIndex] };
+  function updateCardText(cardIndex, fieldId, value) {
+    const newCards = [...cards];
+    const target = { ...newCards[cardIndex] };
+
     const transObj = target.translations || {};
     const langObj = transObj[lang] || {};
-    target.translations = {
-      ...transObj,
-      [lang]: { ...langObj, [fieldId]: value },
-    };
-    nextCards[cardIndex] = target;
-    onChange({ ...data, cards: nextCards });
-  };
+
+    const newLangObj = { ...langObj };
+    newLangObj[fieldId] = value;
+
+    const newTransObj = { ...transObj };
+    newTransObj[lang] = newLangObj;
+
+    target.translations = newTransObj;
+    newCards[cardIndex] = target;
+
+    onChange({ ...data, cards: newCards });
+  }
 
   /* ---------- Card icon update ---------- */
-  const updateCardIcon = (cardIndex, url, publicId) => {
-    const nextCards = [...cards];
-    nextCards[cardIndex] = {
-      ...nextCards[cardIndex],
-      icon: { url, publicId },
+  function updateCardIcon(cardIndex, url, publicId) {
+    const newCards = [...cards];
+    const target = { ...newCards[cardIndex] };
+    target.icon = { url: url, publicId: publicId };
+    newCards[cardIndex] = target;
+
+    onChange({ ...data, cards: newCards });
+  }
+
+  /* ---------- Add new card ---------- */
+  function addCard() {
+    const newCard = {
+      id: crypto.randomUUID(),
+      icon: { url: "", publicId: "" },
+      translations: {
+        en: { title: "", description: "" },
+        ps: { title: "", description: "" },
+        fa: { title: "", description: "" },
+      },
     };
-    onChange({ ...data, cards: nextCards });
-  };
 
-  /* ---------- Add / remove card ---------- */
-  const addCard = () => {
-    onChange({
-      ...data,
-      cards: [
-        ...cards,
-        {
-          id: crypto.randomUUID(),
-          icon: { url: "", publicId: "" },
-          translations: {
-            en: { title: "", description: "" },
-            ps: { title: "", description: "" },
-            fa: { title: "", description: "" },
-          },
-        },
-      ],
+    const newCards = [...cards, newCard];
+    onChange({ ...data, cards: newCards });
+  }
+
+  /* ---------- Remove whole card (UI only) ---------- */
+  function removeCard(index) {
+    if (deletingIndex !== null) return;
+    if (uploadingIndex !== null) return;
+
+    // Only remove from UI — do NOT delete from Cloudinary
+    // Image stays in Cloudinary so backup/restore works
+    const newCards = cards.filter(function (_, i) {
+      return i !== index;
     });
-  };
 
-  const removeCard = async (index) => {
-    if (deletingIndex !== null || uploadingIndex !== null) return;
-    const publicId = cards[index]?.icon?.publicId;
-    if (publicId) {
-      setDeletingIndex(index);
-      await destroyCloudinaryImage(publicId);
-      setDeletingIndex(null);
-    }
-    onChange({ ...data, cards: cards.filter((_, i) => i !== index) });
-    toast.success("Card removed.");
-  };
+    onChange({ ...data, cards: newCards });
+    toast.success("Card removed from view.");
+  }
 
-  /* ---------- Remove icon only ---------- */
-  const removeCardIcon = async (index) => {
-    if (deletingIndex !== null || uploadingIndex !== null) return;
-    const publicId = cards[index]?.icon?.publicId;
-    setDeletingIndex(index);
-    if (publicId) await destroyCloudinaryImage(publicId);
+  /* ---------- Remove icon only (UI only) ---------- */
+  function removeCardIcon(index) {
+    if (deletingIndex !== null) return;
+    if (uploadingIndex !== null) return;
+
+    // Only clear from UI — do NOT delete from Cloudinary
     updateCardIcon(index, "", "");
-    setDeletingIndex(null);
-    toast.success("Icon removed.");
-  };
+    toast.success("Icon removed from view.");
+  }
 
-  /* ---------- Open Cloudinary widget for a card ---------- */
-  const openWidget = async (cardIndex) => {
-    if (uploadingIndex !== null || deletingIndex !== null || checking) return;
+  /* ---------- Open Cloudinary widget ---------- */
+  async function openWidget(cardIndex) {
+    if (uploadingIndex !== null) return;
+    if (deletingIndex !== null) return;
+    if (checking) return;
 
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     if (!cloudName || !uploadPreset) {
-      return toast.error("Check your Cloudinary environment variables.");
+      toast.error("Check your Cloudinary environment variables.");
+      return;
     }
-    if (!window.cloudinary?.createUploadWidget) {
-      return toast.error("Cloudinary widget is still loading. Please wait.");
+    if (!window.cloudinary || !window.cloudinary.createUploadWidget) {
+      toast.error("Cloudinary widget is still loading. Please wait.");
+      return;
     }
 
     // Permission check BEFORE opening widget
     setChecking(true);
     const allowed = await verifyUploadPermission();
     setChecking(false);
+
     if (!allowed) {
       toast.error("You don't have permission to upload images.");
       return;
     }
 
-    const oldPublicId = cards[cardIndex]?.icon?.publicId || "";
     setUploadingIndex(cardIndex);
+
+    // Build theme
+    let themeName = "light";
+    if (dark) themeName = "dark";
 
     try {
       widget.current = window.cloudinary.createUploadWidget(
         {
-          cloudName,
-          uploadPreset,
-          // sources: ["local", "url"],
+          cloudName: cloudName,
+          uploadPreset: uploadPreset,
           multiple: false,
           maxFiles: 1,
           maxFileSize: 5_000_000,
@@ -349,54 +416,58 @@ export default function FeaturesAdminForm({
           resourceType: "image",
           folder: "bexon/pages/features",
           cropping: false,
-          styles: cloudinaryStyles(dark ? "dark" : "light"),
+          styles: cloudinaryStyles(themeName),
         },
-        async (error, result) => {
+        function (error, result) {
           if (error) {
             toast.error(error.message || "Image upload failed.");
             setUploadingIndex(null);
             return;
           }
 
-          if (result?.event === "success") {
+          if (result && result.event === "success") {
             const newPublicId = result.info.public_id;
             const newUrl = result.info.secure_url;
 
-            if (oldPublicId && oldPublicId !== newPublicId) {
-              await destroyCloudinaryImage(oldPublicId);
-            }
-
+            // Old image stays in Cloudinary for backup/restore safety
             updateCardIcon(cardIndex, newUrl, newPublicId);
-            toast.success(oldPublicId ? "Icon replaced!" : "Icon uploaded!");
+            toast.success("Icon uploaded!");
           }
 
-          if (["close", "abort"].includes(result?.event)) {
+          if (
+            result &&
+            (result.event === "close" || result.event === "abort")
+          ) {
             setUploadingIndex(null);
           }
         },
       );
 
       widget.current.open();
-    } catch {
+    } catch (err) {
       toast.error("Could not open Cloudinary widget.");
       setUploadingIndex(null);
     }
-  };
+  }
 
-  /* ---------- Shared classes ---------- */
-  const getInputClass = (hasError) =>
-    `w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--accent)] ${
-      hasError
-        ? "border-red-500 bg-red-500/10 focus:border-red-500"
-        : "border-[var(--border)]"
-    }`;
+  /* ---------- Rich text wrapper class ---------- */
+  function richWrapperClass(hasError) {
+    if (hasError) {
+      return "overflow-hidden rounded-xl border border-red-500 bg-red-500/5 transition-colors";
+    }
+    return "overflow-hidden rounded-xl border border-[var(--border)] transition-colors";
+  }
 
   const sectionClass =
     "mb-4 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5";
 
-  const hasAnyError =
-    showErrors &&
-    (noCards || missingIcons.length > 0 || currentMissing.length > 0);
+  // Should we highlight the main status banner as error?
+  let hasAnyError = false;
+  if (showErrors) {
+    if (noCards) hasAnyError = true;
+    if (missingIcons.length > 0) hasAnyError = true;
+    if (currentMissing.length > 0) hasAnyError = true;
+  }
 
   return (
     <div>
@@ -412,7 +483,7 @@ export default function FeaturesAdminForm({
           Completion Status
         </h3>
         <div className="flex flex-wrap gap-2 text-xs font-semibold">
-          {/* Cards exist */}
+          {/* Cards count chip */}
           <span
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
               !noCards
@@ -426,7 +497,7 @@ export default function FeaturesAdminForm({
             {cards.length} Card{cards.length === 1 ? "" : "s"}
           </span>
 
-          {/* Icons */}
+          {/* Icons chip */}
           <span
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
               missingIcons.length === 0 && !noCards
@@ -453,26 +524,33 @@ export default function FeaturesAdminForm({
             ["EN", enMissing],
             ["PS", psMissing],
             ["FA", faMissing],
-          ].map(([code, missing]) => (
-            <span
-              key={code}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
-                missing.length === 0
-                  ? "bg-emerald-500/10 text-emerald-600"
-                  : showErrors
-                    ? "bg-red-500/20 text-red-500"
-                    : "bg-[var(--border)] text-[var(--text-muted)]"
-              }`}
-            >
-              {missing.length === 0 ? (
-                <CheckCircle2 size={14} />
-              ) : (
-                <AlertCircle size={14} />
-              )}
-              {code} (
-              {missing.length === 0 ? "Complete" : `${missing.length} missing`})
-            </span>
-          ))}
+          ].map(function (entry) {
+            const code = entry[0];
+            const missing = entry[1];
+            return (
+              <span
+                key={code}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 ${
+                  missing.length === 0
+                    ? "bg-emerald-500/10 text-emerald-600"
+                    : showErrors
+                      ? "bg-red-500/20 text-red-500"
+                      : "bg-[var(--border)] text-[var(--text-muted)]"
+                }`}
+              >
+                {missing.length === 0 ? (
+                  <CheckCircle2 size={14} />
+                ) : (
+                  <AlertCircle size={14} />
+                )}
+                {code} (
+                {missing.length === 0
+                  ? "Complete"
+                  : `${missing.length} missing`}
+                )
+              </span>
+            );
+          })}
         </div>
 
         {hasAnyError && (
@@ -492,21 +570,28 @@ export default function FeaturesAdminForm({
         </h2>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {SECTION_FIELDS.map((field) => {
+          {SECTION_FIELDS.map(function (field) {
             const val = content[field.id] || "";
+            const hasError = isErr(val);
+
             return (
               <div key={field.id}>
                 <label className="mb-1.5 block text-sm font-medium">
                   {field.label}
                 </label>
-                <input
-                  dir={isRtl ? "rtl" : "ltr"}
-                  value={val}
-                  onChange={(e) => updateSectionText(field.id, e.target.value)}
-                  className={getInputClass(isErr(val))}
-                  placeholder={field.placeholder || ""}
-                />
-                {isErr(val) && (
+                <div className={richWrapperClass(hasError)}>
+                  <RichTextEditor
+                    value={val}
+                    onChange={function (html) {
+                      updateSectionText(field.id, html);
+                    }}
+                    isRtl={isRtl}
+                    error={hasError}
+                    placeholder={field.placeholder || ""}
+                    minHeight={field.minHeight || 80}
+                  />
+                </div>
+                {hasError && (
                   <p className="mt-1 text-xs text-red-500">
                     {field.label} is required in {lang.toUpperCase()}
                   </p>
@@ -546,15 +631,22 @@ export default function FeaturesAdminForm({
         )}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {cards.map((card, i) => {
-            const iconUrl = card?.icon?.url || "";
+          {cards.map(function (card, i) {
+            let iconUrl = "";
+            if (card && card.icon && card.icon.url) iconUrl = card.icon.url;
+
             const iconMissing = !iconUrl.trim();
             const isUploading = uploadingIndex === i;
             const isDeleting = deletingIndex === i;
 
+            // Pick a stable key
+            let cardKey = i;
+            if (card.id) cardKey = card.id;
+            else if (card._id) cardKey = card._id;
+
             return (
               <div
-                key={card.id || card._id || i}
+                key={cardKey}
                 className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"
               >
                 {/* Card header */}
@@ -562,7 +654,9 @@ export default function FeaturesAdminForm({
                   <span className="text-sm font-bold">Card {i + 1}</span>
                   <button
                     type="button"
-                    onClick={() => removeCard(i)}
+                    onClick={function () {
+                      removeCard(i);
+                    }}
                     disabled={isDeleting || isUploading}
                     className="cursor-pointer rounded-lg p-2 text-red-500 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -574,7 +668,7 @@ export default function FeaturesAdminForm({
                   </button>
                 </div>
 
-                {/* Icon area */}
+                {/* Icon preview area */}
                 <div
                   className={`flex min-h-28 items-center justify-center overflow-hidden rounded-xl border bg-[var(--background)] ${
                     showErrors && iconMissing
@@ -609,10 +703,13 @@ export default function FeaturesAdminForm({
                   )}
                 </div>
 
+                {/* Upload / Remove icon buttons */}
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => openWidget(i)}
+                    onClick={function () {
+                      openWidget(i);
+                    }}
                     disabled={!ready || isUploading || isDeleting || checking}
                     className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -635,7 +732,9 @@ export default function FeaturesAdminForm({
                   {iconUrl && (
                     <button
                       type="button"
-                      onClick={() => removeCardIcon(i)}
+                      onClick={function () {
+                        removeCardIcon(i);
+                      }}
                       disabled={isDeleting || isUploading}
                       className="cursor-pointer rounded-xl bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                     >
@@ -648,28 +747,29 @@ export default function FeaturesAdminForm({
                   )}
                 </div>
 
-                {/* Card text fields (DRY map) */}
-                {CARD_FIELDS.map((field) => {
+                {/* Card text fields (Rich Text) */}
+                {CARD_FIELDS.map(function (field) {
                   const val = getCardField(card, lang, field.id);
-                  const isTextarea = field.type === "textarea";
-                  const InputTag = isTextarea ? "textarea" : "input";
+                  const hasError = isErr(val);
 
                   return (
                     <div key={field.id}>
                       <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
                         <Type size={12} /> {field.label} ({lang.toUpperCase()})
                       </label>
-                      <InputTag
-                        rows={isTextarea ? 3 : undefined}
-                        dir={isRtl ? "rtl" : "ltr"}
-                        value={val}
-                        onChange={(e) =>
-                          updateCardText(i, field.id, e.target.value)
-                        }
-                        className={getInputClass(isErr(val))}
-                        placeholder={field.placeholder || ""}
-                      />
-                      {isErr(val) && (
+                      <div className={richWrapperClass(hasError)}>
+                        <RichTextEditor
+                          value={val}
+                          onChange={function (html) {
+                            updateCardText(i, field.id, html);
+                          }}
+                          isRtl={isRtl}
+                          error={hasError}
+                          placeholder={field.placeholder || ""}
+                          minHeight={field.minHeight || 100}
+                        />
+                      </div>
+                      {hasError && (
                         <p className="mt-1 text-xs text-red-500">
                           {field.label} is required in {lang.toUpperCase()}
                         </p>
@@ -686,5 +786,5 @@ export default function FeaturesAdminForm({
   );
 }
 
-// Attach static validate method directly to component so FlatEditorPage can find it automatically!
+// Attach static validate method directly to component so FlatEditorPage finds it
 FeaturesAdminForm.validate = validateFeatures;

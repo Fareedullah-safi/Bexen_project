@@ -40,11 +40,10 @@ const SLIDE_TEXT_FIELDS = [
 // Get a translated field value from a slide
 export const getSlideField = (slide, langKey, fieldId) => {
   const val = slide?.translations?.[langKey]?.[fieldId] || "";
-  // For description (HTML from RichTextEditor), strip tags before checking
-  if (fieldId === "description") {
-    return val.replace(/<[^>]*>/g, "").trim();
-  }
-  return String(val).trim();
+  // Strip HTML tags before checking (title and description are both rich text now)
+  return String(val)
+    .replace(/<[^>]*>/g, "")
+    .trim();
 };
 
 // Check missing translated fields across ALL slides for one language
@@ -242,20 +241,6 @@ export default function SliderAdminForm({
     };
   }, []);
 
-  /* ── Delete Image API ── */
-  const destroyCloudinaryImage = async (publicId) => {
-    if (!publicId) return;
-    try {
-      await fetch("/api/admin/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId }),
-      });
-    } catch (err) {
-      console.warn("Cloudinary delete failed:", publicId, err);
-    }
-  };
-
   /* ── Slide text update helper ── */
   const updateSlideText = useCallback(
     (slideId, field, value) => {
@@ -393,7 +378,6 @@ export default function SliderAdminForm({
       }
 
       setReplacingId(slide.id);
-      const oldPublicId = slide.image?.publicId;
 
       try {
         widgetRef.current?.destroy?.();
@@ -409,7 +393,7 @@ export default function SliderAdminForm({
           maxFileSize: MAX_FILE_SIZE,
           styles: cloudinaryStyles(theme),
         },
-        async (err, res) => {
+        (err, res) => {
           const clear = () => setReplacingId(null);
 
           if (err) {
@@ -436,9 +420,7 @@ export default function SliderAdminForm({
               );
               onChange({ ...data, slides: updatedSlides });
 
-              if (oldPublicId && oldPublicId !== res.info.public_id) {
-                destroyCloudinaryImage(oldPublicId);
-              }
+              // Old image stays in Cloudinary for backup/restore safety
               toast.success("Slide replaced!");
             }
             clear();
@@ -469,7 +451,7 @@ export default function SliderAdminForm({
   );
 
   /* ── REMOVE SLIDE ── */
-  const handleRemoveSlide = async (slide) => {
+  const handleRemoveSlide = (slide) => {
     if (deletingId) return;
     const confirmed = window.confirm(
       "Delete this slide? This cannot be undone.",
@@ -477,27 +459,14 @@ export default function SliderAdminForm({
     if (!confirmed) return;
 
     setDeletingId(slide.id);
-
-    try {
-      if (slide.image?.publicId) {
-        await destroyCloudinaryImage(slide.image.publicId);
-      }
-      const allSlides = data?.slides || [];
-      const updatedSlides = allSlides.filter((s) => s.id !== slide.id);
-      onChange({ ...data, slides: updatedSlides });
-      toast.success("Slide removed");
-    } finally {
-      if (isMountedRef.current) setDeletingId(null);
-    }
+    // Only remove from UI — do NOT delete from Cloudinary
+    // Images stay in Cloudinary so backup/restore always works
+    const allSlides = data?.slides || [];
+    const updatedSlides = allSlides.filter((s) => s.id !== slide.id);
+    onChange({ ...data, slides: updatedSlides });
+    toast.success("Slide removed from view.");
+    if (isMountedRef.current) setDeletingId(null);
   };
-
-  /* ── Shared input class ── */
-  const inputClass = (hasError) =>
-    `w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${
-      hasError
-        ? "border-red-500 bg-red-500/10 focus:border-red-500"
-        : "border-[var(--border)]"
-    }`;
 
   return (
     <div className="mx-auto w-full max-w-[1400px]" dir={isRtl ? "rtl" : "ltr"}>
@@ -656,7 +625,7 @@ export default function SliderAdminForm({
                 for (let i = 0; i < ALL_LANGS.length; i++) {
                   const l = ALL_LANGS[i];
                   const t = slide.translations?.[l] || {};
-                  const tTitle = (t.title || "").trim();
+                  const tTitle = (t.title || "").replace(/<[^>]*>/g, "").trim();
                   const tDesc = (t.description || "")
                     .replace(/<[^>]*>/g, "")
                     .trim();
@@ -694,22 +663,29 @@ export default function SliderAdminForm({
 
                   {/* TITLE + DESCRIPTION FIELDS */}
                   <div className="space-y-3 border-t border-[var(--border)] p-3 sm:p-4">
-                    {/* ── Title ── */}
+                    {/* ── Title (Rich Text) ── */}
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">
                         Title ({lang.toUpperCase()})
                       </label>
-                      <input
-                        type="text"
-                        dir={isRtl ? "rtl" : "ltr"}
-                        value={titleVal}
-                        onChange={(e) =>
-                          updateSlideText(slide.id, "title", e.target.value)
-                        }
-                        placeholder="e.g. Welcome to Bexon"
-                        maxLength={120}
-                        className={inputClass(titleErr)}
-                      />
+                      <div
+                        className={`overflow-hidden rounded-xl border transition-colors ${
+                          titleErr
+                            ? "border-red-500 bg-red-500/5"
+                            : "border-[var(--border)]"
+                        }`}
+                      >
+                        <RichTextEditor
+                          value={titleVal}
+                          onChange={(html) =>
+                            updateSlideText(slide.id, "title", html)
+                          }
+                          isRtl={isRtl}
+                          error={titleErr}
+                          placeholder="e.g. Welcome to Bexon"
+                          minHeight={80}
+                        />
+                      </div>
                       {titleErr && (
                         <p className="mt-1 text-xs text-red-500">
                           Title is required in: {titleMissingLangs.join(", ")}
@@ -717,7 +693,7 @@ export default function SliderAdminForm({
                       )}
                     </div>
 
-                    {/* ── Description ── */}
+                    {/* ── Description (Rich Text) ── */}
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-[var(--muted)]">
                         Description ({lang.toUpperCase()})

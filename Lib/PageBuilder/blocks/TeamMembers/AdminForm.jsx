@@ -23,25 +23,25 @@ const SECTION_FIELDS = [
   {
     key: "sectionTitle",
     label: "Section Title",
-    type: "input",
+    type: "rich",
     required: true,
     maxLength: 120,
   },
   {
     key: "sectionSubtitle",
     label: "Section Subtitle",
-    type: "textarea",
+    type: "rich",
     required: true,
     maxLength: 240,
   },
 ];
 
 const MEMBER_FIELDS = [
-  { key: "name", label: "Name", type: "input", required: true, maxLength: 80 },
+  { key: "name", label: "Name", type: "rich", required: true, maxLength: 80 },
   {
     key: "position",
     label: "Position",
-    type: "input",
+    type: "rich",
     required: true,
     maxLength: 120,
   },
@@ -98,6 +98,16 @@ function buildEmptyMember(nextOrder = 1) {
     order: nextOrder,
     translations: buildEmptyTranslations(MEMBER_FIELDS),
   };
+}
+
+/* ─────────────────────────────────────────────
+   Rich text wrapper class
+   ───────────────────────────────────────────── */
+function richWrapperClass(hasError) {
+  if (hasError) {
+    return "overflow-hidden rounded-xl border border-red-500 bg-red-500/5 transition-colors";
+  }
+  return "overflow-hidden rounded-xl border border-[var(--border)] transition-colors";
 }
 
 /* ─────────────────────────────────────────────
@@ -225,7 +235,7 @@ export default function TeamMembersAdminForm({
   const isMountedRef = useRef(true);
 
   useEffect(() => {
-    isMountedRef.current = true; // ← this line was missing
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       try {
@@ -356,21 +366,8 @@ export default function TeamMembersAdminForm({
     });
   }, [normalized, emit]);
 
-  const deleteCloudinaryAsset = async (publicId) => {
-    if (!publicId) return;
-    try {
-      await fetch("/api/admin/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId }),
-      });
-    } catch (err) {
-      console.warn("Cloudinary delete failed:", publicId, err);
-    }
-  };
-
   const removeMemberByUid = useCallback(
-    async (uid) => {
+    (uid) => {
       const member = normalized.members.find((m) => m._uid === uid);
       if (!member) return;
       const confirmed = window.confirm(
@@ -379,15 +376,12 @@ export default function TeamMembersAdminForm({
       if (!confirmed) return;
 
       setRemovingUid(uid);
-      try {
-        if (member.image?.publicId)
-          await deleteCloudinaryAsset(member.image.publicId);
-        const members = normalized.members.filter((m) => m._uid !== uid);
-        emit({ ...normalized, members });
-        toast.success("Member removed");
-      } finally {
-        if (isMountedRef.current) setRemovingUid(null);
-      }
+      // Only remove from UI — do NOT delete from Cloudinary
+      // Images stay in Cloudinary so backup/restore always works
+      const members = normalized.members.filter((m) => m._uid !== uid);
+      emit({ ...normalized, members });
+      toast.success("Member removed from view.");
+      if (isMountedRef.current) setRemovingUid(null);
     },
     [normalized, emit],
   );
@@ -428,12 +422,11 @@ export default function TeamMembersAdminForm({
           uploadPreset: UPLOAD_PRESET,
           folder: UPLOAD_FOLDER,
           multiple: false,
-          // sources: ["local", "url", "camera"],
           clientAllowedFormats: ALLOWED_FORMATS,
           maxFileSize: MAX_FILE_SIZE,
           styles: cloudinaryStyles(theme),
         },
-        async (err, res) => {
+        (err, res) => {
           if (!isMountedRef.current) return;
           if (err) {
             setUploadingUid(null);
@@ -444,9 +437,7 @@ export default function TeamMembersAdminForm({
             updateMemberByUid(uid, {
               image: { url: res.info.secure_url, publicId: res.info.public_id },
             });
-            if (oldPublicId && oldPublicId !== res.info.public_id) {
-              deleteCloudinaryAsset(oldPublicId);
-            }
+            // Old image stays in Cloudinary for backup/restore safety
             toast.success("Image uploaded");
             setUploadingUid(null);
             try {
@@ -470,19 +461,14 @@ export default function TeamMembersAdminForm({
   );
 
   const removeImageByUid = useCallback(
-    async (uid) => {
+    (uid) => {
       const member = normalized.members.find((m) => m._uid === uid);
       if (!member?.image?.url) return;
       setDeletingUid(uid);
-      try {
-        await deleteCloudinaryAsset(member.image.publicId);
-        updateMemberByUid(uid, { image: { url: "", publicId: "" } });
-        toast.success("Image removed");
-      } catch {
-        toast.error("Failed to remove image");
-      } finally {
-        if (isMountedRef.current) setDeletingUid(null);
-      }
+      // Only clear from UI — image stays in Cloudinary for backup/restore
+      updateMemberByUid(uid, { image: { url: "", publicId: "" } });
+      toast.success("Image removed from view.");
+      if (isMountedRef.current) setDeletingUid(null);
     },
     [normalized, updateMemberByUid],
   );
@@ -542,41 +528,22 @@ export default function TeamMembersAdminForm({
         {SECTION_FIELDS.map((field) => {
           const val = normalized.translations[lang]?.[field.key] ?? "";
           const err = isFieldError(field, val);
-          const borderClass = err ? "border-red-500" : "border-[var(--border)]";
 
           return (
             <div key={field.key}>
-              <label
-                className="mb-1.5 block text-sm font-medium"
-                htmlFor={`section-${field.key}`}
-              >
+              <label className="mb-1.5 block text-sm font-medium">
                 {field.label}
               </label>
-              {field.type === "textarea" ? (
-                <textarea
-                  id={`section-${field.key}`}
+              <div className={richWrapperClass(err)}>
+                <RichTextEditor
                   value={val}
-                  onChange={(e) =>
-                    updateSectionTranslation(field.key, e.target.value)
-                  }
-                  rows={2}
-                  maxLength={field.maxLength}
-                  aria-invalid={err}
-                  className={`w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${borderClass}`}
+                  onChange={(html) => updateSectionTranslation(field.key, html)}
+                  isRtl={isRtl}
+                  error={err}
+                  placeholder={`Write ${field.label.toLowerCase()}…`}
+                  minHeight={field.key === "sectionTitle" ? 60 : 80}
                 />
-              ) : (
-                <input
-                  id={`section-${field.key}`}
-                  type="text"
-                  value={val}
-                  onChange={(e) =>
-                    updateSectionTranslation(field.key, e.target.value)
-                  }
-                  maxLength={field.maxLength}
-                  aria-invalid={err}
-                  className={`w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${borderClass}`}
-                />
-              )}
+              </div>
               {err && (
                 <p className="mt-1 text-xs text-red-500">
                   {field.label} is required
@@ -726,13 +693,10 @@ export default function TeamMembersAdminForm({
                 </p>
               </div>
 
-              {/* TRANSLATED FIELDS */}
+              {/* TRANSLATED FIELDS — all rich text */}
               {MEMBER_FIELDS.map((field) => {
                 const val = memberT[field.key] ?? "";
                 const err = isFieldError(field, val);
-                const borderClass = err
-                  ? "border-red-500"
-                  : "border-[var(--border)]";
                 const inputId = `member-${uid}-${field.key}`;
 
                 return (
@@ -744,7 +708,7 @@ export default function TeamMembersAdminForm({
                       {field.label} ({lang.toUpperCase()})
                     </label>
 
-                    {field.type === "rich" ? (
+                    <div className={richWrapperClass(err)}>
                       <RichTextEditor
                         value={val}
                         onChange={(html) =>
@@ -753,40 +717,9 @@ export default function TeamMembersAdminForm({
                         isRtl={isRtl}
                         error={err}
                         placeholder={`Write ${field.label.toLowerCase()}…`}
+                        minHeight={field.key === "description" ? 100 : 60}
                       />
-                    ) : field.type === "textarea" ? (
-                      <textarea
-                        id={inputId}
-                        value={val}
-                        onChange={(e) =>
-                          updateMemberTranslationByUid(
-                            uid,
-                            field.key,
-                            e.target.value,
-                          )
-                        }
-                        rows={3}
-                        maxLength={field.maxLength}
-                        aria-invalid={err}
-                        className={`w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${borderClass}`}
-                      />
-                    ) : (
-                      <input
-                        id={inputId}
-                        type="text"
-                        value={val}
-                        onChange={(e) =>
-                          updateMemberTranslationByUid(
-                            uid,
-                            field.key,
-                            e.target.value,
-                          )
-                        }
-                        maxLength={field.maxLength}
-                        aria-invalid={err}
-                        className={`w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${borderClass}`}
-                      />
-                    )}
+                    </div>
 
                     {err && (
                       <p className="mt-1 text-xs text-red-500">
@@ -818,12 +751,18 @@ export default function TeamMembersAdminForm({
 
         {/* Section heading preview */}
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 text-center">
-          <h2 className="text-xl font-bold text-[var(--foreground)]">
-            {normalized.translations[lang]?.sectionTitle || "—"}
-          </h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            {normalized.translations[lang]?.sectionSubtitle || "—"}
-          </p>
+          <h2
+            className="text-xl font-bold text-[var(--foreground)]"
+            dangerouslySetInnerHTML={{
+              __html: normalized.translations[lang]?.sectionTitle || "—",
+            }}
+          />
+          <div
+            className="mt-1 text-sm text-[var(--muted)]"
+            dangerouslySetInnerHTML={{
+              __html: normalized.translations[lang]?.sectionSubtitle || "—",
+            }}
+          />
         </div>
 
         {/* Members grid */}
@@ -851,12 +790,18 @@ export default function TeamMembersAdminForm({
                       )}
                     </div>
                     <div className="space-y-2 p-4">
-                      <p className="text-sm font-semibold text-[var(--foreground)]">
-                        {pt.name || "—"}
-                      </p>
-                      <p className="text-xs text-[var(--accent)]">
-                        {pt.position || "—"}
-                      </p>
+                      <div
+                        className="text-sm font-semibold text-[var(--foreground)]"
+                        dangerouslySetInnerHTML={{
+                          __html: pt.name || "—",
+                        }}
+                      />
+                      <div
+                        className="text-xs text-[var(--accent)]"
+                        dangerouslySetInnerHTML={{
+                          __html: pt.position || "—",
+                        }}
+                      />
                       {desc ? (
                         <div
                           className="rt-preview text-sm text-[var(--foreground)]"

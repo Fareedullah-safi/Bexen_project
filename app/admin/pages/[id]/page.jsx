@@ -18,7 +18,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { toast } from "sonner";
 
 const languages = [
@@ -91,6 +97,20 @@ export default function FlatEditorPage() {
   const [isDark, setIsDark] = useState(true);
   const [showErrors, setShowErrors] = useState(false);
 
+  // Language switch: keep UI fast, heavy forms update a moment later
+  const [isLangPending, startLangTransition] = useTransition();
+  const deferredTab = useDeferredValue(activeTab);
+
+  // Used by draft save so we always write the latest data
+  const formDataRef = useRef(null);
+  const lastSavedJsonRef = useRef("");
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
+
+  /* ── Theme watcher ── */
   useEffect(() => {
     const updateTheme = () => {
       setIsDark(document.documentElement.classList.contains("dark"));
@@ -104,11 +124,38 @@ export default function FlatEditorPage() {
     return () => observer.disconnect();
   }, []);
 
+  /* ── Auto-save draft to localStorage (debounced + skip if unchanged) ── */
+  useEffect(() => {
+    if (!formData || loading) return;
+
+    // Wait 1.5s after last change so language switch / typing stays smooth
+    const timer = setTimeout(() => {
+      try {
+        const latest = formDataRef.current;
+        if (!latest) return;
+
+        const json = JSON.stringify(latest);
+
+        // Skip write if nothing changed — avoids extra main-thread work
+        if (json === lastSavedJsonRef.current) return;
+
+        localStorage.setItem(`draft-page-${id}`, json);
+        lastSavedJsonRef.current = json;
+      } catch (err) {
+        console.warn("Could not save draft:", err);
+      }
+    }, 20000);
+
+    return () => clearTimeout(timer);
+  }, [formData, id, loading]);
+
+  /* ── Load page data + restore draft ── */
   useEffect(() => {
     if (!document.querySelector("script[data-cloudinary-widget]")) {
       const s = document.createElement("script");
       s.src = "https://upload-widget.cloudinary.com/global/all.js";
       s.async = true;
+      s.dataset.cloudinaryWidget = "true";
       document.head.appendChild(s);
     }
 
@@ -116,18 +163,62 @@ export default function FlatEditorPage() {
       .get(`/api/admin/pages/${id}`)
       .then((res) => {
         const rawPage = res.data.page || res.data;
-        setFormData({
+        const apiData = {
           ...rawPage,
           blocks: rawPage?.blocks || [],
-        });
+        };
+
+        // Check if there is a saved draft in localStorage
+        try {
+          const saved = localStorage.getItem(`draft-page-${id}`);
+          if (saved) {
+            const draftData = JSON.parse(saved);
+            if (draftData && draftData.blocks) {
+              setFormData(draftData);
+              lastSavedJsonRef.current = saved;
+              setShowErrors(false);
+              toast.info("Draft restored from last session.");
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn("Could not load draft:", err);
+        }
+
+        // No draft found — use API data
+        setFormData(apiData);
         setShowErrors(false);
       })
       .catch(() => {
+        // API failed — try localStorage as fallback
+        try {
+          const saved = localStorage.getItem(`draft-page-${id}`);
+          if (saved) {
+            const draftData = JSON.parse(saved);
+            if (draftData && draftData.blocks) {
+              setFormData(draftData);
+              lastSavedJsonRef.current = saved;
+              setShowErrors(false);
+              toast.info("Offline — draft restored from last session.");
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn("Could not load draft:", err);
+        }
+
         toast.error("Failed to load page");
         router.push("/admin/pages");
       })
       .finally(() => setLoading(false));
   }, [id, router]);
+
+  // Smooth language change — ball updates first, forms follow
+  const changeLanguage = (code) => {
+    startLangTransition(() => {
+      setActiveTab(code);
+    });
+  };
 
   const addBlock = (type) => {
     const block = BLOCK_REGISTRY?.[type];
@@ -164,28 +255,15 @@ export default function FlatEditorPage() {
       ),
     }));
 
-  const removeBlock = async (blockId) => {
-    const blockToRemove = (formData?.blocks || []).find(
-      (b) => b.blockId === blockId,
-    );
-
-    if (blockToRemove) {
-      const publicIds = [...new Set(extractPublicIds(blockToRemove.data))];
-      for (const publicId of publicIds) {
-        try {
-          await axios.post("/api/admin/cloudinary/delete", { publicId });
-        } catch (err) {
-          console.error("Failed to delete Cloudinary image:", err);
-        }
-      }
-    }
-
+  const removeBlock = (blockId) => {
+    // Only remove from UI — do NOT delete images from Cloudinary
+    // Images stay in Cloudinary so backup/restore always works
     setFormData((prev) => ({
       ...prev,
       blocks: (prev?.blocks || []).filter((b) => b.blockId !== blockId),
     }));
 
-    toast.success("Block removed");
+    toast.success("Block removed from view.");
   };
 
   const moveBlock = (idx, dir) => {
@@ -248,8 +326,15 @@ export default function FlatEditorPage() {
         ...formData,
         status: "published",
       });
+      // Clear draft — data is now safely in the database
+      try {
+        localStorage.removeItem(`draft-page-${id}`);
+        lastSavedJsonRef.current = "";
+      } catch (err) {
+        console.warn("Could not clear draft:", err);
+      }
       toast.success("Published successfully!");
-      router.push("/admin/pages");
+      // router.push("/admin/pages");
     } catch {
       toast.error("Publish failed. Please try again.");
     } finally {
@@ -259,6 +344,13 @@ export default function FlatEditorPage() {
 
   const handleReload = async () => {
     setLoading(true);
+    // Clear draft so we get fresh data from the database
+    try {
+      localStorage.removeItem(`draft-page-${id}`);
+      lastSavedJsonRef.current = "";
+    } catch (err) {
+      console.warn("Could not clear draft:", err);
+    }
     try {
       const res = await axios.get(`/api/admin/pages/${id}`);
       const rawPage = res.data.page || res.data;
@@ -340,7 +432,7 @@ export default function FlatEditorPage() {
                     <button
                       key={item.code}
                       type="button"
-                      onClick={() => setActiveTab(item.code)}
+                      onClick={() => changeLanguage(item.code)}
                       disabled={saving}
                       className={`relative flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
                         isActive
@@ -365,12 +457,13 @@ export default function FlatEditorPage() {
 
               <AdminLanguageBall
                 language={activeTab}
-                onLanguageChange={setActiveTab}
+                onLanguageChange={changeLanguage}
               />
             </div>
 
             <p className={`mt-2 text-xs ${mutedTextClass}`}>
               Fill EN, PS, and FA before publishing.
+              {isLangPending ? " Switching language…" : ""}
             </p>
           </div>
         </header>
@@ -466,11 +559,15 @@ export default function FlatEditorPage() {
                     </div>
                   </div>
 
-                  <div className="p-5 sm:p-7">
+                  <div
+                    className={`p-5 sm:p-7 ${
+                      isLangPending ? "opacity-70 transition-opacity" : ""
+                    }`}
+                  >
                     {AdminForm ? (
                       <AdminForm
                         data={block.data || {}}
-                        lang={activeTab}
+                        lang={deferredTab}
                         onChange={(newData) =>
                           updateBlock(block.blockId, newData)
                         }

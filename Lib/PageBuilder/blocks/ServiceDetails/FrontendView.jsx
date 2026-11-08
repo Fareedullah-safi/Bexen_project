@@ -1,14 +1,30 @@
 "use client";
 
+import RichText from "@/app/Components/RichText";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+
+/* Helper to strip HTML tags for empty checks */
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
 
 export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
   const content = data?.[lang] || data?.en || {};
   const isRTL = lang === "ps" || lang === "fa";
   const heroImageUrl = data?.heroImage?.url || "";
   const services = data?.services || [];
+
+  const mainTitleText = stripHtml(content.mainTitle);
+  const highlightedTitleText = stripHtml(content.highlightedTitle);
+  const desc1Text = stripHtml(content.description1);
+  const desc2Text = stripHtml(content.description2);
+  const desc3Text = stripHtml(content.description3);
+  const sidebarTagText = stripHtml(content.sidebarTag);
+  const sidebarTitleText = stripHtml(content.sidebarTitle);
 
   return (
     <section
@@ -17,8 +33,8 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
       lang={lang}
     >
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-14 xl:grid-cols-[minmax(0,1fr)_350px] xl:gap-20">
-        {/* Left content */}
-        <main className="min-w-0">
+        {/* Left content column */}
+        <main className="w-full min-w-0">
           {heroImageUrl && (
             <div
               className="wow animate__animated animate__fadeInUp relative overflow-hidden rounded-2xl sm:rounded-3xl"
@@ -39,43 +55,57 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
           )}
 
           <div className="mt-7 sm:mt-10">
-            <h1
-              className="wow animate__animated animate__fadeInUp xs:text-3xl text-[26px] leading-[1.18] font-medium tracking-tight text-[#102326] sm:text-4xl md:text-5xl"
-              data-wow-duration="0.9s"
-              data-wow-delay="0.15s"
-            >
-              {content.mainTitle}{" "}
-              <span className="text-[#1E8A8A]">{content.highlightedTitle}</span>
-            </h1>
+            {(mainTitleText) && (
+              <div
+                role="heading"
+                aria-level={1}
+                className="wow animate__animated animate__fadeInUp xs:text-3xl text-[26px] leading-[1.18] font-medium tracking-tight text-[#102326] sm:text-4xl md:text-5xl"
+                data-wow-duration="0.9s"
+                data-wow-delay="0.15s"
+              >
+                {mainTitleText && (
+                  <RichText content={content.mainTitle} inline={true} />
+                )}{" "}
+              </div>
+            )}
 
-            {content.description1 && (
-              <p
-                className="wow animate__animated animate__fadeInUp mt-5 text-sm leading-7 text-[#102326]/65 sm:mt-6 sm:text-base sm:leading-8"
+            {desc1Text && (
+              <div
+                className="wow animate__animated animate__fadeInUp mt-5 sm:mt-6"
                 data-wow-duration="0.8s"
                 data-wow-delay="0.25s"
               >
-                {content.description1}
-              </p>
+                <RichText
+                  content={content.description1}
+                  className="text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+                />
+              </div>
             )}
 
-            {content.description2 && (
-              <p
-                className="wow animate__animated animate__fadeInUp mt-4 text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+            {desc2Text && (
+              <div
+                className="wow animate__animated animate__fadeInUp mt-4"
                 data-wow-duration="0.8s"
                 data-wow-delay="0.35s"
               >
-                {content.description2}
-              </p>
+                <RichText
+                  content={content.description2}
+                  className="text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+                />
+              </div>
             )}
 
-            {content.description3 && (
-              <p
-                className="wow animate__animated animate__fadeInUp mt-4 text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+            {desc3Text && (
+              <div
+                className="wow animate__animated animate__fadeInUp mt-4"
                 data-wow-duration="0.8s"
                 data-wow-delay="0.45s"
               >
-                {content.description3}
-              </p>
+                <RichText
+                  content={content.description3}
+                  className="text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+                />
+              </div>
             )}
           </div>
         </main>
@@ -83,7 +113,7 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
         {/* Right sidebar */}
         <aside
           style={{ contain: "layout" }}
-          className="will-change-transform lg:sticky lg:top-10 lg:self-start"
+          className="w-full min-w-0 will-change-transform lg:sticky lg:top-10 lg:self-start"
         >
           <div
             className="wow animate__animated animate__fadeInRight rounded-2xl bg-[#ECF0F0] p-5 sm:rounded-3xl sm:p-6"
@@ -91,12 +121,21 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
             data-wow-delay="0.15s"
           >
             <div className="mb-5">
-              <span className="text-xs font-bold tracking-[0.18em] text-[#1E8A8A] uppercase">
-                {content.sidebarTag}
-              </span>
-              <h3 className="mt-2 text-xl font-medium text-[#0C1E21] sm:text-2xl">
-                {content.sidebarTitle}
-              </h3>
+              {sidebarTagText && (
+                <RichText
+                  content={content.sidebarTag}
+                  inline={true}
+                  className="text-xs font-bold tracking-[0.18em] text-[#1E8A8A] uppercase"
+                />
+              )}
+              {sidebarTitleText && (
+                <RichText
+                  content={content.sidebarTitle}
+                  asHeading={true}
+                  headingLevel={3}
+                  className="mt-2 text-xl font-medium text-[#0C1E21] sm:text-2xl"
+                />
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -120,15 +159,25 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
                     data-wow-duration="0.7s"
                     data-wow-delay={`${0.15 + index * 0.08}s`}
                   >
-                    <span className="text-sm leading-5 font-semibold">
-                      {label}
-                    </span>
+                    <RichText
+                      content={label}
+                      inline={true}
+                      className="text-sm leading-5 font-semibold"
+                    />
                     <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${index === 0 ? "bg-white/15" : "bg-[#ECF0F0] group-hover:bg-white/15"}`}
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
+                        index === 0
+                          ? "bg-white/15"
+                          : "bg-[#ECF0F0] group-hover:bg-white/15"
+                      }`}
                     >
                       <ArrowRight
                         size={15}
-                        className={`transition-transform duration-300 ${isRTL ? "rotate-180 group-hover:-translate-x-1" : "group-hover:translate-x-1"}`}
+                        className={`transition-transform duration-300 ${
+                          isRTL
+                            ? "rotate-180 group-hover:-translate-x-1"
+                            : "group-hover:translate-x-1"
+                        }`}
                       />
                     </span>
                   </Link>

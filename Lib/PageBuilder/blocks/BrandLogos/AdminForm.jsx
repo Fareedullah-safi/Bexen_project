@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import RichTextEditor from "../shared/RichTextEditor";
 
 // ==========================================
 // 0. PERMISSION HELPER
@@ -73,12 +74,20 @@ function cloudinaryStyles(theme) {
 
 const SCRIPT = "script[data-cloudinary-widget]";
 
+// Helper to strip HTML tags (for rich-text validation)
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
 // ONE list used for section inputs + validation
 const SECTION_FIELDS = [
   {
     id: "title",
     label: "Section Title",
     placeholder: "e.g. Trusted by leading brands",
+    minHeight: 80,
   },
 ];
 
@@ -87,12 +96,12 @@ export const getSectionField = (data, langKey, fieldId) => {
   return data?.translations?.[langKey]?.[fieldId] || "";
 };
 
-// Check missing fields for a specific language
+// Check missing fields for a specific language (strip HTML first)
 export const checkMissingFields = (data = {}, langKey = "en") => {
   const missing = [];
 
   SECTION_FIELDS.forEach((field) => {
-    if (!String(getSectionField(data, langKey, field.id)).trim()) {
+    if (!stripHtml(getSectionField(data, langKey, field.id))) {
       missing.push(field.label);
     }
   });
@@ -162,7 +171,8 @@ export default function BrandLogosAdminForm({
   const missingLogos = checkMissingLogos(data);
   const noLogos = logos.length === 0;
 
-  const isErr = (val) => showErrors && !String(val || "").trim();
+  // Error check for rich text (strips HTML first)
+  const isErr = (val) => showErrors && !stripHtml(val);
 
   /* ---------- Dark mode detection ---------- */
   useEffect(() => {
@@ -199,19 +209,6 @@ export default function BrandLogosAdminForm({
     return () => script?.removeEventListener("load", checkReady);
   }, []);
 
-  const destroyCloudinaryImage = async (publicId) => {
-    if (!publicId) return;
-    try {
-      await fetch("/api/admin/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId }),
-      });
-    } catch (e) {
-      console.error("Failed to delete image from Cloudinary:", e);
-    }
-  };
-
   /* ---------- Section text update ---------- */
   const updateSectionText = (fieldId, value) => {
     onChange({
@@ -224,16 +221,16 @@ export default function BrandLogosAdminForm({
   };
 
   /* ---------- Remove logo ---------- */
-  const removeLogo = async (index) => {
+  const removeLogo = (index) => {
     if (deletingIndex !== null || uploadingIndex !== null) return;
-    const publicId = logos[index]?.publicId;
-    if (publicId) {
-      setDeletingIndex(index);
-      await destroyCloudinaryImage(publicId);
-      setDeletingIndex(null);
-    }
+
+    setDeletingIndex(index);
+
+    // Only remove from UI — do NOT delete from Cloudinary
     onChange({ ...data, logos: logos.filter((_, i) => i !== index) });
-    toast.success("Logo removed.");
+
+    setDeletingIndex(null);
+    toast.success("Logo removed from view.");
   };
 
   /* ---------- Open Cloudinary widget ---------- */
@@ -273,7 +270,6 @@ export default function BrandLogosAdminForm({
         {
           cloudName,
           uploadPreset,
-          // sources: ["local", "url"],
           multiple: true,
           maxFileSize: 5_000_000,
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "svg"],
@@ -282,7 +278,7 @@ export default function BrandLogosAdminForm({
           cropping: false,
           styles: cloudinaryStyles(dark ? "dark" : "light"),
         },
-        async (error, result) => {
+        (error, result) => {
           if (error) {
             toast.error(error.message || "Image upload failed.");
             if (isReplace) setUploadingIndex(null);
@@ -298,10 +294,7 @@ export default function BrandLogosAdminForm({
             const freshLogos = fresh?.logos || [];
 
             if (isReplace) {
-              // Replace mode: delete old, update the specific slot
-              if (oldPublicId && oldPublicId !== newPublicId) {
-                await destroyCloudinaryImage(oldPublicId);
-              }
+              // Replace mode: old image stays in Cloudinary for backup/restore
               const nextLogos = [...freshLogos];
               nextLogos[logoIndex] = { url: newUrl, publicId: newPublicId };
               onChange({ ...fresh, logos: nextLogos });
@@ -330,12 +323,10 @@ export default function BrandLogosAdminForm({
     }
   };
 
-  /* ---------- Shared classes ---------- */
-  const getInputClass = (hasError) =>
-    `w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--accent)] ${
-      hasError
-        ? "border-red-500 bg-red-500/10 focus:border-red-500"
-        : "border-[var(--border)]"
+  /* ---------- Rich text wrapper class ---------- */
+  const richWrapperClass = (hasError) =>
+    `overflow-hidden rounded-xl border transition-colors ${
+      hasError ? "border-red-500 bg-red-500/5" : "border-[var(--border)]"
     }`;
 
   const sectionClass =
@@ -422,19 +413,24 @@ export default function BrandLogosAdminForm({
 
         {SECTION_FIELDS.map((field) => {
           const val = content[field.id] || "";
+          const hasError = isErr(val);
+
           return (
             <div key={field.id}>
               <label className="mb-1.5 block text-sm font-medium">
                 {field.label}
               </label>
-              <input
-                dir={isRtl ? "rtl" : "ltr"}
-                value={val}
-                onChange={(e) => updateSectionText(field.id, e.target.value)}
-                className={getInputClass(isErr(val))}
-                placeholder={field.placeholder || ""}
-              />
-              {isErr(val) && (
+              <div className={richWrapperClass(hasError)}>
+                <RichTextEditor
+                  value={val}
+                  onChange={(html) => updateSectionText(field.id, html)}
+                  isRtl={isRtl}
+                  error={hasError}
+                  placeholder={field.placeholder || ""}
+                  minHeight={field.minHeight || 80}
+                />
+              </div>
+              {hasError && (
                 <p className="mt-1 text-xs text-red-500">
                   {field.label} is required in {lang.toUpperCase()}
                 </p>

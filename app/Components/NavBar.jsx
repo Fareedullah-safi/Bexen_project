@@ -19,6 +19,11 @@ const LANGUAGES = [
 
 const TEAL = "text-[#1E8A8A]";
 
+function setSiteLanguageCookie(code) {
+  document.cookie =
+    "site-language=" + code + "; path=/; max-age=31536000; SameSite=Lax";
+}
+
 export const NavBar = () => {
   const router = useRouter();
   const pathname = usePathname();
@@ -59,7 +64,11 @@ export const NavBar = () => {
     const savedLanguage = localStorage.getItem("site-language");
     const selectedLanguage =
       LANGUAGES.find((item) => item.code === savedLanguage) || LANGUAGES[0];
+
     setLang(selectedLanguage);
+    localStorage.setItem("site-language", selectedLanguage.code);
+    setSiteLanguageCookie(selectedLanguage.code);
+
     document.documentElement.lang = selectedLanguage.code;
     document.documentElement.dir =
       selectedLanguage.code === "en" ? "ltr" : "rtl";
@@ -87,14 +96,26 @@ export const NavBar = () => {
   // ACTION HANDLERS
   // ==========================================
   const pickLanguage = (e, l) => {
+    // 1. Update client state
     setLang(l);
+
+    // 2. Persist in storage and cookie
     localStorage.setItem("site-language", l.code);
+    setSiteLanguageCookie(l.code);
+
+    // 3. Update HTML attributes for layout/RTL
     document.documentElement.lang = l.code;
     document.documentElement.dir = l.code === "en" ? "ltr" : "rtl";
+
+    // 4. Dispatch custom event for client listeners
     window.dispatchEvent(
       new CustomEvent("site-language-change", { detail: { language: l.code } }),
     );
+
     e.currentTarget.blur();
+
+    // 5. Soft refresh server components without page reload
+    router.refresh();
   };
 
   const submitSearch = (e) => {

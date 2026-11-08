@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import RichTextEditor from "../shared/RichTextEditor";
 
 // ==========================================
 // 0. PERMISSION HELPER
@@ -75,23 +76,26 @@ function cloudinaryStyles(theme) {
 
 const SCRIPT = "script[data-cloudinary-widget]";
 
+// Helper to strip HTML tags (for rich-text validation)
+const stripHtml = (val) =>
+  String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+
 // ONE list used for inputs + validation
+// All are rich text now
 const TEXT_FIELDS = [
   {
     id: "mainTitle",
     label: "Main Title",
     placeholder: "e.g. Transforming Customer:",
+    minHeight: 80,
   },
-  {
-    id: "highlightedTitle",
-    label: "Highlighted Title",
-    placeholder: "e.g. Tailored Solutions...",
-  },
-  { id: "description1", label: "Paragraph 1", type: "textarea" },
-  { id: "description2", label: "Paragraph 2", type: "textarea" },
-  { id: "description3", label: "Paragraph 3", type: "textarea" },
-  { id: "sidebarTag", label: "Sidebar Tag" },
-  { id: "sidebarTitle", label: "Sidebar Title" },
+  { id: "description1", label: "Paragraph 1", minHeight: 150 },
+  { id: "description2", label: "Paragraph 2", minHeight: 150 },
+  { id: "description3", label: "Paragraph 3", minHeight: 150 },
+  { id: "sidebarTag", label: "Sidebar Tag", minHeight: 80 },
+  { id: "sidebarTitle", label: "Sidebar Title", minHeight: 80 },
 ];
 
 export const getServiceLabel = (svc, langKey) => {
@@ -105,21 +109,21 @@ export const getServiceLabel = (svc, langKey) => {
   return "";
 };
 
-// Check missing fields for a language
+// Check missing fields for a language (strip HTML first since all are rich text)
 export const checkMissingFields = (data = {}, langKey = "en") => {
   const content = data?.[langKey] || {};
   const services = data?.services || [];
   const missing = [];
 
   TEXT_FIELDS.forEach((field) => {
-    if (!String(content[field.id] || "").trim()) {
+    if (!stripHtml(content[field.id])) {
       missing.push(field.label);
     }
   });
 
   services.forEach((svc, index) => {
-    if (!getServiceLabel(svc, langKey)?.trim())
-      missing.push(`Link ${index + 1} Label`);
+    const label = getServiceLabel(svc, langKey);
+    if (!stripHtml(label)) missing.push(`Link ${index + 1} Label`);
     if (!svc.href?.trim()) missing.push(`Link ${index + 1} URL`);
   });
 
@@ -170,7 +174,8 @@ export default function ServiceDetailsAdminForm({
   const faMissing = checkMissingFields(data, "fa");
   const isHeroMissing = !heroImage?.url?.trim();
 
-  const isErr = (val) => showErrors && !String(val || "").trim();
+  // Error check for rich text (strips HTML first)
+  const isErr = (val) => showErrors && !stripHtml(val);
 
   useEffect(() => {
     const updateTheme = () =>
@@ -205,19 +210,6 @@ export default function ServiceDetailsAdminForm({
     return () => script?.removeEventListener("load", checkReady);
   }, []);
 
-  const destroyCloudinaryImage = async (publicId) => {
-    if (!publicId) return;
-    try {
-      await fetch("/api/admin/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId }),
-      });
-    } catch (e) {
-      console.error("Failed to delete image from Cloudinary:", e);
-    }
-  };
-
   const updateText = (field, value) => {
     onChange({
       ...data,
@@ -232,13 +224,14 @@ export default function ServiceDetailsAdminForm({
     });
   };
 
-  const removeHeroImage = async () => {
+  const removeHeroImage = () => {
     if (deleting) return;
     setDeleting(true);
-    if (heroImage?.publicId) await destroyCloudinaryImage(heroImage.publicId);
+    // Only clear from UI — do NOT delete from Cloudinary
+    // Image stays in Cloudinary so backup/restore always works
     updateImage("", "");
     setDeleting(false);
-    toast.success("Hero image removed.");
+    toast.success("Hero image removed from view.");
   };
 
   const addService = () => {
@@ -318,7 +311,6 @@ export default function ServiceDetailsAdminForm({
         {
           cloudName,
           uploadPreset,
-          // sources: ["local", "url"],
           multiple: false,
           maxFiles: 1,
           maxFileSize: 5_000_000,
@@ -328,7 +320,7 @@ export default function ServiceDetailsAdminForm({
           cropping: false,
           styles: cloudinaryStyles(dark ? "dark" : "light"),
         },
-        async (error, result) => {
+        (error, result) => {
           if (error) {
             toast.error(error.message || "Image upload failed.");
             setUploading(false);
@@ -339,10 +331,7 @@ export default function ServiceDetailsAdminForm({
             const newPublicId = result.info.public_id;
             const newUrl = result.info.secure_url;
 
-            if (oldPublicId && oldPublicId !== newPublicId) {
-              await destroyCloudinaryImage(oldPublicId);
-            }
-
+            // Old image stays in Cloudinary for backup/restore safety
             updateImage(newUrl, newPublicId);
             toast.success(oldPublicId ? "Image replaced!" : "Image uploaded!");
           }
@@ -360,11 +349,10 @@ export default function ServiceDetailsAdminForm({
     }
   };
 
-  const getInputClass = (hasError) =>
-    `w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm outline-none transition-colors focus:border-[var(--accent)] ${
-      hasError
-        ? "border-red-500 bg-red-500/10 focus:border-red-500"
-        : "border-[var(--border)]"
+  // Border wrapper class for rich text editors
+  const richWrapperClass = (hasError) =>
+    `overflow-hidden rounded-xl border transition-colors ${
+      hasError ? "border-red-500 bg-red-500/5" : "border-[var(--border)]"
     }`;
 
   const sectionClass =
@@ -510,7 +498,7 @@ export default function ServiceDetailsAdminForm({
         </div>
       </section>
 
-      {/* ALL TEXT INPUTS IN ONE JSX */}
+      {/* ALL TEXT INPUTS (Rich Text) */}
       <section className={sectionClass}>
         <h2 className="flex items-center gap-2 font-bold">
           <Text size={18} className="text-[var(--accent)]" /> Content & Sidebar
@@ -520,23 +508,29 @@ export default function ServiceDetailsAdminForm({
         <div className="grid gap-4 sm:grid-cols-2">
           {TEXT_FIELDS.map((field) => {
             const val = content[field.id] || "";
-            const isTextarea = field.type === "textarea";
-            const InputTag = isTextarea ? "textarea" : "input";
+            const hasError = isErr(val);
+            // Paragraphs (description1, 2, 3) take full width
+            const isFullWidth = field.id.startsWith("description");
 
             return (
-              <div key={field.id} className={isTextarea ? "sm:col-span-2" : ""}>
+              <div
+                key={field.id}
+                className={isFullWidth ? "sm:col-span-2" : ""}
+              >
                 <label className="mb-1.5 block text-sm font-medium">
                   {field.label}
                 </label>
-                <InputTag
-                  rows={isTextarea ? 3 : undefined}
-                  dir={isRtl ? "rtl" : "ltr"}
-                  value={val}
-                  onChange={(e) => updateText(field.id, e.target.value)}
-                  className={getInputClass(isErr(val))}
-                  placeholder={field.placeholder || ""}
-                />
-                {isErr(val) && (
+                <div className={richWrapperClass(hasError)}>
+                  <RichTextEditor
+                    value={val}
+                    onChange={(html) => updateText(field.id, html)}
+                    isRtl={isRtl}
+                    error={hasError}
+                    placeholder={field.placeholder || ""}
+                    minHeight={field.minHeight || 100}
+                  />
+                </div>
+                {hasError && (
                   <p className="mt-1 text-xs text-red-500">
                     {field.label} is required in {lang.toUpperCase()}
                   </p>
@@ -567,31 +561,37 @@ export default function ServiceDetailsAdminForm({
 
           {services.map((svc, i) => {
             const labelValue = getServiceLabel(svc, lang);
+            const labelErr = isErr(labelValue);
+            const urlErr = showErrors && !String(svc.href || "").trim();
 
             return (
               <div
                 key={svc.id || i}
                 className="flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 sm:flex-row sm:items-start"
               >
+                {/* Label — Rich Text */}
                 <div className="flex-1">
                   <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
                     <Type size={12} /> Label ({lang.toUpperCase()})
                   </label>
-                  <input
-                    dir={isRtl ? "rtl" : "ltr"}
-                    value={labelValue}
-                    onChange={(e) =>
-                      updateService(i, "label", e.target.value, true)
-                    }
-                    className={getInputClass(isErr(labelValue))}
-                  />
-                  {isErr(labelValue) && (
+                  <div className={richWrapperClass(labelErr)}>
+                    <RichTextEditor
+                      value={labelValue}
+                      onChange={(html) => updateService(i, "label", html, true)}
+                      isRtl={isRtl}
+                      error={labelErr}
+                      placeholder="Link label…"
+                      minHeight={70}
+                    />
+                  </div>
+                  {labelErr && (
                     <p className="mt-1 text-xs text-red-500">
                       Label required in {lang.toUpperCase()}
                     </p>
                   )}
                 </div>
 
+                {/* URL — stays as plain input (URLs are not rich text) */}
                 <div className="flex-1">
                   <label className="mb-1.5 flex items-center gap-2 text-xs font-medium text-[var(--text-muted)]">
                     <LinkIcon size={12} /> URL
@@ -602,9 +602,13 @@ export default function ServiceDetailsAdminForm({
                     onChange={(e) =>
                       updateService(i, "href", e.target.value, false)
                     }
-                    className={getInputClass(isErr(svc.href))}
+                    className={`w-full rounded-xl border bg-[var(--background)] px-4 py-2.5 text-sm transition-colors outline-none focus:border-[var(--accent)] ${
+                      urlErr
+                        ? "border-red-500 bg-red-500/10 focus:border-red-500"
+                        : "border-[var(--border)]"
+                    }`}
                   />
-                  {isErr(svc.href) && (
+                  {urlErr && (
                     <p className="mt-1 text-xs text-red-500">URL is required</p>
                   )}
                 </div>

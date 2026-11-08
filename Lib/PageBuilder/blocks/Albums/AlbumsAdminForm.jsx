@@ -16,13 +16,21 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import RichTextEditor from "../shared/RichTextEditor";
 
 const SCRIPT = "script[data-cloudinary-widget]";
+
+// Helper to strip HTML tags (for rich-text validation)
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
 
 const emptyText = () => ({ title: "", subtitle: "" });
 
 const newAlbum = () => ({
-  _uid: `alb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, // stable key
+  _uid: `alb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
   coverImage: "",
   translations: { en: emptyText(), ps: emptyText(), fa: emptyText() },
   images: [],
@@ -38,11 +46,11 @@ export function validateAlbums(data = {}) {
   const checkLang = (code) => {
     const missing = [];
     const t = data?.translations?.[code] || {};
-    if (!t.title?.trim()) missing.push("Page Title");
-    if (!t.subtitle?.trim()) missing.push("Page Subtitle");
+    if (!stripHtml(t.title)) missing.push("Page Title");
+    if (!stripHtml(t.subtitle)) missing.push("Page Subtitle");
 
     albums.forEach((alb, i) => {
-      if (!alb.translations?.[code]?.title?.trim())
+      if (!stripHtml(alb.translations?.[code]?.title))
         missing.push(`Album #${i + 1} Title`);
     });
     return missing;
@@ -162,10 +170,12 @@ export default function AlbumsAdminForm({
 
   const t = currentData.translations[lang] || emptyText();
   const dir = lang === "en" ? "ltr" : "rtl";
+  const isRtl = lang === "ps" || lang === "fa";
   const valResult = validateAlbums(data);
   const hasAnyError = showErrors && !valResult.isValid;
 
-  const isErr = (val) => showErrors && !String(val || "").trim();
+  // Error check for rich text (strips HTML first)
+  const isErr = (val) => showErrors && !stripHtml(val);
 
   /* ---------- Dark Mode & Script Loader ---------- */
   useEffect(() => {
@@ -210,7 +220,7 @@ export default function AlbumsAdminForm({
     };
   }, []);
 
-  /* ---------- Handlers (Exact match to your snippet) ---------- */
+  /* ---------- Handlers ---------- */
   const setPageField = (name, value) => {
     onChange({
       ...currentData,
@@ -248,7 +258,7 @@ export default function AlbumsAdminForm({
     onChange({ ...currentData, albums });
   };
 
-  const removeAlbum = async (idx) => {
+  const removeAlbum = (idx) => {
     if (deletingAlbumIdx !== null || uploadingAlbumIdx !== null) return;
     if (
       !confirm("Are you sure you want to delete this album and all its photos?")
@@ -256,27 +266,16 @@ export default function AlbumsAdminForm({
       return;
 
     setDeletingAlbumIdx(idx);
-    const albumToRemove = currentData.albums[idx];
 
-    // Cleanup images from Cloudinary
-    if (albumToRemove?.images?.length) {
-      for (const img of albumToRemove.images) {
-        if (img.publicId) {
-          fetch("/api/admin/cloudinary/delete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ publicId: img.publicId }),
-          }).catch(() => {});
-        }
-      }
-    }
+    // Only remove from UI — do NOT delete images from Cloudinary
+    // Images stay in Cloudinary so backup/restore always works
 
     onChange({
       ...currentData,
       albums: currentData.albums.filter((_, i) => i !== idx),
     });
     setDeletingAlbumIdx(null);
-    toast.success("Album removed.");
+    toast.success("Album removed from view.");
   };
 
   /* ---------- Cloudinary Widget (permission-gated + unified theme) ---------- */
@@ -306,7 +305,6 @@ export default function AlbumsAdminForm({
         {
           cloudName,
           uploadPreset,
-          // sources: ["local", "url"],
           multiple: true,
           folder: "bexon/albums",
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
@@ -351,23 +349,15 @@ export default function AlbumsAdminForm({
 
   const removeImageFromAlbum = async (albumIdx, imgIdx) => {
     if (deletingAlbumIdx !== null || uploadingAlbumIdx !== null) return;
+
     const freshData = dataRef.current;
-    const img = freshData.albums[albumIdx].images[imgIdx];
-
-    setDeletingAlbumIdx(albumIdx);
-
-    if (img.publicId) {
-      fetch("/api/admin/cloudinary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicId: img.publicId }),
-      }).catch(() => {});
-    }
 
     const albums = [...freshData.albums];
+
     const updatedImages = albums[albumIdx].images.filter(
       (_, i) => i !== imgIdx,
     );
+
     albums[albumIdx] = {
       ...albums[albumIdx],
       coverImage: updatedImages[0]?.url || "",
@@ -375,15 +365,14 @@ export default function AlbumsAdminForm({
     };
 
     onChange({ ...freshData, albums });
-    setDeletingAlbumIdx(null);
   };
 
-  /* ---------- Styles (Exact match to your snippet) ---------- */
-  const getInputClass = (hasError) =>
-    `w-full rounded-xl border bg-[var(--surface-soft)] px-4 py-3 text-sm text-[var(--foreground)] outline-none transition-all duration-300 placeholder:text-[var(--muted)] focus:bg-[var(--surface)] focus:ring-4 focus:ring-[var(--accent)]/10 ${
+  /* ---------- Styles ---------- */
+  const richWrapperClass = (hasError) =>
+    `overflow-hidden rounded-xl border transition-all duration-300 ${
       hasError
-        ? "border-red-500 hover:border-red-500 focus:border-red-500 bg-red-500/5"
-        : "border-[var(--border)] hover:border-[var(--accent)]/50 focus:border-[var(--accent)]"
+        ? "border-red-500 bg-red-500/5"
+        : "border-[var(--border)] hover:border-[var(--accent)]/50 focus-within:border-[var(--accent)] focus-within:ring-4 focus-within:ring-[var(--accent)]/10"
     }`;
 
   const labelClass =
@@ -454,13 +443,16 @@ export default function AlbumsAdminForm({
             <label className={labelClass}>
               Page Title <span className="text-red-500">*</span>
             </label>
-            <input
-              dir={dir}
-              value={t.title || ""}
-              onChange={(e) => setPageField("title", e.target.value)}
-              className={getInputClass(isErr(t.title))}
-              placeholder="e.g. Photo Albums"
-            />
+            <div className={richWrapperClass(isErr(t.title))}>
+              <RichTextEditor
+                value={t.title || ""}
+                onChange={(html) => setPageField("title", html)}
+                isRtl={isRtl}
+                error={isErr(t.title)}
+                placeholder="e.g. Photo Albums"
+                minHeight={80}
+              />
+            </div>
             {isErr(t.title) && (
               <p className="mt-1 text-xs text-red-500">Required</p>
             )}
@@ -469,13 +461,16 @@ export default function AlbumsAdminForm({
             <label className={labelClass}>
               Page Subtitle <span className="text-red-500">*</span>
             </label>
-            <input
-              dir={dir}
-              value={t.subtitle || ""}
-              onChange={(e) => setPageField("subtitle", e.target.value)}
-              className={getInputClass(isErr(t.subtitle))}
-              placeholder="e.g. Select an album to explore photo collections."
-            />
+            <div className={richWrapperClass(isErr(t.subtitle))}>
+              <RichTextEditor
+                value={t.subtitle || ""}
+                onChange={(html) => setPageField("subtitle", html)}
+                isRtl={isRtl}
+                error={isErr(t.subtitle)}
+                placeholder="e.g. Select an album to explore photo collections."
+                minHeight={80}
+              />
+            </div>
             {isErr(t.subtitle) && (
               <p className="mt-1 text-xs text-red-500">Required</p>
             )}
@@ -572,36 +567,43 @@ export default function AlbumsAdminForm({
 
                   <div className="space-y-4 p-4 sm:p-5">
                     <div className="grid gap-4 sm:grid-cols-2">
+                      {/* Album Title (Rich Text) */}
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                           Album Title ({lang.toUpperCase()}) *
                         </label>
-                        <input
-                          dir={dir}
-                          value={albT.title || ""}
-                          onChange={(e) =>
-                            setAlbumText(albumIdx, "title", e.target.value)
-                          }
-                          className={getInputClass(isErr(albT.title))}
-                          placeholder="e.g. Nature & Landscapes"
-                        />
+                        <div className={richWrapperClass(isErr(albT.title))}>
+                          <RichTextEditor
+                            value={albT.title || ""}
+                            onChange={(html) =>
+                              setAlbumText(albumIdx, "title", html)
+                            }
+                            isRtl={isRtl}
+                            error={isErr(albT.title)}
+                            placeholder="e.g. Nature & Landscapes"
+                            minHeight={80}
+                          />
+                        </div>
                         {isErr(albT.title) && (
                           <p className="mt-1 text-xs text-red-500">Required</p>
                         )}
                       </div>
+                      {/* Album Subtitle (Rich Text) */}
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                           Album Subtitle ({lang.toUpperCase()})
                         </label>
-                        <input
-                          dir={dir}
-                          value={albT.subtitle || ""}
-                          onChange={(e) =>
-                            setAlbumText(albumIdx, "subtitle", e.target.value)
-                          }
-                          className={getInputClass(false)}
-                          placeholder="e.g. Breathtaking views."
-                        />
+                        <div className={richWrapperClass(false)}>
+                          <RichTextEditor
+                            value={albT.subtitle || ""}
+                            onChange={(html) =>
+                              setAlbumText(albumIdx, "subtitle", html)
+                            }
+                            isRtl={isRtl}
+                            placeholder="e.g. Breathtaking views."
+                            minHeight={80}
+                          />
+                        </div>
                       </div>
                     </div>
 

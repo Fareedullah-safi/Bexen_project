@@ -16,7 +16,7 @@ const HOME_LABEL = {
 
 export default function BannerFrontendView({
   data = {},
-  lang: langProp = "en",
+  lang: langProp = "ps",
   pageTitle = "",
 }) {
   const [lang, setLang] = useState(langProp);
