@@ -600,7 +600,7 @@ export default function FlatEditorPage() {
 
         {/* FOOTER */}
         <footer
-          className={`fixed bottom-3 left-1/2 z-50 flex w-[calc(100%-1rem)] max-w-6xl -translate-x-1/2 flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-xl sm:flex-row sm:items-center sm:px-6 ${
+          className={`sticky bottom-4 z-40 flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-xl sm:flex-row sm:items-center sm:px-6 ${
             isDark
               ? "border-[#263442] bg-[#111a23]/95"
               : "border-[#e4e7ec] bg-white/95"
