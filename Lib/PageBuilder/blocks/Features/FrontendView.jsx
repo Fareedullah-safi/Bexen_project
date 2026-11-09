@@ -77,12 +77,14 @@ export default function FeaturesFrontendView({ data, lang: langProp = "en" }) {
 
         {/* Section Main Title */}
         {titleText && (
-          <div
-            role="heading"
-            aria-level={1}
-            className="rt-desc rt-tight wow animate__animated animate__fadeInUp pt-6 text-center text-4xl leading-tight font-medium text-gray-700 sm:text-5xl"
-            dangerouslySetInnerHTML={{ __html: t.title }}
-          />
+          <div className="wow animate__animated animate__fadeInUp pt-4 pb-4">
+            <div
+              role="heading"
+              aria-level={1}
+              className="rt-desc rt-tight text-center text-4xl leading-tight font-medium text-gray-700 sm:text-5xl"
+              dangerouslySetInnerHTML={{ __html: t.title }}
+            />
+          </div>
         )}
 
         {/* Cards grid */}
@@ -151,5 +153,5 @@ const FEATURES_STYLES = `
   .rt-desc a { color: #1E8A8A; text-decoration: underline; text-underline-offset: 2px; }
   .rt-desc ul, .rt-desc ol { margin: 0.4em 0; padding-inline-start: 1.2em; }
   .rt-desc li { margin-bottom: 0.2em; }
-  .rt-tight p { margin: 0; }
+    .rt-desc.rt-tight p { margin: 0 !important; padding: 0 !important; }
 `;

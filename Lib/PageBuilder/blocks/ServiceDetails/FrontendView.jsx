@@ -170,7 +170,7 @@ export default function ServiceDetailsFrontendView({
         {/* Right sidebar */}
         <aside
           style={{ contain: "layout" }}
-          className="w-full min-w-0 will-change-transform lg:sticky lg:top-10 lg:self-start"
+          className="min-w-0 will-change-transform lg:sticky lg:top-28 lg:self-start"
         >
           <div
             className="wow animate__animated animate__fadeInRight rounded-2xl bg-[#ECF0F0] p-5 sm:rounded-3xl sm:p-6"
