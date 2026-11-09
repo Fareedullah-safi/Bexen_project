@@ -11,55 +11,123 @@ function stripHtml(val) {
 }
 
 const BRAND_LOGOS_STYLES = `
-  .brand-title p { margin: 0; display: inline; }
-  .brand-title strong, .brand-title b { font-weight: 700; }
-  .brand-title em, .brand-title i { font-style: italic; }
-  .brand-title mark.ql-hl {
-    border-radius: 9999px;
-    padding: 2px 8px;
-    color: #ffffff !important;
+  /* Force paragraph lines from Quill editor to stack vertically without margin gaps */
+  .brand-title p {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.4 !important;
   }
-  .brand-title a { color: #1E8A8A; text-decoration: underline; }
+
+  /* Quill highlight background pill styling */
+  .brand-title mark.ql-hl,
+  .brand-title span[style*="background-color"] {
+    border-radius: 9999px;
+    padding: 2px 10px;
+    display: inline-block;
+  }
 `;
 
-export default function BrandLogosView({ data, lang = "en" }) {
-  if (!data) return null;
+export default function BrandLogosView({ data, lang: langProp = "en" }) {
+  const [lang, setLang] = useState(langProp);
 
-  const t = data.translations?.[lang] || data.translations?.en || {};
-  const logos = (data.logos || [])
-    .map((logo) => (typeof logo === "string" ? logo : logo?.url))
-    .filter((url) => typeof url === "string" && url.trim());
+  /* Sync active language state when prop updates from server page */
+  useEffect(() => {
+    if (langProp) {
+      setLang(langProp);
+    }
+  }, [langProp]);
 
-  const title = t.title || "";
+  /* Listen for site language switcher event from NavBar */
+  useEffect(() => {
+    function handleLanguageChange(event) {
+      let selectedLanguage = "en";
+
+      if (event && event.detail && event.detail.language) {
+        selectedLanguage = event.detail.language;
+      } else {
+        selectedLanguage = localStorage.getItem("site-language") || "en";
+      }
+
+      if (
+        selectedLanguage === "en" ||
+        selectedLanguage === "ps" ||
+        selectedLanguage === "fa"
+      ) {
+        setLang(selectedLanguage);
+      }
+    }
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+    return function () {
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
+  }, []);
+
+  if (!data) {
+    return null;
+  }
+
+  let translations = {};
+  if (data.translations && data.translations[lang]) {
+    translations = data.translations[lang];
+  } else if (data.translations && data.translations.en) {
+    translations = data.translations.en;
+  }
+
+  const rawLogos = data.logos || [];
+  const logos = [];
+
+  for (let i = 0; i < rawLogos.length; i++) {
+    const item = rawLogos[i];
+    if (typeof item === "string" && item.trim().length > 0) {
+      logos.push(item);
+    } else if (
+      item &&
+      typeof item.url === "string" &&
+      item.url.trim().length > 0
+    ) {
+      logos.push(item.url);
+    }
+  }
+
+  if (logos.length === 0) {
+    return null;
+  }
+
+  const title = translations.title || "";
   const titleText = stripHtml(title);
   const isRTL = lang === "ps" || lang === "fa";
-
-  if (logos.length === 0) return null;
 
   return (
     <section
       className="relative h-100 w-[96vw] max-w-full overflow-hidden bg-[#eef2f2] py-20"
       style={{ direction: "ltr" }}
     >
-      <div className="relative z-0 mx-auto flex max-w-7xl flex-col items-center px-4">
-        {/* Center circle title */}
+      <div className="relative z-0 mx-auto flex max-w-7xl min-w-0 flex-col items-center px-4">
+        {/* Center circle title container */}
         <div
           className="wow animate__animated animate__fadeIn pointer-events-none absolute top-1/2 left-1/2 z-9 mt-6 flex h-50 w-50 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-gray-300 bg-white/20 px-4 text-center leading-loose backdrop-blur-md lg:h-80 lg:w-80"
           dir={isRTL ? "rtl" : "ltr"}
           data-wow-duration="1s"
         >
-          <div className="brand-title max-w-80 text-center text-lg leading-7 font-semibold text-[#102124] lg:text-xl">
-            {titleText ? (
-              <div dangerouslySetInnerHTML={{ __html: title }} />
+          <div className="brand-title flex flex-col items-center justify-center text-center text-lg font-semibold text-[#102124] lg:text-xl">
+            {titleText.length > 0 ? (
+              <div
+                role="heading"
+                aria-level={2}
+                className="w-full text-center"
+                dangerouslySetInnerHTML={{ __html: title }}
+              />
             ) : (
               <FormattedTitle text="" />
             )}
           </div>
         </div>
 
-        {/* Infinite scroll track */}
+        {/* Infinite marquee track */}
         <div
-          className="wow animate__animated animate__fadeInUp mt-14 w-full overflow-hidden"
+          className="wow animate__animated animate__fadeInUp mt-14 w-full min-w-0 overflow-hidden"
           data-wow-duration="1s"
           data-wow-delay="0.3s"
           style={{ direction: "ltr" }}
@@ -68,7 +136,6 @@ export default function BrandLogosView({ data, lang = "en" }) {
         </div>
       </div>
 
-      {/* Global CSS styles */}
       <style dangerouslySetInnerHTML={{ __html: BRAND_LOGOS_STYLES }} />
     </section>
   );
@@ -97,30 +164,34 @@ function FormattedTitle({ text }) {
   const normalizedText = text.replace(/\\n/g, "\n");
   const lines = normalizedText.split("\n");
 
-  return lines.map((line, lineIdx) => (
-    <span key={lineIdx} className="block">
-      {line.split(/(\+?\d+\+?|Bexon|بکسون)/g).map((part, i) => {
-        if (/^\+?\d+\+?$/.test(part)) {
-          return (
-            <span
-              key={i}
-              className="mx-1 inline-block rounded-full bg-[#1E8A8A] px-2 py-0.5 text-white"
-            >
-              {part}
-            </span>
-          );
-        }
-        if (part === "Bexon" || part === "بکسون") {
-          return (
-            <span key={i} className="text-gray-500 underline">
-              {part}
-            </span>
-          );
-        }
-        return part;
-      })}
-    </span>
-  ));
+  return lines.map(function (line, lineIdx) {
+    const parts = line.split(/(\+?\d+\+?|Bexon|بکسون)/g);
+
+    return (
+      <span key={lineIdx} className="block">
+        {parts.map(function (part, i) {
+          if (/^\+?\d+\+?$/.test(part)) {
+            return (
+              <span
+                key={i}
+                className="mx-1 inline-block rounded-full bg-[#1E8A8A] px-2 py-0.5 text-white"
+              >
+                {part}
+              </span>
+            );
+          }
+          if (part === "Bexon" || part === "بکسون") {
+            return (
+              <span key={i} className="text-gray-500 underline">
+                {part}
+              </span>
+            );
+          }
+          return part;
+        })}
+      </span>
+    );
+  });
 }
 
 /* ==================== MARQUEE TRACK ==================== */
@@ -138,38 +209,44 @@ function MarqueeTrack({ logos }) {
     }
   }, [logos]);
 
-  // Re-sync WOW.js after dynamic block mounts
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer = setTimeout(function () {
       if (typeof window !== "undefined" && window.WOW) {
         try {
           new window.WOW({ live: false }).sync();
         } catch {
-          // WOW.js not available
+          // WOW.js sync fallback
         }
       }
     }, 100);
-    return () => clearTimeout(timer);
+    return function () {
+      clearTimeout(timer);
+    };
   }, []);
 
-  const duration = Math.max(groupWidth / 60, 10);
+  let duration = 10;
+  if (groupWidth > 0) {
+    duration = Math.max(groupWidth / 60, 10);
+  }
 
-  const logoSet = logos.map((logo, i) => (
-    <LogoCard key={i} logo={logo} index={i} />
-  ));
+  const logoSet = [];
+  for (let i = 0; i < logos.length; i++) {
+    logoSet.push(<LogoCard key={i} logo={logos[i]} index={i} />);
+  }
+
+  let trackStyle = undefined;
+  if (groupWidth > 0) {
+    trackStyle = {
+      animationDuration: duration + "s",
+      "--scroll-distance": "-" + groupWidth + "px",
+    };
+  }
 
   return (
     <div
       ref={trackRef}
       className="logo-track flex w-max hover:[animation-play-state:paused]"
-      style={
-        groupWidth
-          ? {
-              animationDuration: `${duration}s`,
-              "--scroll-distance": `-${groupWidth}px`,
-            }
-          : undefined
-      }
+      style={trackStyle}
     >
       <div className="flex shrink-0 gap-3 pr-3 sm:gap-4 sm:pr-4 md:gap-5 md:pr-5 lg:gap-6 lg:pr-6">
         {logoSet}
@@ -193,7 +270,7 @@ function LogoCard({ logo, index }) {
       <div className="relative h-full max-h-12 w-full sm:max-h-14 md:max-h-16 lg:max-h-20">
         <Image
           src={logo}
-          alt={`Company logo ${index + 1}`}
+          alt={"Company logo " + (index + 1)}
           fill
           sizes="(max-width: 640px) 96px, (max-width: 768px) 120px, (max-width: 1024px) 140px, 160px"
           className="object-contain opacity-60 transition-all duration-300 hover:opacity-100"

@@ -460,3 +460,106 @@ html[dir="rtl"]
   display: block;
   overflow-x: auto;
 }
+
+/* =======================================================
+   PRODUCTION RICH TEXT & RESPONSIVE HTML RESETS
+   ======================================================= */
+
+/* Prevent horizontal page overflow on mobile devices */
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Base reset for any rendered HTML content from DB */
+.rt-content,
+.rt-inline {
+  display: block;
+  width: 100%;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  box-sizing: border-box;
+}
+
+/* Inline HTML (for titles, badges, buttons - removes paragraph gaps) */
+.rt-inline {
+  display: inline-block;
+  width: auto;
+}
+.rt-inline p {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Multi-line body text & description HTML */
+.rt-content p {
+  margin: 0 0 0.6em 0 !important;
+  padding: 0 !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+.rt-content p:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Force all images, tables, videos, and iframes inside HTML to be responsive */
+.rt-content img,
+.rt-content table,
+.rt-content iframe,
+.rt-content video,
+.rt-inline img {
+  max-width: 100% !important;
+  height: auto !important;
+  box-sizing: border-box;
+}
+
+/* Make DB tables scrollable on mobile without breaking layout */
+.rt-content table {
+  display: block;
+  width: 100% !important;
+  overflow-x: auto;
+}
+
+/* Quill alignment support */
+.rt-content .ql-align-center,
+.rt-inline .ql-align-center,
+.ql-align-center {
+  text-align: center !important;
+}
+.rt-content .ql-align-right,
+.rt-inline .ql-align-right,
+.ql-align-right {
+  text-align: right !important;
+}
+.rt-content .ql-align-left,
+.rt-inline .ql-align-left,
+.ql-align-left {
+  text-align: left !important;
+}
+.rt-content .ql-align-justify,
+.rt-inline .ql-align-justify,
+.ql-align-justify {
+  text-align: justify !important;
+}
+
+/* Links and list styles */
+.rt-content a,
+.rt-inline a {
+  color: #1e8a8a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rt-content ul,
+.rt-content ol {
+  margin: 0.5em 0;
+  padding-inline-start: 1.25em;
+}
+.rt-content li {
+  margin-bottom: 0.25em;
+}

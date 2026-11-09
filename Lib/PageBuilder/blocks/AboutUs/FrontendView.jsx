@@ -4,13 +4,6 @@ import { ArrowRight, Box, Play, Star } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-/* Helper to strip HTML tags for empty checks */
-function stripHtml(val) {
-  return String(val || "")
-    .replace(/<[^>]*>/g, "")
-    .trim();
-}
-
 const ABOUT_US_STYLES = `
   .rt-inline p { display: inline; margin: 0; }
   .rt-desc p { margin: 0 0 0.5em 0; }
@@ -22,8 +15,41 @@ const ABOUT_US_STYLES = `
   .rt-desc li { margin-bottom: 0.2em; }
 `;
 
-export default function AboutUsView({ data, lang = "en" }) {
+export default function AboutUsView({ data, lang: langProp = "en" }) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [lang, setLang] = useState(langProp);
+
+  /* Sync with incoming langProp */
+  useEffect(() => {
+    if (langProp) {
+      setLang(langProp);
+    }
+  }, [langProp]);
+
+  /* Listen for language changes from NavBar */
+  useEffect(() => {
+    function handleLanguageChange(event) {
+      let selectedLanguage = "en";
+      if (event && event.detail && event.detail.language) {
+        selectedLanguage = event.detail.language;
+      } else {
+        selectedLanguage = localStorage.getItem("site-language") || "en";
+      }
+
+      if (
+        selectedLanguage === "en" ||
+        selectedLanguage === "ps" ||
+        selectedLanguage === "fa"
+      ) {
+        setLang(selectedLanguage);
+      }
+    }
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+    return function () {
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
+  }, []);
 
   /* Re-trigger WOW.js after dynamic mount */
   useEffect(() => {
@@ -55,22 +81,19 @@ export default function AboutUsView({ data, lang = "en" }) {
       /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&/]+)/,
     )?.[1] || "";
 
-  const experienceLabelText = stripHtml(t.experienceLabel);
-  const experienceNumberText = stripHtml(t.experienceNumber);
-  const experienceTextText = stripHtml(t.experienceText);
-  const sectionLabelText = stripHtml(t.sectionLabel);
-  const titleText = stripHtml(t.title);
-  const buttonTextText = stripHtml(t.buttonText);
-  const descriptionText = stripHtml(t.description);
-  const clientNameText = stripHtml(t.clientName);
-  const clientRoleText = stripHtml(t.clientRole);
+  const isRtl = lang === "ps" || lang === "fa";
 
   return (
-    <main className="w-full bg-[#eef2f2] px-4 py-10 sm:px-6 md:px-10 lg:px-12 xl:px-16">
-      <div className="mx-auto grid w-full grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-10">
-        {/* LEFT SIDE */}
+    <main
+      dir={isRtl ? "rtl" : "ltr"}
+      className="w-full overflow-x-hidden bg-[#eef2f2] px-4 py-8 sm:px-6 sm:py-10 md:px-10 lg:px-12 xl:px-16"
+    >
+      <div className="mx-auto grid w-full max-w-400 grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-10">
+        {/* LEFT SIDE
+            - mobile/tablet: image keeps an aspect ratio
+            - desktop: image stretches to match the height of the right column */}
         <div
-          className="wow animate__animated animate__fadeInLeft relative w-full"
+          className="wow animate__animated animate__fadeInLeft relative aspect-4/5 w-full min-w-0 sm:aspect-4/3 lg:aspect-auto lg:min-h-155"
           data-wow-duration="1s"
           data-wow-delay="0.1s"
         >
@@ -79,81 +102,77 @@ export default function AboutUsView({ data, lang = "en" }) {
               src={mainImage}
               alt="About us"
               fill
-              sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1024px) calc(50vw - 40px), 50vw"
-              className="!relative h-112.5 w-full rounded-2xl object-cover sm:h-130 md:h-150 lg:h-155"
+              sizes="(max-width: 1024px) calc(100vw - 32px), 50vw"
+              className="rounded-2xl object-cover"
             />
           )}
 
           {/* Experience Card */}
-          {(experienceLabelText ||
-            experienceNumberText ||
-            experienceTextText) && (
-            <div
-              className="wow animate__animated animate__fadeInUp absolute bottom-0 left-0 bg-[#eef2f2] pt-3 pr-3 sm:pt-4 sm:pr-4"
-              data-wow-duration="0.8s"
-              data-wow-delay="0.5s"
-            >
-              <div className="w-52.5 rounded-tr-2xl bg-white p-5 sm:w-62.5 sm:p-6 md:w-70 md:p-7">
-                {experienceLabelText && (
-                  <div
-                    className="rt-inline text-sm font-medium text-[#229393] sm:text-base md:text-lg"
-                    dangerouslySetInnerHTML={{ __html: t.experienceLabel }}
-                  />
-                )}
+          <div
+            className="wow animate__animated animate__fadeInUp absolute start-0 bottom-0 max-w-[90%] bg-[#eef2f2] pe-3 pt-3 sm:pe-4 sm:pt-4"
+            data-wow-duration="0.8s"
+            data-wow-delay="0.5s"
+          >
+            <div className="w-44 max-w-full rounded-se-2xl bg-white p-4 min-[400px]:w-52.5 sm:w-62.5 sm:p-6 md:w-70 md:p-7">
+              {t.experienceLabel && (
+                <div
+                  className="rt-inline text-sm font-medium text-[#229393] sm:text-base md:text-lg"
+                  dangerouslySetInnerHTML={{ __html: t.experienceLabel }}
+                />
+              )}
 
-                {experienceNumberText && (
-                  <div
-                    role="heading"
-                    aria-level={2}
-                    className="rt-inline mt-6 text-4xl leading-none font-bold text-[#102326] sm:mt-8 sm:text-5xl md:mt-10 md:text-6xl"
-                    dangerouslySetInnerHTML={{ __html: t.experienceNumber }}
-                  />
-                )}
+              {t.experienceNumber && (
+                <div
+                  role="heading"
+                  aria-level={2}
+                  className="rt-inline mt-4 text-4xl leading-none font-bold text-[#102326] sm:mt-8 sm:text-5xl md:mt-10 md:text-6xl"
+                  dangerouslySetInnerHTML={{ __html: t.experienceNumber }}
+                />
+              )}
 
-                {experienceTextText && (
-                  <div
-                    className="rt-desc mt-3 text-sm leading-6 text-slate-600 sm:text-base sm:leading-7 md:text-lg"
-                    dangerouslySetInnerHTML={{ __html: t.experienceText }}
-                  />
-                )}
-              </div>
+              {t.experienceText && (
+                <div
+                  className="rt-desc mt-3 text-sm leading-6 text-slate-600 sm:text-base sm:leading-7 md:text-lg"
+                  dangerouslySetInnerHTML={{ __html: t.experienceText }}
+                />
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* RIGHT SIDE */}
         <div
-          className="wow animate__animated animate__fadeInRight flex w-full flex-col gap-5"
+          className="wow animate__animated animate__fadeInRight flex w-full min-w-0 flex-col gap-4 sm:gap-5"
           data-wow-duration="1s"
           data-wow-delay="0.2s"
         >
           {/* MAIN CONTENT CARD */}
           <div className="rounded-2xl bg-white p-4 sm:p-5 md:p-6 lg:p-7">
             {/* Badge */}
-            {sectionLabelText && (
+            {t.sectionLabel && (
               <div
-                className="wow animate__animated animate__fadeIn group inline-flex items-center gap-2 border border-cyan-100 bg-cyan-50/30 px-3 py-1.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:bg-cyan-100 hover:shadow-md sm:px-4"
+                className="wow animate__animated animate__fadeIn group inline-flex max-w-full items-center gap-2 border border-cyan-100 bg-cyan-50/30 px-3 py-1.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:bg-cyan-100 hover:shadow-md sm:px-4"
                 data-wow-duration="0.8s"
                 data-wow-delay="0.4s"
               >
                 <Box
                   size={18}
-                  className="text-[#1E8A8A] transition-transform duration-300 group-hover:rotate-180"
+                  className="shrink-0 text-[#1E8A8A] transition-transform duration-300 group-hover:rotate-180"
                 />
 
                 <div
-                  className="rt-inline text-sm font-bold tracking-wide text-zinc-950"
+                  className="rt-inline text-xs font-bold tracking-wide wrap-break-word text-zinc-950 sm:text-sm"
                   dangerouslySetInnerHTML={{ __html: t.sectionLabel }}
                 />
               </div>
             )}
 
             {/* Heading */}
-            {titleText && (
+            {t.title && (
               <div
                 role="heading"
                 aria-level={1}
-                className="wow animate__animated animate__fadeInUp rt-inline mt-5 text-xl leading-[1.15] font-medium text-[#102326] sm:text-2xl md:text-3xl lg:text-[38px] xl:text-[42px]"
+                className="wow animate__animated animate__fadeInUp rt-inline mt-4 text-xl leading-[1.2] font-medium wrap-break-word text-[#102326] sm:mt-5 sm:text-2xl md:text-3xl lg:text-[32px] xl:text-[38px] 2xl:text-[42px]"
                 data-wow-duration="1s"
                 data-wow-delay="0.5s"
                 dangerouslySetInnerHTML={{ __html: t.title }}
@@ -166,10 +185,10 @@ export default function AboutUsView({ data, lang = "en" }) {
               data-wow-duration="0.8s"
               data-wow-delay="0.7s"
             >
-              {buttonTextText && data?.buttonLink && (
+              {t.buttonText && data?.buttonLink && (
                 <a
                   href={data.buttonLink}
-                  className="group/button inline-flex w-35 cursor-pointer items-center justify-between overflow-hidden rounded-full bg-[#0C1E21] py-1 pr-1 pl-4 text-xs font-semibold text-white transition-colors duration-300 hover:bg-[#1E8A8A]"
+                  className="group/button inline-flex max-w-full min-w-35 cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-full bg-[#0C1E21] py-1 ps-4 pe-1 text-xs font-semibold text-white transition-colors duration-300 hover:bg-[#1E8A8A]"
                 >
                   <span className="overflow-hidden leading-none">
                     <div
@@ -181,7 +200,7 @@ export default function AboutUsView({ data, lang = "en" }) {
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white">
                     <ArrowRight
                       size={16}
-                      className="-rotate-45 text-[#0C1E21] transition-transform duration-300 group-hover/button:rotate-0"
+                      className="-rotate-45 text-[#0C1E21] transition-transform duration-300 group-hover/button:rotate-0 rtl:-scale-x-100"
                     />
                   </span>
                 </a>
@@ -190,10 +209,10 @@ export default function AboutUsView({ data, lang = "en" }) {
           </div>
 
           {/* BOTTOM CARDS */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
             {/* TESTIMONIAL CARD */}
             <div
-              className="wow animate__animated animate__fadeInUp flex min-h-47.5 flex-col justify-between rounded-2xl bg-[#1E8A8A] p-5 text-white sm:min-h-52.5 md:p-6"
+              className="wow animate__animated animate__fadeInUp flex min-h-47.5 min-w-0 flex-col justify-between rounded-2xl bg-[#1E8A8A] p-5 text-white sm:min-h-52.5 md:p-6"
               data-wow-duration="0.9s"
               data-wow-delay="0.3s"
             >
@@ -210,22 +229,23 @@ export default function AboutUsView({ data, lang = "en" }) {
               </div>
 
               {/* Testimonial */}
-              {descriptionText && (
+              {t.description && (
                 <div
-                  className="rt-desc mt-5 text-sm leading-6 text-white/90 sm:text-base"
+                  className="rt-desc mt-5 max-w-full text-sm leading-6 wrap-break-word text-white/90 sm:text-base"
                   dangerouslySetInnerHTML={{ __html: t.description }}
                 />
               )}
 
               {/* Person */}
               <div className="mt-5">
-                {clientNameText && (
+                {t.clientName && (
                   <div
                     className="rt-inline text-sm font-semibold"
                     dangerouslySetInnerHTML={{ __html: t.clientName }}
                   />
                 )}
-                {clientRoleText && (
+                <br />
+                {t.clientRole && (
                   <div
                     className="rt-inline mt-1 text-xs text-white/70"
                     dangerouslySetInnerHTML={{ __html: t.clientRole }}
@@ -236,7 +256,7 @@ export default function AboutUsView({ data, lang = "en" }) {
 
             {/* VIDEO CARD */}
             <div
-              className="wow animate__animated animate__fadeInUp relative min-h-47.5 overflow-hidden rounded-2xl bg-[#102326] sm:min-h-52.5"
+              className="wow animate__animated animate__fadeInUp relative aspect-video min-h-47.5 min-w-0 overflow-hidden rounded-2xl bg-[#102326] sm:aspect-auto sm:min-h-52.5"
               data-wow-duration="0.9s"
               data-wow-delay="0.5s"
             >
@@ -258,16 +278,16 @@ export default function AboutUsView({ data, lang = "en" }) {
                     type="button"
                     onClick={() => setIsPlaying(true)}
                     aria-label="Play video"
-                    className="absolute top-1/2 left-1/2 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white shadow-xl transition-transform duration-300 hover:scale-110"
+                    className="absolute top-1/2 left-1/2 z-10 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-white shadow-xl transition-transform duration-300 hover:scale-110 sm:h-14 sm:w-14"
                   >
                     <Play
                       size={20}
                       fill="currentColor"
-                      className="ml-1 text-[#1E8A8A]"
+                      className="ms-1 text-[#1E8A8A] rtl:-scale-x-100"
                     />
                   </button>
 
-                  <div className="absolute bottom-4 left-4 z-10">
+                  <div className="absolute start-4 bottom-4 z-10 max-w-[calc(100%-2rem)]">
                     <p className="text-sm font-medium text-white">
                       Discover Our Story
                     </p>
@@ -287,7 +307,7 @@ export default function AboutUsView({ data, lang = "en" }) {
         </div>
       </div>
 
-      {/* Global CSS styles */}
+      {/* Local styles for Quill reset */}
       <style dangerouslySetInnerHTML={{ __html: ABOUT_US_STYLES }} />
     </main>
   );

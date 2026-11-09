@@ -144,7 +144,7 @@ export default function FlatEditorPage() {
       } catch (err) {
         console.warn("Could not save draft:", err);
       }
-    }, 20000);
+    }, 30000);
 
     return () => clearTimeout(timer);
   }, [formData, id, loading]);
@@ -334,7 +334,7 @@ export default function FlatEditorPage() {
         console.warn("Could not clear draft:", err);
       }
       toast.success("Published successfully!");
-      // router.push("/admin/pages");
+      router.push("/admin/pages");
     } catch {
       toast.error("Publish failed. Please try again.");
     } finally {

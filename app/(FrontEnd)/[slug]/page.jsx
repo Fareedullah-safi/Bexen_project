@@ -1,3 +1,4 @@
+import { fixData } from "@/Lib/fixText"; // ← added
 import dbConnect from "@/Lib/mongoDB";
 import { BLOCK_REGISTRY } from "@/Lib/PageBuilder/blocks";
 import Page from "@/Models/Pages/Page";
@@ -65,7 +66,7 @@ export default async function DynamicFrontendPage({ params }) {
         return (
           <div key={block.blockId} id={"block-" + block.blockId}>
             <View
-              data={block.data}
+              data={fixData(block.data)} // ← changed
               lang={lang}
               pageTitle={page.title}
               pageSlug={page.slug}

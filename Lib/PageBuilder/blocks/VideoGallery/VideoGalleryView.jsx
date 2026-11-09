@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { Play, Video, X } from "lucide-react";
@@ -11,6 +12,7 @@ function stripHtml(val) {
 }
 
 const VIDEO_GALLERY_STYLES = `
+  .rt-inline, .rt-desc { overflow-wrap: break-word !important; word-break: normal !important; }
   .rt-inline p { display: inline; margin: 0; }
   .rt-desc p { margin: 0 0 0.5em 0; }
   .rt-desc p:last-child { margin-bottom: 0; }
@@ -39,8 +41,29 @@ const parseYouTube = (url = "") => {
   };
 };
 
-export default function VideoGalleryView({ data, lang }) {
+export default function VideoGalleryView({ data, lang: langProp = "en" }) {
   const [activeVideo, setActiveVideo] = useState(null);
+  const [lang, setLang] = useState(langProp);
+
+  // Keep in sync with the server-provided language
+  useEffect(() => {
+    setLang(langProp);
+  }, [langProp]);
+
+  // Instant language switch from the navbar
+  useEffect(() => {
+    function handleLanguageChange(event) {
+      const next =
+        event?.detail?.language || localStorage.getItem("site-language");
+      if (next === "en" || next === "ps" || next === "fa") {
+        setLang(next);
+      }
+    }
+    window.addEventListener("site-language-change", handleLanguageChange);
+    return () => {
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
+  }, []);
 
   // Load data from CMS props
   const pageT = data?.translations?.[lang] || data?.translations?.en || {};
@@ -85,7 +108,7 @@ export default function VideoGalleryView({ data, lang }) {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <header className="mb-12 text-center sm:mb-16">
+        <header className="mb-12 text-center flex flex-col sm:mb-16">
           {tagText && (
             <div
               className="rt-inline mb-3 text-xs font-bold tracking-[0.2em] text-[var(--accent,#1e8a8a)] uppercase"
@@ -141,6 +164,7 @@ export default function VideoGalleryView({ data, lang }) {
                   key={video._uid || video.id || idx}
                   role="button"
                   tabIndex={0}
+                  aria-label={titlePlain || "Play video"}
                   onClick={() =>
                     setActiveVideo({
                       embedUrl: yt.embedUrl,
@@ -171,7 +195,10 @@ export default function VideoGalleryView({ data, lang }) {
                         className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                         loading="lazy"
                         onError={(e) => {
-                          if (yt.videoId) {
+                          if (
+                            yt.videoId &&
+                            !e.currentTarget.src.includes("hqdefault")
+                          ) {
                             e.currentTarget.src = `https://img.youtube.com/vi/${yt.videoId}/hqdefault.jpg`;
                           }
                         }}
@@ -204,7 +231,7 @@ export default function VideoGalleryView({ data, lang }) {
                     )}
                     {subtitlePlain && (
                       <div
-                        className="rt-desc line-clamp-2 text-sm leading-relaxed text-[var(--muted,#6b7280)]"
+                        className="rt-inline line-clamp-2 text-sm leading-relaxed text-[var(--muted,#6b7280)]"
                         dangerouslySetInnerHTML={{ __html: subtitleHtml }}
                       />
                     )}
@@ -220,6 +247,9 @@ export default function VideoGalleryView({ data, lang }) {
       {activeVideo && (
         <div
           dir="ltr"
+          role="dialog"
+          aria-modal="true"
+          aria-label={activeVideo.titlePlain || "Video"}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
         >
           <div
@@ -229,6 +259,7 @@ export default function VideoGalleryView({ data, lang }) {
 
           <button
             type="button"
+            autoFocus
             onClick={() => setActiveVideo(null)}
             className="absolute top-4 right-4 z-50 rounded-full bg-white/10 p-2.5 text-white transition hover:bg-white/20 hover:text-[var(--accent,#1e8a8a)] sm:top-8 sm:right-8"
             aria-label="Close video"

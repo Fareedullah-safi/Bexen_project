@@ -1,9 +1,20 @@
 "use client";
 
-import RichText from "@/app/Components/RichText";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
+const SERVICE_DETAILS_STYLES = `
+  .rt-inline p { display: inline; margin: 0; }
+  .rt-desc p { margin: 0 0 0.5em 0; }
+  .rt-desc p:last-child { margin-bottom: 0; }
+  .rt-desc strong, .rt-desc b { font-weight: 700; color: inherit; }
+  .rt-desc em, .rt-desc i { font-style: italic; }
+  .rt-desc a { color: #1E8A8A; text-decoration: underline; text-underline-offset: 2px; }
+  .rt-desc ul, .rt-desc ol { margin: 0.4em 0; padding-inline-start: 1.2em; }
+  .rt-desc li { margin-bottom: 0.2em; }
+`;
 
 /* Helper to strip HTML tags for empty checks */
 function stripHtml(val) {
@@ -12,14 +23,63 @@ function stripHtml(val) {
     .trim();
 }
 
-export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
+export default function ServiceDetailsFrontendView({
+  data,
+  lang: langProp = "en",
+}) {
+  const [lang, setLang] = useState(langProp);
+
+  /* Sync with incoming langProp */
+  useEffect(() => {
+    if (langProp) {
+      setLang(langProp);
+    }
+  }, [langProp]);
+
+  /* Listen for language changes from NavBar */
+  useEffect(() => {
+    function handleLanguageChange(event) {
+      let selectedLanguage = "en";
+      if (event && event.detail && event.detail.language) {
+        selectedLanguage = event.detail.language;
+      } else {
+        selectedLanguage = localStorage.getItem("site-language") || "en";
+      }
+
+      if (
+        selectedLanguage === "en" ||
+        selectedLanguage === "ps" ||
+        selectedLanguage === "fa"
+      ) {
+        setLang(selectedLanguage);
+      }
+    }
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+    return function () {
+      window.removeEventListener("site-language-change", handleLanguageChange);
+    };
+  }, []);
+
+  /* Re-trigger WOW.js after dynamic mount */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (typeof window !== "undefined" && window.WOW) {
+        try {
+          new window.WOW({ live: false }).sync();
+        } catch {}
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  /* ── helpers ── */
   const content = data?.[lang] || data?.en || {};
   const isRTL = lang === "ps" || lang === "fa";
   const heroImageUrl = data?.heroImage?.url || "";
   const services = data?.services || [];
 
   const mainTitleText = stripHtml(content.mainTitle);
-  const highlightedTitleText = stripHtml(content.highlightedTitle);
   const desc1Text = stripHtml(content.description1);
   const desc2Text = stripHtml(content.description2);
   const desc3Text = stripHtml(content.description3);
@@ -55,18 +115,15 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
           )}
 
           <div className="mt-7 sm:mt-10">
-            {(mainTitleText) && (
+            {mainTitleText && (
               <div
                 role="heading"
                 aria-level={1}
-                className="wow animate__animated animate__fadeInUp xs:text-3xl text-[26px] leading-[1.18] font-medium tracking-tight text-[#102326] sm:text-4xl md:text-5xl"
+                className="wow animate__animated animate__fadeInUp rt-inline xs:text-3xl text-[26px] leading-[1.18] font-medium tracking-tight text-[#102326] sm:text-4xl md:text-5xl"
                 data-wow-duration="0.9s"
                 data-wow-delay="0.15s"
-              >
-                {mainTitleText && (
-                  <RichText content={content.mainTitle} inline={true} />
-                )}{" "}
-              </div>
+                dangerouslySetInnerHTML={{ __html: content.mainTitle }}
+              />
             )}
 
             {desc1Text && (
@@ -75,9 +132,9 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
                 data-wow-duration="0.8s"
                 data-wow-delay="0.25s"
               >
-                <RichText
-                  content={content.description1}
-                  className="text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+                <div
+                  className="rt-desc text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+                  dangerouslySetInnerHTML={{ __html: content.description1 }}
                 />
               </div>
             )}
@@ -88,9 +145,9 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
                 data-wow-duration="0.8s"
                 data-wow-delay="0.35s"
               >
-                <RichText
-                  content={content.description2}
-                  className="text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+                <div
+                  className="rt-desc text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+                  dangerouslySetInnerHTML={{ __html: content.description2 }}
                 />
               </div>
             )}
@@ -101,9 +158,9 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
                 data-wow-duration="0.8s"
                 data-wow-delay="0.45s"
               >
-                <RichText
-                  content={content.description3}
-                  className="text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+                <div
+                  className="rt-desc text-sm leading-7 text-[#102326]/65 sm:text-base sm:leading-8"
+                  dangerouslySetInnerHTML={{ __html: content.description3 }}
                 />
               </div>
             )}
@@ -122,30 +179,33 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
           >
             <div className="mb-5">
               {sidebarTagText && (
-                <RichText
-                  content={content.sidebarTag}
-                  inline={true}
-                  className="text-xs font-bold tracking-[0.18em] text-[#1E8A8A] uppercase"
+                <div
+                  className="rt-inline text-xs font-bold tracking-[0.18em] text-[#1E8A8A] uppercase"
+                  dangerouslySetInnerHTML={{ __html: content.sidebarTag }}
                 />
               )}
               {sidebarTitleText && (
-                <RichText
-                  content={content.sidebarTitle}
-                  asHeading={true}
-                  headingLevel={3}
-                  className="mt-2 text-xl font-medium text-[#0C1E21] sm:text-2xl"
+                <div
+                  role="heading"
+                  aria-level={3}
+                  className="rt-desc mt-2 text-xl font-medium text-[#0C1E21] sm:text-2xl"
+                  dangerouslySetInnerHTML={{ __html: content.sidebarTitle }}
                 />
               )}
             </div>
 
             <div className="flex flex-col gap-2">
               {services.map((service, index) => {
-                const label =
+                let label =
                   service.translations?.[lang]?.label ||
                   service.translations?.en?.label ||
                   service.label?.[lang] ||
                   service.label ||
                   "";
+
+                if (typeof label !== "string") {
+                  label = "";
+                }
 
                 return (
                   <Link
@@ -159,10 +219,9 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
                     data-wow-duration="0.7s"
                     data-wow-delay={`${0.15 + index * 0.08}s`}
                   >
-                    <RichText
-                      content={label}
-                      inline={true}
-                      className="text-sm leading-5 font-semibold"
+                    <div
+                      className="rt-inline text-sm leading-5 font-semibold"
+                      dangerouslySetInnerHTML={{ __html: label }}
                     />
                     <span
                       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
@@ -187,6 +246,9 @@ export default function ServiceDetailsFrontendView({ data, lang = "en" }) {
           </div>
         </aside>
       </div>
+
+      {/* Local styles for Quill reset */}
+      <style dangerouslySetInnerHTML={{ __html: SERVICE_DETAILS_STYLES }} />
     </section>
   );
 }
