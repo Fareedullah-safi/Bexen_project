@@ -599,10 +599,11 @@ export default function FlatEditorPage() {
         </div>
 
         {/* FOOTER */}
+        {/* FOOTER */}
         <footer
-          className={`fixed right-4 bottom-4 left-4 z-50 mx-auto flex max-w-5xl flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-xl sm:right-8 sm:left-64 sm:flex-row sm:items-center sm:px-6 lg:left-72 xl:left-80 ${
+          className={`fixed right-4 bottom-2 left-4 z-50 mx-auto mr-2 ml-5 flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-xl sm:right-6 sm:left-64 sm:flex-row sm:items-center sm:px-6 lg:right-8 lg:left-72 ${
             isDark
-              ? "border-[#263442] bg-[#111a23]/95 text-white"
+              ? "border-[#263442] bg-[#111a23]/10 text-white"
               : "border-[#e4e7ec] bg-white/95 text-gray-900"
           }`}
         >
