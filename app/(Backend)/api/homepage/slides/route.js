@@ -6,132 +6,105 @@ import cloudinary from "@/Lib/cloudinary";
 import dbConnect from "@/Lib/mongoDB";
 import HomeSlider from "@/Models/HomeSlider";
 import { NextResponse } from "next/server";
-export async function POST(request) {
-  try {
-    const permission = await requireEditPermission();
-
-    if (!permission.authorized) {
-      return permission.response;
-    }
-    await dbConnect();
-
-    const formData = await request.formData();
-
-    const file = formData.get("image");
-    const imageUrl = formData.get("imageUrl");
-
-    // Upload image from PC
-    if (file) {
-      const buffer = Buffer.from(await file.arrayBuffer());
-
-      const result = await new Promise((resolve, reject) =>
-        cloudinary.uploader
-          .upload_stream({ folder: "home-slider" }, (error, result) =>
-            error ? reject(error) : resolve(result),
-          )
-          .end(buffer),
-      );
-
-      const slide = await HomeSlider.create({
-        image: result.secure_url,
-        publicId: result.public_id,
-        source: "upload",
-      });
-
-      return NextResponse.json(slide, { status: 201 });
-    }
-
-    // Upload image from URL
-    if (imageUrl) {
-      const result = await cloudinary.uploader.upload(imageUrl, {
-        folder: "home-slider",
-      });
-
-      const slide = await HomeSlider.create({
-        image: result.secure_url,
-        publicId: result.public_id,
-        source: "url",
-      });
-
-      return NextResponse.json(slide, { status: 201 });
-    }
-
-    return NextResponse.json(
-      { message: "Select an image or enter an image URL" },
-      { status: 400 },
-    );
-  } catch (error) {
-    console.error(error);
-
-    return NextResponse.json(
-      { message: error.message || "Upload failed" },
-      { status: 500 },
-    );
-  }
-}
-
-// get data
 
 export async function GET() {
   try {
     await dbConnect();
-    const slides = await HomeSlider.find();
-    return NextResponse.json({ slides });
+    let doc = await HomeSlider.findOne();
+    if (!doc) {
+      doc = await HomeSlider.create({ slides: [] });
+    }
+    return NextResponse.json({ success: true, slides: doc.slides || [] });
   } catch (error) {
-    console.error(error);
     return NextResponse.json(
-      { message: error.message || "Failed to fetch slides" },
+      { success: false, message: error.message },
       { status: 500 },
     );
   }
 }
 
-// delete api
-export async function DELETE(request) {
+export async function POST(req) {
   try {
-    const permission = await requireDeletePermission();
-
-    console.log("DELETE AUTHORIZATION:", {
-      authorized: permission.authorized,
-      role: permission.admin?.role,
-    });
-
+    const permission = await requireEditPermission();
     if (!permission.authorized) {
       return permission.response;
     }
 
     await dbConnect();
+    const body = await req.json();
+    const slides = Array.isArray(body.slides) ? body.slides : [];
 
-    const { id } = await request.json();
+    // Destroy Cloudinary assets removed from the list
+    const current = await HomeSlider.findOne();
+    if (current && Array.isArray(current.slides)) {
+      const keepIds = new Set();
+      for (let i = 0; i < slides.length; i++) {
+        if (slides[i] && slides[i].publicId) {
+          keepIds.add(slides[i].publicId);
+        }
+      }
 
-    if (!id) {
-      return NextResponse.json(
-        { message: "Image ID is required" },
-        { status: 400 },
-      );
+      for (let i = 0; i < current.slides.length; i++) {
+        const pid = current.slides[i].publicId;
+        if (pid && !keepIds.has(pid)) {
+          try {
+            await cloudinary.uploader.destroy(pid);
+          } catch (err) {}
+        }
+      }
     }
 
-    const slide = await HomeSlider.findById(id);
-
-    if (!slide) {
-      return NextResponse.json({ message: "Image not found" }, { status: 404 });
-    }
-
-    if (slide.publicId) {
-      await cloudinary.uploader.destroy(slide.publicId);
-    }
-
-    await HomeSlider.findByIdAndDelete(id);
-
-    return NextResponse.json(
-      { message: "Image deleted successfully" },
-      { status: 200 },
+    const updated = await HomeSlider.findOneAndUpdate(
+      {},
+      { slides: slides },
+      { new: true, upsert: true, runValidators: true },
     );
-  } catch (error) {
-    console.error("Delete image error:", error);
 
+    return NextResponse.json({
+      success: true,
+      message: "Slides saved successfully",
+      slides: updated.slides || [],
+    });
+  } catch (error) {
     return NextResponse.json(
-      { message: error.message || "Failed to delete image" },
+      { success: false, message: error.message },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(req) {
+  try {
+    const permission = await requireDeletePermission();
+    if (!permission.authorized) {
+      return permission.response;
+    }
+
+    await dbConnect();
+    const body = await req.json();
+    const id = body.id || body.slideId;
+    const publicId = body.publicId;
+
+    if (publicId) {
+      try {
+        await cloudinary.uploader.destroy(publicId);
+      } catch (err) {}
+    }
+
+    const updated = await HomeSlider.findOneAndUpdate(
+      {},
+      { $pull: { slides: { $or: [{ id: id }, { publicId: publicId }] } } },
+      { new: true },
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "Slide deleted successfully",
+      slides: updated ? updated.slides : [],
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, message: error.message },
       { status: 500 },
     );
   }

@@ -55,6 +55,7 @@ async function verifySuperAdmin() {
       cache: "no-store",
     });
     const data = await res.json();
+    console.log(data);
     if (res.ok && data && data.success === true) {
       return true;
     }

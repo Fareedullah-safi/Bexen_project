@@ -5,146 +5,195 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-export default function Section() {
-  const [images, setImages] = useState([]);
-  const [image, setImage] = useState(null);
-  const [imageKey, setImageKey] = useState(0);
-  const [loading, setLoading] = useState(true);
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
+function getSlideImageUrl(slide) {
+  if (!slide) return "";
+  if (typeof slide.image === "string") return slide.image.trim();
+  if (slide.image && typeof slide.image.url === "string") {
+    return slide.image.url.trim();
+  }
+  return "";
+}
+
+const SLIDER_STYLES = `
+  .slider-title, .slider-desc {
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+  .slider-title p { margin: 0; display: inline; }
+  .slider-title p:last-child { margin-bottom: 0; }
+  .slider-title strong, .slider-title b { color: #ffffff; font-weight: 800; }
+  .slider-title em, .slider-title i { font-style: italic; }
+  .slider-title a { color: #5eead4; text-decoration: underline; text-underline-offset: 2px; }
+  .slider-title a:hover { color: #99f6e4; }
+  .slider-title span { color: inherit; }
+
+  .slider-desc p { margin: 0 0 0.4em 0; }
+  .slider-desc p:last-child { margin-bottom: 0; }
+  .slider-desc strong, .slider-desc b { color: #ffffff; font-weight: 700; }
+  .slider-desc em, .slider-desc i { font-style: italic; }
+  .slider-desc a { color: #5eead4; text-decoration: underline; text-underline-offset: 2px; }
+  .slider-desc a:hover { color: #99f6e4; }
+  .slider-desc ul, .slider-desc ol { margin: 0.3em 0; padding-inline-start: 1.2em; }
+  .slider-desc li { margin-bottom: 0.2em; }
+  .slider-desc span { color: inherit; }
+`;
+
+export default function Section({ data: propData, lang: propLang = "en" }) {
+  const [data, setData] = useState(propData || null);
+  const [activeLang, setActiveLang] = useState(propLang);
+  const [loading, setLoading] = useState(!propData);
   const [showControls, setShowControls] = useState(false);
+  const [currentImageIndex, setCurrentIndex] = useState(0);
+  const [imageKey, setImageKey] = useState(0);
 
+  /* 1. Fetch data internally if propData is missing */
   useEffect(() => {
-    const controller = new AbortController();
+    if (propData) {
+      setData(propData);
+      setLoading(false);
+      return;
+    }
 
-    const getSlides = async () => {
+    const controller = new AbortController();
+    async function fetchSlides() {
       try {
         const res = await fetch("/api/homepage/slides", {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
           cache: "no-store",
           signal: controller.signal,
         });
-
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok) {
-          throw new Error(
-            data?.message || `Failed to load slides (${res.status})`,
-          );
+        const result = await res.json();
+        if (res.ok && result) {
+          setData(result);
         }
-
-        if (!data || !Array.isArray(data.slides)) {
-          throw new Error(data?.message || "Invalid slides API response.");
-        }
-
-        const imageData = data.slides
-          .map((slide) => slide?.image)
-          .filter((src) => typeof src === "string" && src.trim().length > 0);
-
-        setImages(imageData);
-        setImage(imageData[0] || null);
-        setImageKey(0);
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          console.error("Failed to load slides:", error);
-          setImages([]);
-          setImage(null);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("Failed to load slides:", err);
         }
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
         }
       }
-    };
+    }
 
-    getSlides();
+    fetchSlides();
+    return () => controller.abort();
+  }, [propData]);
 
-    return () => {
-      controller.abort();
+  /* 2. Language Synchronization */
+  useEffect(() => {
+    if (propLang) {
+      setActiveLang(propLang);
+    }
+  }, [propLang]);
+
+  useEffect(() => {
+    function handleLanguageChange(event) {
+      const selectedLanguage =
+        event?.detail?.language || event?.detail?.languageId;
+      if (
+        selectedLanguage === "en" ||
+        selectedLanguage === "ps" ||
+        selectedLanguage === "fa"
+      ) {
+        setActiveLang(selectedLanguage);
+      }
+    }
+
+    window.addEventListener("site-language-change", handleLanguageChange);
+    return function () {
+      window.removeEventListener("site-language-change", handleLanguageChange);
     };
   }, []);
 
+  const isRtl = activeLang === "ps" || activeLang === "fa";
+
+  /* 3. Extract Valid Slides */
+  const rawSlides = Array.isArray(data?.slides)
+    ? data.slides
+    : Array.isArray(data)
+      ? data
+      : [];
+  const validSlides = rawSlides.filter(function (slide) {
+    return getSlideImageUrl(slide).length > 0;
+  });
+
+  const images = validSlides.map(getSlideImageUrl);
+
+  /* 4. Auto Slide Timer */
   useEffect(() => {
     if (images.length <= 1) return;
 
     const interval = setInterval(() => {
-      setImage((current) => {
-        const currentIndex = images.indexOf(current);
-        const nextIndex =
-          currentIndex < 0 ? 0 : (currentIndex + 1) % images.length;
-
-        return images[nextIndex];
-      });
-
+      setCurrentIndex((prev) => (prev + 1) % images.length);
       setImageKey((key) => key + 1);
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [images]);
+  }, [images.length]);
 
+  /* 5. Hide Controls Timer */
   useEffect(() => {
     if (!showControls) return;
-
-    const timeout = setTimeout(() => {
-      setShowControls(false);
-    }, 5000);
-
+    const timeout = setTimeout(() => setShowControls(false), 5000);
     return () => clearTimeout(timeout);
   }, [showControls]);
 
-  const handleImageChange = (img) => {
-    if (!img) return;
-
-    setImage(img);
-    setImageKey((key) => key + 1);
+  function handlePrevious() {
+    if (images.length <= 1) return;
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+    setImageKey((k) => k + 1);
     setShowControls(true);
-  };
+  }
 
-  const handlePrevious = () => {
+  function handleNext() {
     if (images.length <= 1) return;
+    setCurrentIndex((prev) => (prev + 1) % images.length);
+    setImageKey((k) => k + 1);
+    setShowControls(true);
+  }
 
-    const currentIndex = images.indexOf(image);
-    const previousIndex = (currentIndex - 1 + images.length) % images.length;
+  const currentImage = images[currentImageIndex] || null;
+  const currentSlide = validSlides[currentImageIndex] || null;
 
-    handleImageChange(images[previousIndex]);
-  };
+  /* Translation resolve: current lang -> fallback English -> empty */
+  const slideT =
+    currentSlide?.translations?.[activeLang] ||
+    currentSlide?.translations?.en ||
+    {};
 
-  const handleNext = () => {
-    if (images.length <= 1) return;
+  const slideTitle = slideT.title || "";
+  const slideDesc = slideT.description || "";
 
-    const currentIndex = images.indexOf(image);
-    const nextIndex = (currentIndex + 1) % images.length;
-
-    handleImageChange(images[nextIndex]);
-  };
-
-  const handleMouseEnter = () => {
-    if (!loading && images.length > 1) {
-      setShowControls(true);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    setShowControls(false);
-  };
+  const titleText = stripHtml(slideTitle);
+  const descText = stripHtml(slideDesc);
+  const hasText = titleText.length > 0 || descText.length > 0;
 
   return (
-    <main className="z-7 h-full w-full px-4 py-3">
+    <main className="z-7 h-full w-full px-4 py-3" dir={isRtl ? "rtl" : "ltr"}>
       <div
         className="relative mx-auto h-125 w-full overflow-hidden rounded-lg"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onMouseEnter={() =>
+          !loading && images.length > 1 && setShowControls(true)
+        }
+        onMouseLeave={() => setShowControls(false)}
       >
-        {image && (
+        {/* Background Image */}
+        {currentImage && (
           <div
             key={imageKey}
             className="wow animate__animated animate__fadeIn relative h-full w-full"
             data-wow-duration="1.2s"
           >
             <Image
-              src={image}
-              alt="Nature Image"
+              src={currentImage}
+              alt={titleText || "Hero Slider Image"}
               fill
               priority
               sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 32px), calc(100vw - 32px)"
@@ -153,17 +202,52 @@ export default function Section() {
           </div>
         )}
 
-        {loading && !image && <Loader />}
+        {/* Text Overlay */}
+        {currentImage && hasText && (
+          <div
+            key={`text-${imageKey}-${activeLang}`}
+            className="animate__animated animate__fadeInUp absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end rounded-b-lg px-5 pt-20 pb-16 sm:px-8 sm:pt-28 sm:pb-20 md:px-12"
+            style={{
+              background:
+                "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0) 100%)",
+              animationDuration: "0.8s",
+            }}
+            dir={isRtl ? "rtl" : "ltr"}
+          >
+            {titleText.length > 0 && (
+              <div
+                role="heading"
+                aria-level={2}
+                className="slider-title mb-2 max-w-3xl text-xl leading-tight font-extrabold tracking-tight text-white drop-shadow-lg sm:text-2xl md:text-3xl lg:text-4xl"
+                style={{ textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}
+                dangerouslySetInnerHTML={{ __html: slideTitle }}
+              />
+            )}
 
-        {!loading && !image && (
-          <div className="flex h-full w-full items-center justify-center rounded-lg bg-[#F7F9FC] text-sm text-[var(--muted)]">
+            {descText.length > 0 && (
+              <div
+                className="slider-desc max-w-2xl text-sm leading-relaxed text-white/90 drop-shadow-md sm:text-base md:text-lg"
+                style={{ textShadow: "0 1px 6px rgba(0,0,0,0.4)" }}
+                dangerouslySetInnerHTML={{ __html: slideDesc }}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Loading Spinner */}
+        {loading && !currentImage && <Loader />}
+
+        {/* Empty State */}
+        {!loading && !currentImage && (
+          <div className="flex h-full w-full items-center justify-center rounded-lg bg-[#F7F9FC] text-sm text-[var(--muted)] dark:bg-[#111a23]">
             No slider images available.
           </div>
         )}
 
+        {/* Slider Navigation Bar */}
         {images.length > 1 && (
           <div
-            className={`absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/25 bg-black/20 p-1.5 shadow-lg backdrop-blur-md transition-all duration-500 ${
+            className={`absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/25 bg-black/20 p-1.5 shadow-lg backdrop-blur-md transition-all duration-500 ${
               showControls
                 ? "translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-3 opacity-0"
@@ -183,7 +267,7 @@ export default function Section() {
             </button>
 
             <span className="min-w-12 px-1 text-center text-xs font-semibold tracking-wide text-white">
-              {images.indexOf(image) + 1} / {images.length}
+              {currentImageIndex + 1} / {images.length}
             </span>
 
             <button
@@ -201,6 +285,8 @@ export default function Section() {
           </div>
         )}
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: SLIDER_STYLES }} />
     </main>
   );
 }

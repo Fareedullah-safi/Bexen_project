@@ -1,28 +1,40 @@
 import mongoose from "mongoose";
 
-const homeSliderSchema = new mongoose.Schema(
+const slideTranslationSchema = new mongoose.Schema(
   {
-    image: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    title: { type: String, default: "" },
+    description: { type: String, default: "" },
+  },
+  { _id: false },
+);
 
-    publicId: {
-      type: String,
-      default: null,
-      trim: true,
-    },
-
+const slideItemSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    image: { type: String, required: true, trim: true },
+    publicId: { type: String, default: null, trim: true },
     source: {
       type: String,
       enum: ["upload", "url"],
-      required: true,
+      default: "upload",
+    },
+    translations: {
+      en: { type: slideTranslationSchema, default: () => ({}) },
+      ps: { type: slideTranslationSchema, default: () => ({}) },
+      fa: { type: slideTranslationSchema, default: () => ({}) },
     },
   },
+  { _id: false },
+);
+
+const homeSliderSchema = new mongoose.Schema(
   {
-    timestamps: true,
+    slides: {
+      type: [slideItemSchema],
+      default: [],
+    },
   },
+  { timestamps: true },
 );
 
 export default mongoose.models.HomeSlider ||
