@@ -804,7 +804,7 @@ export default function SolutionsAdmin() {
                     </div>
                     <div>
                       <label className={labelClass}>Description</label>
-                      <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
+                      <div className="overflow-hidden rounded-2xl border border-[var(--border)] w-full">
                         <RichTextEditor
                           key={"card-desc-" + item.id + "-" + language}
                           value={item.description[language]}
