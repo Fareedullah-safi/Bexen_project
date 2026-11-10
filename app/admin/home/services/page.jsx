@@ -33,7 +33,7 @@ async function verifyUploadPermission() {
       cache: "no-store",
     });
     const data = await res.json();
-    return res.ok && data?.success === true;
+    return res.ok && data && data.success === true;
   } catch {
     return false;
   }
@@ -322,7 +322,7 @@ export default function SolutionsAdmin() {
   const inputDirection = language === "en" ? "ltr" : "rtl";
   const busy = isSaving || !!deletingId;
 
-  /* Theme watcher — same as Blog admin */
+  /* Theme watcher */
   useEffect(() => {
     const update = () =>
       setTheme(
@@ -683,6 +683,7 @@ export default function SolutionsAdmin() {
       </p>
 
       <div className="space-y-6">
+        {/* Section Header */}
         <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
           <div className="mb-6 flex items-center gap-3">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
@@ -721,6 +722,7 @@ export default function SolutionsAdmin() {
           </div>
         </section>
 
+        {/* Solutions Cards */}
         <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
@@ -787,38 +789,18 @@ export default function SolutionsAdmin() {
                 </div>
 
                 <div className="grid gap-5 lg:grid-cols-2">
-                  <div className="space-y-4">
-                    <div>
-                      <label className={labelClass}>Card Title</label>
-                      <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-                        <RichTextEditor
-                          key={"card-title-" + item.id + "-" + language}
-                          value={item.title[language]}
-                          onChange={(val) =>
-                            updateSolutionTranslation(item.id, "title", val)
-                          }
-                          dir={inputDirection}
-                          placeholder="e.g. Business Strategy Development"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelClass}>Description</label>
-                      <div className="overflow-hidden rounded-2xl border border-[var(--border)] w-full">
-                        <RichTextEditor
-                          key={"card-desc-" + item.id + "-" + language}
-                          value={item.description[language]}
-                          onChange={(val) =>
-                            updateSolutionTranslation(
-                              item.id,
-                              "description",
-                              val,
-                            )
-                          }
-                          dir={inputDirection}
-                          placeholder="Enter short card description..."
-                        />
-                      </div>
+                  <div>
+                    <label className={labelClass}>Card Title</label>
+                    <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
+                      <RichTextEditor
+                        key={"card-title-" + item.id + "-" + language}
+                        value={item.title[language]}
+                        onChange={(val) =>
+                          updateSolutionTranslation(item.id, "title", val)
+                        }
+                        dir={inputDirection}
+                        placeholder="e.g. Business Strategy Development"
+                      />
                     </div>
                   </div>
 
@@ -832,6 +814,21 @@ export default function SolutionsAdmin() {
                       theme={theme}
                       onChange={(uploaded) => updateImage(item.id, uploaded)}
                     />
+                  </div>
+
+                  <div className="lg:col-span-2">
+                    <label className={labelClass}>Description</label>
+                    <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
+                      <RichTextEditor
+                        key={"card-desc-" + item.id + "-" + language}
+                        value={item.description[language]}
+                        onChange={(val) =>
+                          updateSolutionTranslation(item.id, "description", val)
+                        }
+                        dir={inputDirection}
+                        placeholder="Enter short card description..."
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
