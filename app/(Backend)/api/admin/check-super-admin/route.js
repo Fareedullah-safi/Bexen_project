@@ -5,16 +5,20 @@ export async function GET() {
   try {
     const permission = await requireEditPermission();
 
-    // If not authorized at all
+    // If not authorized by cookie/session
     if (!permission.authorized) {
-      return NextResponse.json(
-        { success: false, message: "Not authorized" },
-        { status: 403 },
+      return (
+        permission.response ||
+        NextResponse.json(
+          { success: false, message: "Not authorized" },
+          { status: 403 },
+        )
       );
     }
 
-    // Check if the user's role is super-admin
-    const userRole = permission.user?.role || permission.role || "";
+    // Check user role from permission.admin
+    const userRole =
+      permission.admin?.role || permission.user?.role || permission.role || "";
 
     if (userRole !== "super-admin") {
       return NextResponse.json(
