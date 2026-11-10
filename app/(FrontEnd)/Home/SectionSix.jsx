@@ -7,12 +7,29 @@ import { useEffect, useState } from "react";
 
 const SECTION_SIX_STYLES = `
   .rt-inline p { display: inline; margin: 0; }
+
   .rt-desc p { margin: 0 0 0.5em 0; }
+
   .rt-desc p:last-child { margin-bottom: 0; }
-  .rt-desc strong, .rt-desc b { font-weight: 700; color: inherit; }
+
+  .rt-desc strong, .rt-desc b {
+    font-weight: 700;
+    color: inherit;
+  }
+
   .rt-desc em, .rt-desc i { font-style: italic; }
-  .rt-desc a { color: #1E8A8A; text-decoration: underline; text-underline-offset: 2px; }
-  .rt-desc ul, .rt-desc ol { margin: 0.4em 0; padding-inline-start: 1.2em; }
+
+  .rt-desc a {
+    color: #1E8A8A;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .rt-desc ul, .rt-desc ol {
+    margin: 0.4em 0;
+    padding-inline-start: 1.2em;
+  }
+
   .rt-desc li { margin-bottom: 0.2em; }
 `;
 
@@ -29,6 +46,7 @@ export default function SectionSix() {
         const res = await fetch("/api/homepage/projects", {
           cache: "no-store",
         });
+
         const result = await res.json().catch(() => null);
 
         if (active && result && result.success !== false) {
@@ -101,28 +119,30 @@ export default function SectionSix() {
 
   const isRTL = language === "fa" || language === "ps";
 
-  // Header Data Mapping
+  // Header Data Mapping - New Schema
   const header = projectsData?.header || {};
+
   const badgeText = getLocalizedText(header.badgeText);
-  const headingLine = getLocalizedText(header.headingLine);
-  const headingText = getLocalizedText(header.headingText);
-  const highlightWord = getLocalizedText(header.highlightWord);
+  const title = getLocalizedText(header.title);
   const description = getLocalizedText(header.description);
   const buttonText = getLocalizedText(header.buttonText);
-  const buttonLink =
-    typeof header.buttonLink === "string" ? header.buttonLink : "";
 
-  // Projects Mapping
+  const buttonLink =
+    typeof header.buttonLink === "string" ? header.buttonLink : "/projects";
+
+  // Projects Mapping - New Schema
   const projects = (
     Array.isArray(projectsData?.projects) ? projectsData.projects : []
   )
     .map((project) => ({
       ...project,
-      image: project.image || project.imageUrl || project.url || "",
+      image: project.image || "",
       tag: getLocalizedText(project.tag),
       title: getLocalizedText(project.title),
+      order: Number(project.order) || 0,
     }))
-    .filter((project) => project.image && project.title);
+    .filter((project) => project.image && project.title)
+    .sort((a, b) => a.order - b.order);
 
   const handleButtonClick = () => {
     if (buttonLink) {
@@ -162,7 +182,9 @@ export default function SectionSix() {
           <div className="absolute top-4 left-4 z-10 rounded-full bg-white/10 px-3 py-1.5 text-xs text-white backdrop-blur-md transition-all duration-300 hover:bg-[#1E8A8A] sm:px-4 sm:py-2 sm:text-sm">
             <span
               className="rt-inline"
-              dangerouslySetInnerHTML={{ __html: project.tag }}
+              dangerouslySetInnerHTML={{
+                __html: project.tag,
+              }}
             />
           </div>
         )}
@@ -178,7 +200,9 @@ export default function SectionSix() {
                   ? "text-lg sm:text-xl md:text-2xl"
                   : "text-base sm:text-lg md:text-xl"
               }`}
-              dangerouslySetInnerHTML={{ __html: project.title }}
+              dangerouslySetInnerHTML={{
+                __html: project.title,
+              }}
             />
           </div>
 
@@ -208,7 +232,12 @@ export default function SectionSix() {
       dir={isRTL ? "rtl" : "ltr"}
       className="w-full bg-[#ECF0F0] px-4 py-12 sm:px-6 sm:py-14 lg:px-6 lg:py-16"
     >
-      <style dangerouslySetInnerHTML={{ __html: SECTION_SIX_STYLES }} />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: SECTION_SIX_STYLES,
+        }}
+      />
+
       <div className="mx-auto w-full max-w-[1400px]">
         <div className="px-2 sm:px-4 lg:px-8">
           {/* Badge */}
@@ -224,44 +253,29 @@ export default function SectionSix() {
 
               <span
                 className="rt-inline text-sm font-bold text-zinc-950"
-                dangerouslySetInnerHTML={{ __html: badgeText }}
+                dangerouslySetInnerHTML={{
+                  __html: badgeText,
+                }}
               />
             </span>
           )}
 
           {/* Heading and Description */}
-          {(headingLine ||
-            headingText ||
-            highlightWord ||
-            description ||
-            buttonText) && (
+          {(title || description || buttonText) && (
             <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:gap-10">
-              {(headingLine || headingText || highlightWord) && (
+              {/* New Single Title Field */}
+              {title && (
                 <h1
                   data-wow-duration="0.9s"
                   data-wow-delay="0.1s"
                   className="wow animate__animated animate__fadeInLeft text-3xl leading-tight font-medium text-[#102326] sm:text-4xl md:text-5xl lg:text-[48px]"
                 >
-                  {headingLine && (
-                    <span
-                      className="rt-inline"
-                      dangerouslySetInnerHTML={{ __html: headingLine }}
-                    />
-                  )}
-                  {headingText && (
-                    <span
-                      className="rt-inline"
-                      dangerouslySetInnerHTML={{ __html: headingText }}
-                    />
-                  )}
-                  {highlightWord && (
-                    <span
-                      className="rt-inline text-[#1E8A8A]"
-                      dangerouslySetInnerHTML={{
-                        __html: " " + highlightWord,
-                      }}
-                    />
-                  )}
+                  <span
+                    className="rt-inline"
+                    dangerouslySetInnerHTML={{
+                      __html: title,
+                    }}
+                  />
                 </h1>
               )}
 
@@ -271,7 +285,9 @@ export default function SectionSix() {
                     data-wow-duration="0.9s"
                     data-wow-delay="0.2s"
                     className="wow animate__animated animate__fadeInRight rt-desc max-w-xl flex-1 text-sm leading-6 text-zinc-600 sm:text-base md:text-lg"
-                    dangerouslySetInnerHTML={{ __html: description }}
+                    dangerouslySetInnerHTML={{
+                      __html: description,
+                    }}
                   />
                 )}
 
@@ -286,7 +302,9 @@ export default function SectionSix() {
                     <span className="overflow-hidden leading-none">
                       <span
                         className="rt-inline block transition-transform duration-400 [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5"
-                        dangerouslySetInnerHTML={{ __html: buttonText }}
+                        dangerouslySetInnerHTML={{
+                          __html: buttonText,
+                        }}
                       />
                     </span>
 
@@ -313,7 +331,9 @@ export default function SectionSix() {
 
         {/* Projects */}
         {Array.from(
-          { length: Math.ceil(projects.length / 2) },
+          {
+            length: Math.ceil(projects.length / 2),
+          },
           (_, rowIndex) => (
             <div
               key={rowIndex}
