@@ -1,10 +1,69 @@
 "use client";
 
+import { fixData } from "@/Lib/fixText";
 import { ArrowRight, Box } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
 const API = "/api/homepage/articles-section";
+
+const SECTION_ELEVEN_STYLES = `
+  .section-eleven-rt .rt-inline p,
+  .section-eleven-rt .rt-inline h1,
+  .section-eleven-rt .rt-inline h2,
+  .section-eleven-rt .rt-inline h3,
+  .section-eleven-rt .rt-inline h4,
+  .section-eleven-rt .rt-inline h5,
+  .section-eleven-rt .rt-inline h6 {
+    display: inline;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .section-eleven-rt .rt-inline br {
+    display: none;
+  }
+  .section-eleven-rt .rt-desc p {
+    margin: 0.35em 0;
+  }
+  .section-eleven-rt .rt-desc p:first-child {
+    margin-top: 0;
+  }
+  .section-eleven-rt .rt-desc p:last-child {
+    margin-bottom: 0;
+  }
+  .section-eleven-rt .rt-tight p {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .section-eleven-rt .rt-inline,
+  .section-eleven-rt .rt-desc {
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+  .section-eleven-rt .rt-inline strong,
+  .section-eleven-rt .rt-inline b {
+    font-weight: 700;
+    color: #1E8A8A;
+  }
+  .section-eleven-rt a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  .section-eleven-rt ul,
+  .section-eleven-rt ol {
+    margin: 0.25em 0;
+    padding-left: 1.25em;
+  }
+  .section-eleven-rt strong,
+  .section-eleven-rt b {
+    font-weight: 700;
+  }
+`;
+
+function stripTags(value) {
+  if (typeof value !== "string") return "";
+  return value.replace(/<[^>]*>/g, "").trim();
+}
 
 const getText = (value, language = "en") => {
   if (typeof value === "string" || typeof value === "number") {
@@ -21,7 +80,6 @@ const getText = (value, language = "en") => {
 const getArticleTranslation = (blog, language) => {
   const translation = blog?.translations?.[language];
 
-  // Support both the multilingual schema and older flat article data.
   if (translation && typeof translation === "object") {
     return {
       day: getText(translation.day) || getText(blog.day) || "01",
@@ -41,29 +99,39 @@ const getArticleTranslation = (blog, language) => {
   };
 };
 
-const getSectionHeading = (titles, language) => {
-  // New multilingual API shape: Titles.en, Titles.fa, Titles.ps
-  if (titles?.[language] && typeof titles[language] === "object") {
+const getSectionTitle = (titles, language) => {
+  if (titles?.[language]) {
     const selected = titles[language];
     const english = titles.en || {};
 
-    return {
-      sectionTitle:
-        getText(selected.sectionTitle) ||
-        getText(english.sectionTitle) ||
-        "The Ultimate",
-      highlightedTitle:
-        getText(selected.highlightedTitle) ||
-        getText(english.highlightedTitle) ||
-        "Resource.",
-    };
+    let val = "";
+    if (typeof selected === "string") {
+      val = selected;
+    } else if (selected && typeof selected === "object") {
+      val = selected.title || selected.sectionTitle || "";
+      if (selected.highlightedTitle) {
+        val = `${val} <strong>${selected.highlightedTitle}</strong>`;
+      }
+    }
+
+    if (!val) {
+      if (typeof english === "string") {
+        val = english;
+      } else if (english && typeof english === "object") {
+        val = english.title || english.sectionTitle || "";
+        if (english.highlightedTitle) {
+          val = `${val} <strong>${english.highlightedTitle}</strong>`;
+        }
+      }
+    }
+
+    return val || "The Ultimate <strong>Resource.</strong>";
   }
 
-  // Support the legacy flat API shape.
-  return {
-    sectionTitle: getText(titles?.sectionTitle) || "The Ultimate",
-    highlightedTitle: getText(titles?.highlightedTitle) || "Resource.",
-  };
+  if (typeof titles === "string") return titles;
+  if (titles?.title) return titles.title;
+
+  return "The Ultimate <strong>Resource.</strong>";
 };
 
 export default function SectionEleven() {
@@ -124,7 +192,7 @@ export default function SectionEleven() {
           throw new Error(result?.message || "Invalid articles API response.");
         }
 
-        const section = result.data;
+        const section = fixData(result.data);
         const posts = Array.isArray(section.posts) ? section.posts : [];
 
         setBlogs(
@@ -144,8 +212,7 @@ export default function SectionEleven() {
 
         setTitles(
           section.Titles || {
-            sectionTitle: section.sectionTitle,
-            highlightedTitle: section.highlightedTitle,
+            title: section.title,
           },
         );
       } catch (error) {
@@ -167,12 +234,12 @@ export default function SectionEleven() {
     };
   }, []);
 
-  const heading = getSectionHeading(titles, language);
+  const sectionTitle = getSectionTitle(titles, language);
 
   return (
     <section
       dir={language === "en" ? "ltr" : "rtl"}
-      className="w-full bg-[#ECF0F0] px-4 py-16 sm:px-6 md:px-8 lg:px-12"
+      className="section-eleven-rt w-full bg-[#ECF0F0] px-4 py-16 sm:px-6 md:px-8 lg:px-12"
     >
       <div className="w-full">
         <span className="wow animate__animated animate__fadeInDown mx-auto flex w-fit items-center gap-2 rounded-md border border-[#1E8A8A]/20 bg-white/40 px-4 py-2 text-xs font-bold tracking-wide text-[#102326]">
@@ -184,10 +251,18 @@ export default function SectionEleven() {
               : "لیدلوري او نظریې"}
         </span>
 
-        <h1 className="wow animate__animated animate__fadeInUp mt-4 text-center text-3xl leading-tight font-medium text-[#102326] sm:text-4xl md:text-5xl lg:text-6xl">
-          {heading.sectionTitle}{" "}
-          <span className="text-[#1E8A8A]">{heading.highlightedTitle}</span>
-        </h1>
+        {sectionTitle && (
+          <div
+            role="heading"
+            aria-level={1}
+            className="wow animate__animated animate__fadeInUp mt-4 text-center text-3xl leading-tight font-medium text-[#102326] sm:text-4xl md:text-5xl lg:text-6xl"
+          >
+            <span
+              className="rt-inline rt-tight"
+              dangerouslySetInnerHTML={{ __html: sectionTitle }}
+            />
+          </div>
+        )}
 
         {loading ? (
           <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-3">
@@ -213,6 +288,7 @@ export default function SectionEleven() {
               const { title, category, author, day, month } = article;
 
               const link = getText(blog.link) || "/";
+              const plainTitle = stripTags(title) || "Article";
 
               return (
                 <div
@@ -224,7 +300,7 @@ export default function SectionEleven() {
                   <div className="relative h-56 w-full overflow-hidden sm:h-64 md:h-72">
                     <Image
                       src={blog.image}
-                      alt={title}
+                      alt={plainTitle}
                       fill
                       sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 33vw"
                       className="object-cover transition duration-700 hover:scale-105"
@@ -243,8 +319,12 @@ export default function SectionEleven() {
                   <div className="px-5 py-6 sm:px-6 sm:py-7">
                     {/* Meta */}
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                      <span className="rounded-md border border-zinc-300 px-3 py-1 text-base font-medium text-[#102326] sm:text-lg">
-                        {category || "Business"}
+                      <span className="rt-inline rounded-md border border-zinc-300 px-3 py-1 text-base font-medium text-[#102326] sm:text-lg">
+                        <span
+                          dangerouslySetInnerHTML={{
+                            __html: category || "Business",
+                          }}
+                        />
                       </span>
 
                       <span className="text-base text-zinc-500 sm:text-lg">
@@ -255,8 +335,8 @@ export default function SectionEleven() {
                             : "لیکوال:"}
                       </span>
 
-                      <span className="text-base text-[#102326] sm:text-lg">
-                        {author}
+                      <span className="rt-inline text-base text-[#102326] sm:text-lg">
+                        <span dangerouslySetInnerHTML={{ __html: author }} />
                       </span>
                     </div>
 
@@ -264,10 +344,10 @@ export default function SectionEleven() {
                     <a
                       href={link}
                       className="group/title mt-6 block"
-                      aria-label={`Read ${title}`}
+                      aria-label={`Read ${plainTitle}`}
                     >
-                      <span className="inline cursor-pointer [background-image:linear-gradient(#102326,#102326)] [box-decoration-break:clone] [background-size:0%_2px] [background-position:0_100%] [background-repeat:no-repeat] text-2xl leading-8 font-semibold text-[#102326] transition-[background-size] duration-700 ease-out [-webkit-box-decoration-break:clone] group-hover/title:[background-size:100%_2px] sm:text-2xl md:text-[23.3px]">
-                        {title}
+                      <span className="rt-inline inline cursor-pointer [background-image:linear-gradient(#102326,#102326)] [box-decoration-break:clone] [background-size:0%_2px] [background-position:0_100%] [background-repeat:no-repeat] text-2xl leading-8 font-semibold text-[#102326] transition-[background-size] duration-700 ease-out [-webkit-box-decoration-break:clone] group-hover/title:[background-size:100%_2px] sm:text-2xl md:text-[23.3px]">
+                        <span dangerouslySetInnerHTML={{ __html: title }} />
                       </span>
                     </a>
 
@@ -300,6 +380,8 @@ export default function SectionEleven() {
           </div>
         )}
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: SECTION_ELEVEN_STYLES }} />
     </section>
   );
 }

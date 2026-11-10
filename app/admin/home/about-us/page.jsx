@@ -1,14 +1,15 @@
 "use client";
 
+import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import AdminStickyFooter from "@/app/Components/Admin/AdminStickyFooter";
 import Spinner from "@/app/Components/Admin/Spinner";
+import RichTextEditor from "@/Lib/PageBuilder/blocks/shared/RichTextEditor";
 import {
   AlertCircle,
   CheckCircle2,
   ImagePlus,
   LoaderCircle,
   PlayCircle,
-  RotateCcw,
-  Save,
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -58,7 +59,6 @@ const initialData = {
   clientRole: { en: "", fa: "", ps: "" },
 };
 
-// 🔐 Verify upload permission before opening Cloudinary widget
 async function verifyUploadPermission() {
   try {
     const res = await fetch("/api/admin/cloudinary/verify", {
@@ -71,7 +71,6 @@ async function verifyUploadPermission() {
   }
 }
 
-// 🎨 Cloudinary Widget Theme (matches SliderAdminForm)
 function cloudinaryStyles(theme) {
   const palettes = {
     dark: {
@@ -108,6 +107,14 @@ function cloudinaryStyles(theme) {
   return { palette: palettes[theme] || palettes.light };
 }
 
+function stripHtml(html) {
+  if (!html) return "";
+  return html
+    .replace(/<[^>]*>?/gm, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+}
+
 export default function AboutUsAdmin() {
   const [formData, setFormData] = useState(initialData);
   const [language, setLanguage] = useState("en");
@@ -136,25 +143,24 @@ export default function AboutUsAdmin() {
   const cloudinaryWidgetRef = useRef(null);
   const activeUploadRef = useRef("");
 
-  // Load the current theme.
   useEffect(() => {
-    const updateTheme = () => {
+    function updateTheme() {
       setIsDark(document.documentElement.classList.contains("dark"));
-    };
+    }
 
     updateTheme();
 
     const observer = new MutationObserver(updateTheme);
-
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["class"],
     });
 
-    return () => observer.disconnect();
+    return function () {
+      observer.disconnect();
+    };
   }, []);
 
-  // Load the Cloudinary Upload Widget.
   useEffect(() => {
     let script = document.querySelector(
       'script[data-cloudinary-upload-widget="true"]',
@@ -162,19 +168,19 @@ export default function AboutUsAdmin() {
 
     let createdScript = false;
 
-    const handleLoad = () => {
-      if (window.cloudinary?.createUploadWidget) {
+    function handleLoad() {
+      if (window.cloudinary && window.cloudinary.createUploadWidget) {
         setIsCloudinaryReady(true);
       } else {
         toast.error("Cloudinary Upload Widget failed to initialize.");
       }
-    };
+    }
 
-    const handleError = () => {
+    function handleError() {
       toast.error("Could not load the Cloudinary Upload Widget.");
-    };
+    }
 
-    if (window.cloudinary?.createUploadWidget) {
+    if (window.cloudinary && window.cloudinary.createUploadWidget) {
       setIsCloudinaryReady(true);
       return;
     }
@@ -194,96 +200,115 @@ export default function AboutUsAdmin() {
       document.head.appendChild(script);
     }
 
-    return () => {
-      script?.removeEventListener("load", handleLoad);
-      script?.removeEventListener("error", handleError);
+    return function () {
+      if (script) {
+        script.removeEventListener("load", handleLoad);
+        script.removeEventListener("error", handleError);
+      }
     };
   }, []);
 
-  // Load About Us data from MongoDB.
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const response = await fetch("/api/homepage/about-us", {
-          cache: "no-store",
-        });
+  async function loadData() {
+    setIsFetching(true);
+    try {
+      const response = await fetch("/api/homepage/about-us", {
+        cache: "no-store",
+      });
 
-        const result = await response.json();
+      const result = await response.json();
 
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || "Failed to load About Us.");
-        }
-
-        if (!result.data) return;
-
-        const data = result.data;
-
-        fields.forEach((field) => {
-          const value = data[field];
-
-          data[field] =
-            typeof value === "string"
-              ? { en: value, fa: "", ps: "" }
-              : {
-                  en: value?.en || "",
-                  fa: value?.fa || "",
-                  ps: value?.ps || "",
-                };
-        });
-
-        const mainImage = data.mainImage || {};
-        const thumbnailImage = data.thumbnailImage || {};
-
-        setFormData({
-          ...initialData,
-          ...data,
-          mainImage: mainImage.url || "",
-          thumbnailImage: thumbnailImage.url || "",
-        });
-
-        setImageIds({
-          mainImage: mainImage.publicId || "",
-          thumbnailImage: thumbnailImage.publicId || "",
-        });
-
-        setPreviews({
-          mainImage: mainImage.url || "",
-          thumbnailImage: thumbnailImage.url || "",
-        });
-      } catch (error) {
-        console.error("About Us GET Error:", error);
-        toast.error(error.message || "Failed to load About Us.");
-      } finally {
-        setIsFetching(false);
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to load About Us.");
       }
-    }
 
+      if (!result.data) return;
+
+      const data = result.data;
+
+      fields.forEach(function (field) {
+        const value = data[field];
+
+        data[field] =
+          typeof value === "string"
+            ? { en: value, fa: "", ps: "" }
+            : {
+                en: value?.en || "",
+                fa: value?.fa || "",
+                ps: value?.ps || "",
+              };
+      });
+
+      const mainImage = data.mainImage || {};
+      const thumbnailImage = data.thumbnailImage || {};
+
+      setFormData({
+        ...initialData,
+        ...data,
+        mainImage: mainImage.url || "",
+        thumbnailImage: thumbnailImage.url || "",
+      });
+
+      setImageIds({
+        mainImage: mainImage.publicId || "",
+        thumbnailImage: thumbnailImage.publicId || "",
+      });
+
+      setPreviews({
+        mainImage: mainImage.url || "",
+        thumbnailImage: thumbnailImage.url || "",
+      });
+    } catch (error) {
+      console.error("About Us GET Error:", error);
+      toast.error(error.message || "Failed to load About Us.");
+    } finally {
+      setIsFetching(false);
+    }
+  }
+
+  useEffect(() => {
     loadData();
   }, []);
 
   function handleChange(event) {
-    const { name, value } = event.target;
+    const name = event.target.name;
+    const value = event.target.value;
 
     if (fields.includes(name)) {
-      setFormData((prev) => ({
+      setFormData(function (prev) {
+        return {
+          ...prev,
+          [name]: {
+            ...prev[name],
+            [language]: value,
+          },
+        };
+      });
+    } else {
+      setFormData(function (prev) {
+        return {
+          ...prev,
+          [name]: value,
+        };
+      });
+    }
+  }
+
+  function handleRichTextChange(name, value) {
+    setFormData(function (prev) {
+      return {
         ...prev,
         [name]: {
           ...prev[name],
           [language]: value,
         },
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
+      };
+    });
   }
 
   function getMissingFieldsForLanguage(languageCode) {
-    return fields.filter((field) => {
-      const value = formData[field]?.[languageCode];
-      return typeof value !== "string" || !value.trim();
+    return fields.filter(function (field) {
+      const value = formData[field] ? formData[field][languageCode] : "";
+      return !stripHtml(value);
     });
   }
 
@@ -292,15 +317,19 @@ export default function AboutUsAdmin() {
   }
 
   function getFieldLabel(field) {
-    return field
-      .replace(/([A-Z])/g, " $1")
-      .replace(/^./, (character) => character.toUpperCase());
+    return field.replace(/([A-Z])/g, " $1").replace(/^./, function (character) {
+      return character.toUpperCase();
+    });
   }
 
   async function openCloudinaryWidget(field) {
     if (isSaving || uploadingImage) return;
 
-    if (!isCloudinaryReady || !window.cloudinary?.createUploadWidget) {
+    if (
+      !isCloudinaryReady ||
+      !window.cloudinary ||
+      !window.cloudinary.createUploadWidget
+    ) {
       toast.error("Cloudinary is still loading. Please try again.");
       return;
     }
@@ -315,7 +344,6 @@ export default function AboutUsAdmin() {
       return;
     }
 
-    // 🔐 PERMISSION CHECK
     setUploadingImage(field);
     activeUploadRef.current = field;
 
@@ -336,9 +364,8 @@ export default function AboutUsAdmin() {
 
       const widget = window.cloudinary.createUploadWidget(
         {
-          cloudName,
-          uploadPreset,
-          // sources: ["local"],
+          cloudName: cloudName,
+          uploadPreset: uploadPreset,
           multiple: false,
           maxFileSize: 5 * 1024 * 1024,
           clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
@@ -349,7 +376,7 @@ export default function AboutUsAdmin() {
           resourceType: "image",
           styles: cloudinaryStyles(isDark ? "dark" : "light"),
         },
-        (error, result) => {
+        function (error, result) {
           if (error) {
             console.error("Cloudinary Widget Error:", error);
             toast.error(error.message || "Cloudinary image upload failed.");
@@ -365,30 +392,38 @@ export default function AboutUsAdmin() {
             const uploaded = result.info;
             const targetField = activeUploadRef.current || field;
 
-            if (!uploaded?.secure_url || !uploaded?.public_id) {
+            if (!uploaded || !uploaded.secure_url || !uploaded.public_id) {
               toast.error("Cloudinary did not return a valid image.");
               return;
             }
 
-            setFormData((prev) => ({
-              ...prev,
-              [targetField]: uploaded.secure_url,
-            }));
+            setFormData(function (prev) {
+              return {
+                ...prev,
+                [targetField]: uploaded.secure_url,
+              };
+            });
 
-            setImageIds((prev) => ({
-              ...prev,
-              [targetField]: uploaded.public_id,
-            }));
+            setImageIds(function (prev) {
+              return {
+                ...prev,
+                [targetField]: uploaded.public_id,
+              };
+            });
 
-            setPreviews((prev) => ({
-              ...prev,
-              [targetField]: uploaded.secure_url,
-            }));
+            setPreviews(function (prev) {
+              return {
+                ...prev,
+                [targetField]: uploaded.secure_url,
+              };
+            });
 
-            setImageErrors((prev) => ({
-              ...prev,
-              [targetField]: false,
-            }));
+            setImageErrors(function (prev) {
+              return {
+                ...prev,
+                [targetField]: false,
+              };
+            });
 
             toast.success(
               targetField === "mainImage"
@@ -417,14 +452,23 @@ export default function AboutUsAdmin() {
   }
 
   function removeImage(field) {
-    setFormData((prev) => ({ ...prev, [field]: "" }));
-    setPreviews((prev) => ({ ...prev, [field]: "" }));
-    setImageIds((prev) => ({ ...prev, [field]: "" }));
-    setImageErrors((prev) => ({ ...prev, [field]: false }));
+    setFormData(function (prev) {
+      return { ...prev, [field]: "" };
+    });
+    setPreviews(function (prev) {
+      return { ...prev, [field]: "" };
+    });
+    setImageIds(function (prev) {
+      return { ...prev, [field]: "" };
+    });
+    setImageErrors(function (prev) {
+      return { ...prev, [field]: false };
+    });
   }
 
   function validateForm() {
-    for (const item of languages) {
+    for (let i = 0; i < languages.length; i += 1) {
+      const item = languages[i];
       const missingFields = getMissingFieldsForLanguage(item.code);
 
       if (missingFields.length > 0) {
@@ -472,17 +516,18 @@ export default function AboutUsAdmin() {
       ];
 
       if (
-        !["http:", "https:"].includes(url.protocol) ||
+        (url.protocol !== "http:" && url.protocol !== "https:") ||
         !validHosts.includes(url.hostname)
       ) {
         throw new Error("Invalid YouTube URL");
       }
-    } catch {
+    } catch (err) {
       toast.error("Enter a valid YouTube URL.");
       return false;
     }
 
-    for (const field of imageFields) {
+    for (let j = 0; j < imageFields.length; j += 1) {
+      const field = imageFields[j];
       const value = formData[field];
       const publicId = imageIds[field];
 
@@ -505,7 +550,7 @@ export default function AboutUsAdmin() {
         ) {
           throw new Error("Image must be hosted on Cloudinary.");
         }
-      } catch {
+      } catch (err) {
         toast.error(
           `${getFieldLabel(field)} must be a valid Cloudinary image URL.`,
         );
@@ -524,7 +569,9 @@ export default function AboutUsAdmin() {
   }
 
   async function handleSave(event) {
-    event.preventDefault();
+    if (event && event.preventDefault) {
+      event.preventDefault();
+    }
 
     if (isSaving || uploadingImage || !validateForm()) return;
 
@@ -532,7 +579,11 @@ export default function AboutUsAdmin() {
 
     try {
       const payload = {
-        ...Object.fromEntries(fields.map((field) => [field, formData[field]])),
+        ...Object.fromEntries(
+          fields.map(function (field) {
+            return [field, formData[field]];
+          }),
+        ),
         buttonLink: formData.buttonLink.trim(),
         videoLink: formData.videoLink.trim(),
         mainImage: {
@@ -559,12 +610,15 @@ export default function AboutUsAdmin() {
 
       const saved = result.data;
 
-      setFormData((prev) => ({
-        ...prev,
-        ...saved,
-        mainImage: saved.mainImage?.url || payload.mainImage.url,
-        thumbnailImage: saved.thumbnailImage?.url || payload.thumbnailImage.url,
-      }));
+      setFormData(function (prev) {
+        return {
+          ...prev,
+          ...saved,
+          mainImage: saved.mainImage?.url || payload.mainImage.url,
+          thumbnailImage:
+            saved.thumbnailImage?.url || payload.thumbnailImage.url,
+        };
+      });
 
       setImageIds({
         mainImage: saved.mainImage?.publicId || payload.mainImage.publicId,
@@ -633,6 +687,31 @@ export default function AboutUsAdmin() {
     );
   }
 
+  function renderRichInput(label, name, placeholder) {
+    return (
+      <div key={name}>
+        <label htmlFor={name} className={labelClass}>
+          {label} <span className="text-red-400">*</span>
+        </label>
+        <div
+          className={`overflow-hidden rounded-xl border ${
+            isDark ? "border-[#263442]" : "border-[#e4e7ec]"
+          }`}
+        >
+          <RichTextEditor
+            key={name + "-" + language}
+            value={formData[name]?.[language] || ""}
+            onChange={function (val) {
+              handleRichTextChange(name, val);
+            }}
+            placeholder={placeholder}
+            dir={language === "en" ? "ltr" : "rtl"}
+          />
+        </div>
+      </div>
+    );
+  }
+
   function renderImageField(label, field) {
     const isUploading = uploadingImage === field;
 
@@ -659,25 +738,25 @@ export default function AboutUsAdmin() {
                   src={previews[field]}
                   alt={label}
                   className="h-full w-full object-contain"
-                  onError={() =>
-                    setImageErrors((prev) => ({
-                      ...prev,
-                      [field]: true,
-                    }))
-                  }
-                  onLoad={() =>
-                    setImageErrors((prev) => ({
-                      ...prev,
-                      [field]: false,
-                    }))
-                  }
+                  onError={function () {
+                    setImageErrors(function (prev) {
+                      return { ...prev, [field]: true };
+                    });
+                  }}
+                  onLoad={function () {
+                    setImageErrors(function (prev) {
+                      return { ...prev, [field]: false };
+                    });
+                  }}
                 />
               )}
             </div>
 
             <button
               type="button"
-              onClick={() => removeImage(field)}
+              onClick={function () {
+                removeImage(field);
+              }}
               disabled={isSaving || Boolean(uploadingImage)}
               className="absolute top-5 right-5 rounded-lg bg-red-500 p-2 text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
               aria-label={`Remove ${label}`}
@@ -716,7 +795,9 @@ export default function AboutUsAdmin() {
 
             <button
               type="button"
-              onClick={() => openCloudinaryWidget(field)}
+              onClick={function () {
+                openCloudinaryWidget(field);
+              }}
               disabled={
                 !isCloudinaryReady || isSaving || Boolean(uploadingImage)
               }
@@ -747,7 +828,7 @@ export default function AboutUsAdmin() {
   }
 
   return (
-    <div className={`min-h-screen p-2 ${pageClass}`}>
+    <div className={`min-h-screen w-full p-2 pb-28 ${pageClass}`}>
       <div className="mx-auto max-w-6xl">
         <header className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
@@ -763,69 +844,74 @@ export default function AboutUsAdmin() {
             </p>
           </div>
 
-          <div className="min-w-0 sm:min-w-[320px]">
-            <label className={`${labelClass} mb-3`}>Content Language</label>
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 sm:min-w-[320px]">
+              <label className={`${labelClass} mb-3`}>Content Language</label>
 
-            <div
-              className="inline-flex w-full flex-wrap items-center gap-1.5 rounded-2xl border border-[#1E8A8A]/20 bg-[#1E8A8A]/5 p-1.5 shadow-sm"
-              role="group"
-              aria-label="Content language"
-            >
-              {languages.map((item) => {
-                const isActive = language === item.code;
-                const isComplete = isLanguageComplete(item.code);
-                const missingCount = getMissingFieldsForLanguage(
-                  item.code,
-                ).length;
+              <div
+                className="inline-flex w-full flex-wrap items-center gap-1.5 rounded-2xl border border-[#1E8A8A]/20 bg-[#1E8A8A]/5 p-1.5 shadow-sm"
+                role="group"
+                aria-label="Content language"
+              >
+                {languages.map(function (item) {
+                  const isActive = language === item.code;
+                  const isComplete = isLanguageComplete(item.code);
+                  const missingCount = getMissingFieldsForLanguage(
+                    item.code,
+                  ).length;
 
-                return (
-                  <button
-                    key={item.code}
-                    type="button"
-                    onClick={() => setLanguage(item.code)}
-                    disabled={isSaving || Boolean(uploadingImage)}
-                    aria-pressed={isActive}
-                    aria-label={`${item.label}: ${
-                      isComplete
-                        ? "all translated fields complete"
-                        : `${missingCount} translated fields missing`
-                    }`}
-                    className={`relative flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#1E8A8A] focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
-                      isActive
-                        ? "bg-[#1E8A8A] text-white shadow-md shadow-[#1E8A8A]/20"
-                        : isDark
-                          ? "text-gray-400 hover:bg-[#1E8A8A]/15 hover:text-[#35B5B5]"
-                          : "text-gray-600 hover:bg-[#1E8A8A]/10 hover:text-[#1E8A8A]"
-                    }`}
-                  >
-                    {item.code === "en"
-                      ? "English"
-                      : item.code === "fa"
-                        ? "دری"
-                        : "پښتو"}
-
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        isComplete ? "bg-emerald-400" : "bg-red-400"
-                      }`}
-                      title={
+                  return (
+                    <button
+                      key={item.code}
+                      type="button"
+                      onClick={function () {
+                        setLanguage(item.code);
+                      }}
+                      disabled={isSaving || Boolean(uploadingImage)}
+                      aria-pressed={isActive}
+                      aria-label={`${item.label}: ${
                         isComplete
-                          ? `${item.label} is complete`
+                          ? "all translated fields complete"
                           : `${missingCount} translated fields missing`
-                      }
-                    />
+                      }`}
+                      className={`relative flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#1E8A8A] focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isActive
+                          ? "bg-[#1E8A8A] text-white shadow-md shadow-[#1E8A8A]/20"
+                          : isDark
+                            ? "text-gray-400 hover:bg-[#1E8A8A]/15 hover:text-[#35B5B5]"
+                            : "text-gray-600 hover:bg-[#1E8A8A]/10 hover:text-[#1E8A8A]"
+                      }`}
+                    >
+                      {item.code === "en"
+                        ? "English"
+                        : item.code === "fa"
+                          ? "دری"
+                          : "پښتو"}
 
-                    {isActive && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                    )}
-                  </button>
-                );
-              })}
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          isComplete ? "bg-emerald-400" : "bg-red-400"
+                        }`}
+                        title={
+                          isComplete
+                            ? `${item.label} is complete`
+                            : `${missingCount} translated fields missing`
+                        }
+                      />
+
+                      {isActive && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <p className={`mt-2 text-xs ${mutedTextClass}`}>
-              Select a language to edit its content.
-            </p>
+            <AdminLanguageBall
+              language={language}
+              onLanguageChange={setLanguage}
+            />
           </div>
         </header>
 
@@ -838,28 +924,36 @@ export default function AboutUsAdmin() {
 
               <p className={`mt-1 text-xs ${mutedTextClass}`}>
                 Editing:{" "}
-                {languages.find((item) => item.code === language)?.label}
+                {
+                  languages.find(function (item) {
+                    return item.code === language;
+                  })?.label
+                }
               </p>
             </div>
 
             <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-7">
-              {renderInput("Experience Number", "experienceNumber", "13+")}
+              {renderRichInput("Experience Number", "experienceNumber", "13+")}
 
-              {renderInput(
+              {renderRichInput(
                 "Experience Label",
                 "experienceLabel",
                 "Years of Experience",
               )}
 
-              {renderInput(
+              {renderRichInput(
                 "Experience Text",
                 "experienceText",
                 "Our experience",
               )}
 
-              {renderInput("Section Label", "sectionLabel", "Get to Know Us")}
+              {renderRichInput(
+                "Section Label",
+                "sectionLabel",
+                "Get to Know Us",
+              )}
 
-              {renderInput("Title", "title", "Enter section title")}
+              {renderRichInput("Title", "title", "Enter section title")}
 
               {renderInput("Button Text", "buttonText", "Learn More")}
 
@@ -870,19 +964,25 @@ export default function AboutUsAdmin() {
                   Description <span className="text-red-400">*</span>
                 </label>
 
-                <textarea
-                  id="description"
-                  name="description"
-                  rows={5}
-                  value={formData.description?.[language] || ""}
-                  onChange={handleChange}
-                  placeholder="Write your About Us description..."
-                  dir={language === "en" ? "ltr" : "rtl"}
-                  className={`${inputClass} resize-y leading-6`}
-                />
+                <div
+                  className={`overflow-hidden rounded-xl border ${
+                    isDark ? "border-[#263442]" : "border-[#e4e7ec]"
+                  }`}
+                >
+                  <RichTextEditor
+                    key={"description-" + language}
+                    value={formData.description?.[language] || ""}
+                    onChange={function (val) {
+                      handleRichTextChange("description", val);
+                    }}
+                    placeholder="Write your About Us description..."
+                    dir={language === "en" ? "ltr" : "rtl"}
+                  />
+                </div>
 
                 <p className={`mt-2 text-right text-xs ${mutedTextClass}`}>
-                  {(formData.description?.[language] || "").length} characters
+                  {stripHtml(formData.description?.[language] || "").length}{" "}
+                  characters
                 </p>
               </div>
             </div>
@@ -942,62 +1042,28 @@ export default function AboutUsAdmin() {
             </div>
 
             <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-7">
-              {renderInput("Client Name", "clientName", "Enter client name")}
+              {renderRichInput(
+                "Client Name",
+                "clientName",
+                "Enter client name",
+              )}
 
-              {renderInput("Client Role", "clientRole", "Enter client role")}
+              {renderRichInput(
+                "Client Role",
+                "clientRole",
+                "Enter client role",
+              )}
             </div>
           </section>
 
-          <footer
-            className={`sticky bottom-3 z-10 flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-xl sm:flex-row sm:items-center sm:px-6 ${
-              isDark
-                ? "border-[#263442] bg-[#111a23]/95"
-                : "border-[#e4e7ec] bg-white/95"
-            }`}
-          >
-            <p className={`text-xs ${mutedTextClass}`}>
-              Save your changes in the selected language.
-            </p>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                disabled={isSaving || Boolean(uploadingImage)}
-                className={`flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium ${
-                  isDark
-                    ? "border-[#263442] text-gray-300"
-                    : "border-[#e4e7ec] text-gray-700"
-                }`}
-              >
-                <RotateCcw size={16} />
-                Reload Saved Data
-              </button>
-
-              <button
-                type="submit"
-                disabled={isSaving || Boolean(uploadingImage)}
-                className="flex items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#249b98] disabled:opacity-60"
-              >
-                {isSaving ? (
-                  <>
-                    <LoaderCircle size={17} className="animate-spin" />
-                    Saving Changes...
-                  </>
-                ) : uploadingImage ? (
-                  <>
-                    <LoaderCircle size={17} className="animate-spin" />
-                    Uploading Image...
-                  </>
-                ) : (
-                  <>
-                    <Save size={17} />
-                    Save Changes
-                  </>
-                )}
-              </button>
-            </div>
-          </footer>
+          <AdminStickyFooter
+            onReload={loadData}
+            onSave={handleSave}
+            saving={isSaving}
+            busy={isSaving || Boolean(uploadingImage)}
+            saveLabel="Save Changes"
+            savingLabel="Saving Changes..."
+          />
         </form>
       </div>
     </div>

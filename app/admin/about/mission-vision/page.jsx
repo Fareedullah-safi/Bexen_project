@@ -1,10 +1,12 @@
 "use client";
 
 import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import AdminStickyFooter from "@/app/Components/Admin/AdminStickyFooter";
 import Spinner from "@/app/Components/Admin/Spinner";
+import RichTextEditor from "@/Lib/PageBuilder/blocks/shared/RichTextEditor";
+import { stripHtml } from "@/Lib/sanitizeText";
 import axios from "axios";
 import {
-  AlertCircle,
   BarChart,
   Box,
   CheckCircle2,
@@ -13,7 +15,6 @@ import {
   ImagePlus,
   Link as LinkIcon,
   Loader2,
-  Save,
   Target,
   Type,
 } from "lucide-react";
@@ -32,7 +33,6 @@ const LANGUAGES = [
 const sectionClass =
   "rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-[#263442] dark:bg-[#111a23]";
 
-// Helper function for dynamic input classes (Red border if error exists)
 const getInputClass = (hasError) =>
   `w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none transition-colors dark:bg-[#16212c] dark:text-gray-100 ${
     hasError
@@ -40,13 +40,11 @@ const getInputClass = (hasError) =>
       : "border-gray-200 focus:border-[#1e8a8a] dark:border-[#263442]"
   }`;
 
-// Component to show error text under inputs
 const FieldError = ({ message }) => {
   if (!message) return null;
   return <p className="mt-1.5 text-xs font-medium text-red-500">{message}</p>;
 };
 
-// --- Theme helper for Cloudinary widget (dark / light) ---
 function cloudinaryStyles(theme) {
   const palettes = {
     dark: {
@@ -83,25 +81,25 @@ function cloudinaryStyles(theme) {
   return { palette: palettes[theme] || palettes.light };
 }
 
-// --- Permission check helper ---
 async function verifyUploadPermission() {
   try {
     const res = await fetch("/api/admin/cloudinary/verify", {
       cache: "no-store",
     });
     const data = await res.json();
-    return res.ok && data?.success === true;
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
 }
 
-// --- DATA STRUCTURES ---
 const emptyTranslation = () => ({
   topTag: "CHOOSE THE BEST",
-  mainTitle:
-    "Driving Innovation and Excellence for Sustainable Corporate Success",
-  highlightedTitle: "Worldwide.",
+  title:
+    'Driving Innovation and Excellence for Sustainable Corporate Success <span style="color:#1E8A8A">Worldwide.</span>',
   buttonText: "Learn More About Us",
 
   progressTitle: "Business Progress",
@@ -149,13 +147,12 @@ export default function AboutSectionAdmin() {
   const [checking, setChecking] = useState(false);
   const [theme, setTheme] = useState("light");
 
-  // Error tracking state
   const [errors, setErrors] = useState({ shared: {}, en: {}, ps: {}, fa: {} });
 
   const widgetRef = useRef(null);
   const inputDirection = language === "en" ? "ltr" : "rtl";
+  const busy = saving || checking;
 
-  // --- Watch dark / light mode ---
   useEffect(() => {
     const update = () => {
       if (document.documentElement.classList.contains("dark")) {
@@ -173,51 +170,63 @@ export default function AboutSectionAdmin() {
     return () => observer.disconnect();
   }, []);
 
-  // --- Rebuild widget when theme flips ---
   useEffect(() => {
     if (widgetRef.current) {
-      widgetRef.current.destroy?.();
+      if (typeof widgetRef.current.destroy === "function") {
+        widgetRef.current.destroy();
+      }
       widgetRef.current = null;
     }
   }, [theme]);
 
-  // --- DATA LOADING ---
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const response = await axios.get(API);
-        if (response.data?.success && response.data?.data) {
-          setData({
-            ...emptyData(),
-            ...response.data.data,
-            translations: {
-              en: {
-                ...emptyTranslation(),
-                ...response.data.data.translations?.en,
-              },
-              ps: {
-                ...emptyTranslation(),
-                ...response.data.data.translations?.ps,
-              },
-              fa: {
-                ...emptyTranslation(),
-                ...response.data.data.translations?.fa,
-              },
+  async function loadData() {
+    setLoading(true);
+    try {
+      const response = await axios.get(API);
+      if (response.data && response.data.success && response.data.data) {
+        setData({
+          ...emptyData(),
+          ...response.data.data,
+          translations: {
+            en: {
+              ...emptyTranslation(),
+              ...(response.data.data.translations &&
+                response.data.data.translations.en),
             },
-          });
-        }
-      } catch (error) {
-        toast.error("Failed to load section data.");
-      } finally {
-        setLoading(false);
+            ps: {
+              ...emptyTranslation(),
+              ...(response.data.data.translations &&
+                response.data.data.translations.ps),
+            },
+            fa: {
+              ...emptyTranslation(),
+              ...(response.data.data.translations &&
+                response.data.data.translations.fa),
+            },
+          },
+        });
+        setErrors({ shared: {}, en: {}, ps: {}, fa: {} });
       }
+    } catch (error) {
+      toast.error("Failed to load section data.");
+    } finally {
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
     loadData();
   }, []);
 
-  // --- HANDLERS & ERROR CLEARING ---
   function changeLanguage(code) {
-    if (!LANGUAGES.some((item) => item.code === code)) return;
+    let exists = false;
+    for (let i = 0; i < LANGUAGES.length; i++) {
+      if (LANGUAGES[i].code === code) {
+        exists = true;
+        break;
+      }
+    }
+    if (!exists) return;
     setLanguage(code);
     try {
       localStorage.setItem("admin-content-language", code);
@@ -227,15 +236,13 @@ export default function AboutSectionAdmin() {
   function handleRootChange(e) {
     const { name, value } = e.target;
     setData((prev) => ({ ...prev, [name]: value }));
-    // Clear error as user types
     setErrors((prev) => ({
       ...prev,
       shared: { ...prev.shared, [name]: null },
     }));
   }
 
-  function handleTranslationChange(e) {
-    const { name, value } = e.target;
+  function handleRichTextChange(name, value) {
     setData((prev) => ({
       ...prev,
       translations: {
@@ -243,14 +250,13 @@ export default function AboutSectionAdmin() {
         [language]: { ...prev.translations[language], [name]: value },
       },
     }));
-    // Clear error as user types
     setErrors((prev) => ({
       ...prev,
       [language]: { ...prev[language], [name]: null },
     }));
   }
 
-  function handleListChange(listName, index, value) {
+  function handleListRichTextChange(listName, index, value) {
     setData((prev) => {
       const newList = [...prev.translations[language][listName]];
       newList[index] = value;
@@ -262,21 +268,25 @@ export default function AboutSectionAdmin() {
         },
       };
     });
-    // Clear error for specific array item
     setErrors((prev) => ({
       ...prev,
       [language]: { ...prev[language], [`${listName}_${index}`]: null },
     }));
   }
 
-  // --- IMAGE UPLOAD ---
   async function uploadImage() {
-    // --- Permission check before opening widget ---
+    if (busy) return;
+
     setChecking(true);
     const allowed = await verifyUploadPermission();
     setChecking(false);
     if (!allowed) {
       toast.error("You don't have permission to upload images.");
+      return;
+    }
+
+    if (!window.cloudinary) {
+      toast.error("Image uploader is not ready. Please try again.");
       return;
     }
 
@@ -292,7 +302,7 @@ export default function AboutSectionAdmin() {
         },
         (error, result) => {
           if (error) return toast.error("Upload failed.");
-          if (result?.event === "success") {
+          if (result && result.event === "success") {
             setData((prev) => ({
               ...prev,
               image: result.info.secure_url,
@@ -302,7 +312,9 @@ export default function AboutSectionAdmin() {
               ...prev,
               shared: { ...prev.shared, image: null },
             }));
-            toast.success("Image uploaded!");
+            toast.success(
+              "Image uploaded. Click Save All Changes to persist it.",
+            );
           }
         },
       );
@@ -310,13 +322,11 @@ export default function AboutSectionAdmin() {
     widgetRef.current.open();
   }
 
-  // --- STRUCTURED VALIDATION ---
   function validateForm() {
     const newErrors = { shared: {}, en: {}, ps: {}, fa: {} };
     let isValid = true;
     let firstErrorLanguage = null;
 
-    // 1. Validate Shared Fields (Link & Image & Numbers)
     if (!data.image) {
       newErrors.shared.image = "Main image is required.";
       isValid = false;
@@ -343,11 +353,9 @@ export default function AboutSectionAdmin() {
       isValid = false;
     }
 
-    // 2. Validate Text Fields for ALL Languages
     const textFields = [
       "topTag",
-      "mainTitle",
-      "highlightedTitle",
+      "title",
       "buttonText",
       "progressTitle",
       "progressLabel1",
@@ -358,29 +366,29 @@ export default function AboutSectionAdmin() {
       "visionDesc",
     ];
 
-    for (const lang of LANGUAGES) {
-      const trans = data.translations[lang.code];
+    for (let l = 0; l < LANGUAGES.length; l++) {
+      const lang = LANGUAGES[l].code;
+      const trans = data.translations[lang];
 
-      // Standard text strings
-      for (const field of textFields) {
-        if (!trans[field]?.trim()) {
-          newErrors[lang.code][field] = "This field cannot be empty.";
+      for (let i = 0; i < textFields.length; i++) {
+        const field = textFields[i];
+        if (!stripHtml(trans[field] || "")) {
+          newErrors[lang][field] = "This field cannot be empty.";
           isValid = false;
-          if (!firstErrorLanguage) firstErrorLanguage = lang.code;
+          if (!firstErrorLanguage) firstErrorLanguage = lang;
         }
       }
 
-      // Arrays (Mission / Vision Bullet Points)
       for (let i = 0; i < 3; i++) {
-        if (!trans.missionList[i]?.trim()) {
-          newErrors[lang.code][`missionList_${i}`] = "Required";
+        if (!stripHtml(trans.missionList[i] || "")) {
+          newErrors[lang][`missionList_${i}`] = "Required";
           isValid = false;
-          if (!firstErrorLanguage) firstErrorLanguage = lang.code;
+          if (!firstErrorLanguage) firstErrorLanguage = lang;
         }
-        if (!trans.visionList[i]?.trim()) {
-          newErrors[lang.code][`visionList_${i}`] = "Required";
+        if (!stripHtml(trans.visionList[i] || "")) {
+          newErrors[lang][`visionList_${i}`] = "Required";
           isValid = false;
-          if (!firstErrorLanguage) firstErrorLanguage = lang.code;
+          if (!firstErrorLanguage) firstErrorLanguage = lang;
         }
       }
     }
@@ -390,9 +398,13 @@ export default function AboutSectionAdmin() {
     if (!isValid) {
       if (firstErrorLanguage && firstErrorLanguage !== language) {
         setLanguage(firstErrorLanguage);
-        const langName = LANGUAGES.find(
-          (l) => l.code === firstErrorLanguage,
-        )?.label;
+        let langName = "Language";
+        for (let i = 0; i < LANGUAGES.length; i++) {
+          if (LANGUAGES[i].code === firstErrorLanguage) {
+            langName = LANGUAGES[i].label;
+            break;
+          }
+        }
         toast.error(`Please fix missing fields in ${langName}.`, {
           icon: "⚠️",
         });
@@ -404,18 +416,20 @@ export default function AboutSectionAdmin() {
     return isValid;
   }
 
-  // --- SAVE ---
   async function handleSave() {
+    if (busy) return;
     if (!validateForm()) return;
 
     setSaving(true);
     try {
       const payload = { ...data, buttonLink: data.buttonLink.trim() };
       const response = await axios.post(API, payload);
-      if (!response.data?.success) throw new Error("Failed to save");
+      if (!response.data || !response.data.success) {
+        throw new Error("Failed to save");
+      }
       toast.success("Section updated successfully.");
     } catch (error) {
-      toast.error(error.message || "Failed to save section.");
+      toast.error(error.message ? error.message : "Failed to save section.");
     } finally {
       setSaving(false);
     }
@@ -433,13 +447,12 @@ export default function AboutSectionAdmin() {
   const currentE = errors[language];
 
   return (
-    <div className="relative min-h-screen space-y-6 bg-[#f7f9fc] pb-24 text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
+    <div className="relative min-h-screen space-y-6 bg-[#f7f9fc] pb-28 text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
       <Script
         src="https://upload-widget.cloudinary.com/global/all.js"
         onLoad={() => setCloudinaryReady(true)}
       />
 
-      {/* --- HEADER --- */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-[#e7f5f5] p-3 text-[#1e8a8a] dark:bg-[#162c32] dark:text-[#35b5b5]">
@@ -455,25 +468,32 @@ export default function AboutSectionAdmin() {
 
         <div className="flex flex-wrap items-center justify-end gap-3">
           <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm dark:border-[#263442] dark:bg-[#111a23]">
-            {LANGUAGES.map((item) => (
-              <button
-                key={item.code}
-                onClick={() => changeLanguage(item.code)}
-                className={`relative rounded-lg px-4 py-2 text-xs font-bold transition-all ${
-                  language === item.code
-                    ? "bg-[#1e8a8a] text-white shadow-md"
-                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#16212c]"
-                }`}
-              >
-                {item.label}
-                {/* Tiny red dot if this language has hidden errors */}
-                {Object.keys(errors[item.code]).some(
-                  (k) => errors[item.code][k],
-                ) && (
-                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
-                )}
-              </button>
-            ))}
+            {LANGUAGES.map((item) => {
+              let hasErr = false;
+              const keys = Object.keys(errors[item.code]);
+              for (let i = 0; i < keys.length; i++) {
+                if (errors[item.code][keys[i]]) {
+                  hasErr = true;
+                  break;
+                }
+              }
+              return (
+                <button
+                  key={item.code}
+                  onClick={() => changeLanguage(item.code)}
+                  className={`relative rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                    language === item.code
+                      ? "bg-[#1e8a8a] text-white shadow-md"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#16212c]"
+                  }`}
+                >
+                  {item.label}
+                  {hasErr && (
+                    <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
+                  )}
+                </button>
+              );
+            })}
           </div>
           <AdminLanguageBall
             language={language}
@@ -482,14 +502,12 @@ export default function AboutSectionAdmin() {
         </div>
       </div>
 
-      {/* --- MEDIA & HEADINGS --- */}
       <section className={sectionClass}>
         <h2 className="mb-5 flex items-center gap-2 border-b pb-3 text-lg font-bold dark:border-gray-800">
           <Type size={18} className="text-[#1e8a8a]" /> Media & Headings
         </h2>
 
         <div className="grid gap-6 sm:grid-cols-12">
-          {/* Image */}
           <div className="space-y-3 sm:col-span-4">
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Main Image
@@ -516,7 +534,7 @@ export default function AboutSectionAdmin() {
             <FieldError message={errors.shared.image} />
             <button
               onClick={uploadImage}
-              disabled={checking}
+              disabled={!cloudinaryReady || busy}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] transition-all hover:bg-[#1e8a8a] hover:text-white disabled:opacity-50"
             >
               {checking ? (
@@ -528,49 +546,44 @@ export default function AboutSectionAdmin() {
             </button>
           </div>
 
-          {/* Texts */}
           <div className="space-y-5 sm:col-span-8">
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
                 Top Tagline
               </label>
-              <input
-                dir={inputDirection}
-                name="topTag"
-                value={currentT.topTag}
-                onChange={handleTranslationChange}
-                className={getInputClass(currentE.topTag)}
-              />
+              <div
+                className={
+                  currentE.topTag ? "rounded-md border border-red-500" : ""
+                }
+              >
+                <RichTextEditor
+                  key={"topTag-" + language}
+                  value={currentT.topTag}
+                  onChange={(val) => handleRichTextChange("topTag", val)}
+                  dir={inputDirection}
+                />
+              </div>
               <FieldError message={currentE.topTag} />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-3">
                 <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
                   Main Title
                 </label>
-                <textarea
-                  dir={inputDirection}
-                  name="mainTitle"
-                  value={currentT.mainTitle}
-                  onChange={handleTranslationChange}
-                  rows="2"
-                  className={getInputClass(currentE.mainTitle)}
-                />
-                <FieldError message={currentE.mainTitle} />
-              </div>
-              <div className="sm:col-span-1">
-                <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  Highlighted Word
-                </label>
-                <input
-                  dir={inputDirection}
-                  name="highlightedTitle"
-                  value={currentT.highlightedTitle}
-                  onChange={handleTranslationChange}
-                  className={getInputClass(currentE.highlightedTitle)}
-                />
-                <FieldError message={currentE.highlightedTitle} />
+                <div
+                  className={
+                    currentE.title ? "rounded-md border border-red-500" : ""
+                  }
+                >
+                  <RichTextEditor
+                    key={"title-" + language}
+                    value={currentT.title}
+                    onChange={(val) => handleRichTextChange("title", val)}
+                    dir={inputDirection}
+                  />
+                </div>
+                <FieldError message={currentE.title} />
               </div>
             </div>
 
@@ -580,13 +593,20 @@ export default function AboutSectionAdmin() {
                   <ChevronRight size={16} className="text-gray-400" /> Button
                   Text
                 </label>
-                <input
-                  dir={inputDirection}
-                  name="buttonText"
-                  value={currentT.buttonText}
-                  onChange={handleTranslationChange}
-                  className={getInputClass(currentE.buttonText)}
-                />
+                <div
+                  className={
+                    currentE.buttonText
+                      ? "rounded-md border border-red-500"
+                      : ""
+                  }
+                >
+                  <RichTextEditor
+                    key={"buttonText-" + language}
+                    value={currentT.buttonText}
+                    onChange={(val) => handleRichTextChange("buttonText", val)}
+                    dir={inputDirection}
+                  />
+                </div>
                 <FieldError message={currentE.buttonText} />
               </div>
               <div>
@@ -608,7 +628,6 @@ export default function AboutSectionAdmin() {
         </div>
       </section>
 
-      {/* --- PROGRESS WIDGET --- */}
       <section className={sectionClass}>
         <h2 className="mb-5 flex items-center gap-2 border-b pb-3 text-lg font-bold dark:border-gray-800">
           <BarChart size={18} className="text-[#1e8a8a]" /> Floating Progress
@@ -619,13 +638,18 @@ export default function AboutSectionAdmin() {
             <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Widget Title
             </label>
-            <input
-              dir={inputDirection}
-              name="progressTitle"
-              value={currentT.progressTitle}
-              onChange={handleTranslationChange}
-              className={getInputClass(currentE.progressTitle)}
-            />
+            <div
+              className={
+                currentE.progressTitle ? "rounded-md border border-red-500" : ""
+              }
+            >
+              <RichTextEditor
+                key={"progressTitle-" + language}
+                value={currentT.progressTitle}
+                onChange={(val) => handleRichTextChange("progressTitle", val)}
+                dir={inputDirection}
+              />
+            </div>
             <FieldError message={currentE.progressTitle} />
           </div>
 
@@ -633,13 +657,20 @@ export default function AboutSectionAdmin() {
             <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Progress 1 Label
             </label>
-            <input
-              dir={inputDirection}
-              name="progressLabel1"
-              value={currentT.progressLabel1}
-              onChange={handleTranslationChange}
-              className={getInputClass(currentE.progressLabel1)}
-            />
+            <div
+              className={
+                currentE.progressLabel1
+                  ? "rounded-md border border-red-500"
+                  : ""
+              }
+            >
+              <RichTextEditor
+                key={"progressLabel1-" + language}
+                value={currentT.progressLabel1}
+                onChange={(val) => handleRichTextChange("progressLabel1", val)}
+                dir={inputDirection}
+              />
+            </div>
             <FieldError message={currentE.progressLabel1} />
           </div>
           <div className="sm:col-span-2">
@@ -661,13 +692,20 @@ export default function AboutSectionAdmin() {
             <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Progress 2 Label
             </label>
-            <input
-              dir={inputDirection}
-              name="progressLabel2"
-              value={currentT.progressLabel2}
-              onChange={handleTranslationChange}
-              className={getInputClass(currentE.progressLabel2)}
-            />
+            <div
+              className={
+                currentE.progressLabel2
+                  ? "rounded-md border border-red-500"
+                  : ""
+              }
+            >
+              <RichTextEditor
+                key={"progressLabel2-" + language}
+                value={currentT.progressLabel2}
+                onChange={(val) => handleRichTextChange("progressLabel2", val)}
+                dir={inputDirection}
+              />
+            </div>
             <FieldError message={currentE.progressLabel2} />
           </div>
           <div className="sm:col-span-2">
@@ -687,7 +725,6 @@ export default function AboutSectionAdmin() {
         </div>
       </section>
 
-      {/* --- MISSION & VISION CARDS --- */}
       <div className="grid gap-6 sm:grid-cols-2">
         <section className={sectionClass}>
           <h2 className="mb-5 flex items-center gap-2 border-b pb-3 text-lg font-bold dark:border-gray-800">
@@ -698,27 +735,38 @@ export default function AboutSectionAdmin() {
               <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
                 Title
               </label>
-              <input
-                dir={inputDirection}
-                name="missionTitle"
-                value={currentT.missionTitle}
-                onChange={handleTranslationChange}
-                className={getInputClass(currentE.missionTitle)}
-              />
+              <div
+                className={
+                  currentE.missionTitle
+                    ? "rounded-md border border-red-500"
+                    : ""
+                }
+              >
+                <RichTextEditor
+                  key={"missionTitle-" + language}
+                  value={currentT.missionTitle}
+                  onChange={(val) => handleRichTextChange("missionTitle", val)}
+                  dir={inputDirection}
+                />
+              </div>
               <FieldError message={currentE.missionTitle} />
             </div>
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
                 Description
               </label>
-              <textarea
-                dir={inputDirection}
-                name="missionDesc"
-                value={currentT.missionDesc}
-                onChange={handleTranslationChange}
-                rows="3"
-                className={getInputClass(currentE.missionDesc)}
-              />
+              <div
+                className={
+                  currentE.missionDesc ? "rounded-md border border-red-500" : ""
+                }
+              >
+                <RichTextEditor
+                  key={"missionDesc-" + language}
+                  value={currentT.missionDesc}
+                  onChange={(val) => handleRichTextChange("missionDesc", val)}
+                  dir={inputDirection}
+                />
+              </div>
               <FieldError message={currentE.missionDesc} />
             </div>
             <div className="pt-2">
@@ -728,20 +776,27 @@ export default function AboutSectionAdmin() {
               <div className="space-y-3">
                 {[0, 1, 2].map((i) => (
                   <div key={`mission-${i}`}>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-start gap-3">
                       <CheckCircle2
                         size={18}
-                        className="min-w-[18px] text-[#1e8a8a]"
+                        className="mt-3 min-w-[18px] text-[#1e8a8a]"
                       />
-                      <input
-                        dir={inputDirection}
-                        value={currentT.missionList[i]}
-                        onChange={(e) =>
-                          handleListChange("missionList", i, e.target.value)
-                        }
-                        className={getInputClass(currentE[`missionList_${i}`])}
-                        placeholder={`Item ${i + 1}`}
-                      />
+                      <div
+                        className={`flex-1 ${
+                          currentE[`missionList_${i}`]
+                            ? "rounded-md border border-red-500"
+                            : ""
+                        }`}
+                      >
+                        <RichTextEditor
+                          key={"missionList-" + language + "-" + i}
+                          value={currentT.missionList[i]}
+                          onChange={(val) =>
+                            handleListRichTextChange("missionList", i, val)
+                          }
+                          dir={inputDirection}
+                        />
+                      </div>
                     </div>
                     <FieldError message={currentE[`missionList_${i}`]} />
                   </div>
@@ -760,27 +815,36 @@ export default function AboutSectionAdmin() {
               <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
                 Title
               </label>
-              <input
-                dir={inputDirection}
-                name="visionTitle"
-                value={currentT.visionTitle}
-                onChange={handleTranslationChange}
-                className={getInputClass(currentE.visionTitle)}
-              />
+              <div
+                className={
+                  currentE.visionTitle ? "rounded-md border border-red-500" : ""
+                }
+              >
+                <RichTextEditor
+                  key={"visionTitle-" + language}
+                  value={currentT.visionTitle}
+                  onChange={(val) => handleRichTextChange("visionTitle", val)}
+                  dir={inputDirection}
+                />
+              </div>
               <FieldError message={currentE.visionTitle} />
             </div>
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
                 Description
               </label>
-              <textarea
-                dir={inputDirection}
-                name="visionDesc"
-                value={currentT.visionDesc}
-                onChange={handleTranslationChange}
-                rows="3"
-                className={getInputClass(currentE.visionDesc)}
-              />
+              <div
+                className={
+                  currentE.visionDesc ? "rounded-md border border-red-500" : ""
+                }
+              >
+                <RichTextEditor
+                  key={"visionDesc-" + language}
+                  value={currentT.visionDesc}
+                  onChange={(val) => handleRichTextChange("visionDesc", val)}
+                  dir={inputDirection}
+                />
+              </div>
               <FieldError message={currentE.visionDesc} />
             </div>
             <div className="pt-2">
@@ -790,20 +854,27 @@ export default function AboutSectionAdmin() {
               <div className="space-y-3">
                 {[0, 1, 2].map((i) => (
                   <div key={`vision-${i}`}>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-start gap-3">
                       <CheckCircle2
                         size={18}
-                        className="min-w-[18px] text-[#1e8a8a]"
+                        className="mt-3 min-w-[18px] text-[#1e8a8a]"
                       />
-                      <input
-                        dir={inputDirection}
-                        value={currentT.visionList[i]}
-                        onChange={(e) =>
-                          handleListChange("visionList", i, e.target.value)
-                        }
-                        className={getInputClass(currentE[`visionList_${i}`])}
-                        placeholder={`Item ${i + 1}`}
-                      />
+                      <div
+                        className={`flex-1 ${
+                          currentE[`visionList_${i}`]
+                            ? "rounded-md border border-red-500"
+                            : ""
+                        }`}
+                      >
+                        <RichTextEditor
+                          key={"visionList-" + language + "-" + i}
+                          value={currentT.visionList[i]}
+                          onChange={(val) =>
+                            handleListRichTextChange("visionList", i, val)
+                          }
+                          dir={inputDirection}
+                        />
+                      </div>
                     </div>
                     <FieldError message={currentE[`visionList_${i}`]} />
                   </div>
@@ -814,34 +885,15 @@ export default function AboutSectionAdmin() {
         </section>
       </div>
 
-      {/* --- STICKY SAVE BAR --- */}
-      <div className="sticky bottom-4 z-40 mt-8 flex items-center justify-between rounded-2xl border border-gray-200 bg-white/80 px-6 py-4 shadow-xl backdrop-blur-xl dark:border-[#263442] dark:bg-[#111a23]/80">
-        <div className="hidden items-center gap-3 sm:flex">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1e8a8a]/10 text-[#1e8a8a]">
-            <AlertCircle size={20} />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-              Editing:{" "}
-              <span className="text-[#1e8a8a]">
-                {LANGUAGES.find((item) => item.code === language)?.label}
-              </span>
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Button link must start with / · Fill all fields across languages
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-8 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#167070] hover:shadow-lg disabled:opacity-70 sm:w-auto"
-        >
-          <Save size={18} />
-          {saving ? "Saving Changes..." : "Save All Changes"}
-        </button>
-      </div>
+      <AdminStickyFooter
+        onReload={loadData}
+        onSave={handleSave}
+        saving={saving}
+        busy={busy}
+        saveLabel="Save All Changes"
+        savingLabel="Saving Changes..."
+        reloadLabel="Reload Saved Data"
+      />
     </div>
   );
 }

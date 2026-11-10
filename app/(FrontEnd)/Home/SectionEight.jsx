@@ -1,15 +1,67 @@
 "use client";
 
+import { fixData } from "@/Lib/fixText";
 import { ArrowLeft, ArrowRight, GlobeIcon, Quote } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+const SECTION_EIGHT_STYLES = `
+  .section-eight-rt .rt-inline p,
+  .section-eight-rt .rt-inline h1,
+  .section-eight-rt .rt-inline h2,
+  .section-eight-rt .rt-inline h3,
+  .section-eight-rt .rt-inline h4,
+  .section-eight-rt .rt-inline h5,
+  .section-eight-rt .rt-inline h6 {
+    display: inline;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .section-eight-rt .rt-inline br {
+    display: none;
+  }
+  .section-eight-rt .rt-desc p {
+    margin: 0.35em 0;
+  }
+  .section-eight-rt .rt-desc p:first-child {
+    margin-top: 0;
+  }
+  .section-eight-rt .rt-desc p:last-child {
+    margin-bottom: 0;
+  }
+  .section-eight-rt .rt-tight p {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .section-eight-rt .rt-inline,
+  .section-eight-rt .rt-desc {
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+  .section-eight-rt a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  .section-eight-rt ul,
+  .section-eight-rt ol {
+    margin: 0.25em 0;
+    padding-left: 1.25em;
+  }
+  .section-eight-rt strong,
+  .section-eight-rt b {
+    font-weight: 700;
+  }
+`;
+
+function stripTags(value) {
+  if (typeof value !== "string") return "";
+  return value.replace(/<[^>]*>/g, "").trim();
+}
+
 export default function SectionEight() {
   const [section, setSection] = useState({
     badgeText: "",
-    highlightWord: "",
-    headingLineOne: "",
-    headingLineTwo: "",
+    title: "",
     description: "",
   });
 
@@ -55,38 +107,27 @@ export default function SectionEight() {
         }
 
         if (result.success && result.data) {
-          if (result.data.section) {
-            const sectionData = result.data.section;
+          const data = fixData(result.data);
+
+          if (data.section) {
+            const sectionData = data.section;
 
             setSection({
               badgeText: getLocalizedText(sectionData.badgeText, language),
-              highlightWord: getLocalizedText(
-                sectionData.highlightWord,
-                language,
-              ),
-              headingLineOne: getLocalizedText(
-                sectionData.headingLineOne,
-                language,
-              ),
-              headingLineTwo: getLocalizedText(
-                sectionData.headingLineTwo,
-                language,
-              ),
+              title: getLocalizedText(sectionData.title, language),
               description: getLocalizedText(sectionData.description, language),
             });
           } else {
             setSection({
               badgeText: "",
-              highlightWord: "",
-              headingLineOne: "",
-              headingLineTwo: "",
+              title: "",
               description: "",
             });
           }
 
-          if (Array.isArray(result.data.reviews)) {
+          if (Array.isArray(data.reviews)) {
             setTestimonials(
-              result.data.reviews
+              data.reviews
                 .filter(
                   (testimonial) =>
                     testimonial &&
@@ -117,9 +158,7 @@ export default function SectionEight() {
           setTestimonials([]);
           setSection({
             badgeText: "",
-            highlightWord: "",
-            headingLineOne: "",
-            headingLineTwo: "",
+            title: "",
             description: "",
           });
         }
@@ -182,22 +221,14 @@ export default function SectionEight() {
         )
       : [];
 
-  const headingParts = section.headingLineOne
-    ? section.headingLineOne.split(section.highlightWord || "\u0000")
-    : [];
-
   return (
-    <section className="relative z-10 -mt-50 w-full bg-[#e8eeee] px-4">
+    <section className="section-eight-rt relative z-10 -mt-50 w-full bg-[#e8eeee] px-4">
       <div className="relative min-h-screen overflow-hidden rounded-3xl bg-white">
         <div className="absolute inset-0 bg-[radial-gradient(#bfdbfe_1px,transparent_1px)] [background-size:16px_16px]" />
 
         <div className="relative z-10 mx-auto w-full max-w-7xl px-6 py-16 pt-50 sm:px-10 lg:px-16">
           {/* Heading */}
-          {(section.badgeText ||
-            section.headingLineOne ||
-            section.headingLineTwo ||
-            section.highlightWord ||
-            section.description) && (
+          {(section.badgeText || section.title || section.description) && (
             <div>
               {section.badgeText && (
                 <span
@@ -208,47 +239,36 @@ export default function SectionEight() {
                     size={17}
                     className="transition-transform duration-500 group-hover:rotate-180"
                   />
-                  {section.badgeText}
+                  <span
+                    className="rt-inline"
+                    dangerouslySetInnerHTML={{ __html: section.badgeText }}
+                  />
                 </span>
               )}
 
               <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                {(section.headingLineOne ||
-                  section.headingLineTwo ||
-                  section.highlightWord) && (
-                  <h1
+                {section.title && (
+                  <div
+                    role="heading"
+                    aria-level={1}
                     data-wow-duration="0.9s"
                     data-wow-delay="0.1s"
                     className="wow animate__animated animate__fadeInLeft max-w-3xl text-4xl leading-tight font-medium text-[#102326] sm:text-5xl lg:text-5xl"
                   >
-                    {section.highlightWord && section.headingLineOne
-                      ? headingParts[0]
-                      : section.headingLineOne}
-
-                    {section.highlightWord && section.headingLineOne && (
-                      <span className="text-[#1E8A8A]">
-                        {section.highlightWord}
-                      </span>
-                    )}
-
-                    {section.highlightWord &&
-                      section.headingLineOne &&
-                      headingParts.slice(1).join(section.highlightWord)}
-
-                    {section.headingLineOne && section.headingLineTwo && <br />}
-
-                    {section.headingLineTwo && (
-                      <span className="text-[#1E8A8A]">
-                        {section.headingLineTwo}
-                      </span>
-                    )}
-                  </h1>
+                    <span
+                      className="rt-inline rt-tight"
+                      dangerouslySetInnerHTML={{
+                        __html: section.title,
+                      }}
+                    />
+                  </div>
                 )}
 
                 {section.description && (
-                  <p className="max-w-xl text-sm leading-6 text-zinc-600 sm:text-base md:text-lg">
-                    {section.description}
-                  </p>
+                  <div
+                    className="rt-desc max-w-xl text-sm leading-6 text-zinc-600 sm:text-base md:text-lg"
+                    dangerouslySetInnerHTML={{ __html: section.description }}
+                  />
                 )}
 
                 {/* Navigation */}
@@ -304,77 +324,90 @@ export default function SectionEight() {
             </div>
           ) : (
             <div className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-3">
-              {visibleTestimonials.map((testimonial, index) => (
-                <div
-                  key={`${testimonial._renderKey}-${index}`}
-                  data-wow-duration="0.8s"
-                  data-wow-delay={`${0.1 + index * 0.12}s`}
-                  className="wow animate__animated animate__fadeInUp group relative flex min-h-80 flex-col justify-between overflow-hidden rounded-3xl border border-[#102326]/8 bg-white/80 p-6 shadow-[0_10px_40px_rgba(16,35,38,0.06)] backdrop-blur-sm transition-all duration-500 hover:-translate-y-2 hover:border-[#1E8A8A]/20 hover:shadow-[0_20px_50px_rgba(16,35,38,0.1)] sm:p-7"
-                >
-                  {/* Top Accent */}
-                  <div className="absolute top-0 left-0 h-1 w-0 bg-[#1E8A8A] transition-all duration-500 group-hover:w-full" />
+              {visibleTestimonials.map((testimonial, index) => {
+                const plainName = stripTags(testimonial.name) || "Client";
 
-                  {/* Soft Glow */}
-                  <div className="pointer-events-none absolute -top-10 -right-10 h-28 w-28 rounded-full bg-[#1E8A8A]/5 blur-2xl transition-all duration-500 group-hover:bg-[#1E8A8A]/10" />
+                return (
+                  <div
+                    key={`${testimonial._renderKey}-${index}`}
+                    data-wow-duration="0.8s"
+                    data-wow-delay={`${0.1 + index * 0.12}s`}
+                    className="wow animate__animated animate__fadeInUp group relative flex min-h-80 flex-col justify-between overflow-hidden rounded-3xl border border-[#102326]/8 bg-white/80 p-6 shadow-[0_10px_40px_rgba(16,35,38,0.06)] backdrop-blur-sm transition-all duration-500 hover:-translate-y-2 hover:border-[#1E8A8A]/20 hover:shadow-[0_20px_50px_rgba(16,35,38,0.1)] sm:p-7"
+                  >
+                    {/* Top Accent */}
+                    <div className="absolute top-0 left-0 h-1 w-0 bg-[#1E8A8A] transition-all duration-500 group-hover:w-full" />
 
-                  {/* Content */}
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#eef2f2]">
-                        <Quote
-                          size={22}
-                          className="text-[#1E8A8A] transition-transform duration-500 group-hover:scale-110"
-                        />
-                      </div>
+                    {/* Soft Glow */}
+                    <div className="pointer-events-none absolute -top-10 -right-10 h-28 w-28 rounded-full bg-[#1E8A8A]/5 blur-2xl transition-all duration-500 group-hover:bg-[#1E8A8A]/10" />
 
-                      <div className="rounded-full bg-[#eef2f2] px-3 py-1 text-xs tracking-widest text-[#1E8A8A]">
-                        ★★★★★
-                      </div>
-                    </div>
-
-                    {testimonial.text && (
-                      <p className="mt-7 text-sm leading-7 text-zinc-600 sm:text-base">
-                        {testimonial.text}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* User */}
-                  <div className="relative z-10 mt-8 flex items-center gap-4 border-t border-[#102326]/8 pt-5">
-                    <div className="relative h-12 w-12 shrink-0">
-                      {testimonial.image ? (
-                        <Image
-                          src={testimonial.image}
-                          alt={testimonial.name || "Client"}
-                          fill
-                          sizes="48px"
-                          className="rounded-full object-cover ring-4 ring-[#eef2f2] transition-transform duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2f2] text-lg font-semibold text-[#1E8A8A] ring-4 ring-[#eef2f2]">
-                          {(testimonial.name || "C").charAt(0).toUpperCase()}
+                    {/* Content */}
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#eef2f2]">
+                          <Quote
+                            size={22}
+                            className="text-[#1E8A8A] transition-transform duration-500 group-hover:scale-110"
+                          />
                         </div>
-                      )}
 
-                      <span className="absolute right-0 bottom-0 h-3 w-3 rounded-full border-2 border-white bg-[#1E8A8A]" />
+                        <div className="rounded-full bg-[#eef2f2] px-3 py-1 text-xs tracking-widest text-[#1E8A8A]">
+                          ★★★★★
+                        </div>
+                      </div>
+
+                      {testimonial.text && (
+                        <div
+                          className="rt-desc mt-7 text-sm leading-7 text-zinc-600 sm:text-base"
+                          dangerouslySetInnerHTML={{ __html: testimonial.text }}
+                        />
+                      )}
                     </div>
 
-                    <div>
-                      {testimonial.name && (
-                        <h2 className="text-sm font-semibold text-[#102326] sm:text-base">
-                          {testimonial.name}
-                        </h2>
-                      )}
+                    {/* User */}
+                    <div className="relative z-10 mt-8 flex items-center gap-4 border-t border-[#102326]/8 pt-5">
+                      <div className="relative h-12 w-12 shrink-0">
+                        {testimonial.image ? (
+                          <Image
+                            src={testimonial.image}
+                            alt={plainName}
+                            fill
+                            sizes="48px"
+                            className="rounded-full object-cover ring-4 ring-[#eef2f2] transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2f2] text-lg font-semibold text-[#1E8A8A] ring-4 ring-[#eef2f2]">
+                            {plainName.charAt(0).toUpperCase()}
+                          </div>
+                        )}
 
-                      {testimonial.role && (
-                        <p className="mt-1 text-xs text-zinc-500">
-                          {testimonial.role}
-                        </p>
-                      )}
+                        <span className="absolute right-0 bottom-0 h-3 w-3 rounded-full border-2 border-white bg-[#1E8A8A]" />
+                      </div>
+
+                      <div>
+                        {testimonial.name && (
+                          <div
+                            role="heading"
+                            aria-level={2}
+                            className="rt-inline text-sm font-semibold text-[#102326] sm:text-base"
+                            dangerouslySetInnerHTML={{
+                              __html: testimonial.name,
+                            }}
+                          />
+                        )}
+
+                        {testimonial.role && (
+                          <div
+                            className="rt-inline mt-1 text-xs text-zinc-500"
+                            dangerouslySetInnerHTML={{
+                              __html: testimonial.role,
+                            }}
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -402,6 +435,8 @@ export default function SectionEight() {
           )}
         </div>
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: SECTION_EIGHT_STYLES }} />
     </section>
   );
 }

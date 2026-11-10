@@ -1,7 +1,10 @@
 "use client";
 
 import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import AdminStickyFooter from "@/app/Components/Admin/AdminStickyFooter";
 import Spinner from "@/app/Components/Admin/Spinner";
+import RichTextEditor from "@/Lib/PageBuilder/blocks/shared/RichTextEditor";
+import { stripHtml } from "@/Lib/sanitizeText";
 import axios from "axios";
 import {
   ChevronRight,
@@ -9,7 +12,6 @@ import {
   HelpCircle,
   Info,
   Link as LinkIcon,
-  Save,
   Type,
 } from "lucide-react";
 import Link from "next/link";
@@ -27,8 +29,7 @@ const LANGUAGES = [
 
 const emptyTranslation = () => ({
   topTag: "COMMON QUESTIONS",
-  mainTitle: "Need Help? Start Here...",
-  highlightedTitle: "Help?",
+  title: "Need Help? Start Here...",
   description:
     "We stay ahead of the curve, leveraging cutting-edge technologies and strategies to keep you competitive.",
   buttonText: "Request a Call",
@@ -66,6 +67,19 @@ const FieldError = ({ message }) => {
   return <p className="mt-1.5 text-xs font-medium text-red-500">{message}</p>;
 };
 
+function resolveTitle(trans) {
+  if (!trans) return "";
+  if (trans.title && stripHtml(trans.title)) return trans.title;
+  const line1 = trans.headingLineOne || trans.mainTitle || "";
+  const line2 = trans.headingLineTwo || trans.highlightedTitle || "";
+  const t1 = stripHtml(line1);
+  const t2 = stripHtml(line2);
+  if (t1 && t2) return line1 + " " + line2;
+  if (t1) return line1;
+  if (t2) return line2;
+  return trans.title || "";
+}
+
 export default function FAQSectionAdmin() {
   const [data, setData] = useState(emptyData());
   const [language, setLanguage] = useState("en");
@@ -75,36 +89,56 @@ export default function FAQSectionAdmin() {
 
   const inputDirection = language === "en" ? "ltr" : "rtl";
 
-  // --- DATA LOADING ---
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const response = await axios.get(API);
-        if (response.data?.success && response.data?.data) {
-          const fetched = response.data.data;
+  async function loadData() {
+    setLoading(true);
+    try {
+      const response = await axios.get(API);
+      if (response.data && response.data.success && response.data.data) {
+        const fetched = response.data.data;
 
-          setData({
-            ...emptyData(),
-            ...fetched,
-            translations: {
-              en: { ...emptyTranslation(), ...fetched.translations?.en },
-              ps: { ...emptyTranslation(), ...fetched.translations?.ps },
-              fa: { ...emptyTranslation(), ...fetched.translations?.fa },
-            },
-          });
+        function mergeLang(code) {
+          const raw =
+            fetched.translations && fetched.translations[code]
+              ? fetched.translations[code]
+              : {};
+          return {
+            ...emptyTranslation(),
+            ...raw,
+            title: resolveTitle(raw) || emptyTranslation().title,
+          };
         }
-      } catch (error) {
-        toast.error("Failed to load FAQ header data.");
-      } finally {
-        setLoading(false);
+
+        setData({
+          ...emptyData(),
+          ...fetched,
+          translations: {
+            en: mergeLang("en"),
+            ps: mergeLang("ps"),
+            fa: mergeLang("fa"),
+          },
+        });
+        setErrors(initializeErrors());
       }
+    } catch (error) {
+      toast.error("Failed to load FAQ header data.");
+    } finally {
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
     loadData();
   }, []);
 
-  // --- HANDLERS ---
-  const changeLanguage = (code) => {
-    if (!LANGUAGES.some((item) => item.code === code)) return;
+  function changeLanguage(code) {
+    let exists = false;
+    for (let i = 0; i < LANGUAGES.length; i++) {
+      if (LANGUAGES[i].code === code) {
+        exists = true;
+        break;
+      }
+    }
+    if (!exists) return;
     setLanguage(code);
     try {
       localStorage.setItem("admin-content-language", code);
@@ -115,34 +149,41 @@ export default function FAQSectionAdmin() {
         detail: { languageId: code },
       }),
     );
-  };
+  }
 
-  const handleRootChange = (e) => {
-    const { name, value } = e.target;
-    setData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({
-      ...prev,
-      shared: { ...prev.shared, [name]: null },
-    }));
-  };
+  function handleRootChange(e) {
+    const name = e.target.name;
+    const value = e.target.value;
+    setData(function (prev) {
+      return { ...prev, [name]: value };
+    });
+    setErrors(function (prev) {
+      return {
+        ...prev,
+        shared: { ...prev.shared, [name]: null },
+      };
+    });
+  }
 
-  const handleTranslationChange = (e) => {
-    const { name, value } = e.target;
-    setData((prev) => ({
-      ...prev,
-      translations: {
-        ...prev.translations,
-        [language]: { ...prev.translations[language], [name]: value },
-      },
-    }));
-    setErrors((prev) => ({
-      ...prev,
-      [language]: { ...prev[language], [name]: null },
-    }));
-  };
+  function handleRichTextChange(name, value) {
+    setData(function (prev) {
+      return {
+        ...prev,
+        translations: {
+          ...prev.translations,
+          [language]: { ...prev.translations[language], [name]: value },
+        },
+      };
+    });
+    setErrors(function (prev) {
+      return {
+        ...prev,
+        [language]: { ...prev[language], [name]: null },
+      };
+    });
+  }
 
-  // --- VALIDATION ---
-  const validateForm = () => {
+  function validateForm() {
     const newErrors = initializeErrors();
     let isValid = true;
     let firstErrorLanguage = null;
@@ -159,68 +200,83 @@ export default function FAQSectionAdmin() {
       isValid = false;
     }
 
-    const headerFields = [
-      "topTag",
-      "mainTitle",
-      "highlightedTitle",
-      "description",
-      "buttonText",
-    ];
+    const headerFields = ["topTag", "title", "description", "buttonText"];
 
-    LANGUAGES.forEach((lang) => {
-      const trans = data.translations[lang.code];
+    for (let l = 0; l < LANGUAGES.length; l++) {
+      const lang = LANGUAGES[l].code;
+      const trans = data.translations[lang];
 
-      headerFields.forEach((field) => {
-        // Highlighted title is optional in most designs, but if you want it strict, keep it here
-        if (
-          !String(trans[field] || "").trim() &&
-          field !== "highlightedTitle"
-        ) {
-          newErrors[lang.code][field] = "This field cannot be empty.";
+      for (let i = 0; i < headerFields.length; i++) {
+        const field = headerFields[i];
+        if (!stripHtml(trans[field] || "")) {
+          newErrors[lang][field] = "This field cannot be empty.";
           isValid = false;
-          if (!firstErrorLanguage) firstErrorLanguage = lang.code;
+          if (!firstErrorLanguage) firstErrorLanguage = lang;
         }
-      });
-    });
+      }
+    }
 
     setErrors(newErrors);
 
     if (!isValid) {
       if (firstErrorLanguage && firstErrorLanguage !== language) {
         setLanguage(firstErrorLanguage);
-        toast.error(
-          `Please fix missing fields in ${
-            LANGUAGES.find((l) => l.code === firstErrorLanguage)?.label
-          }.`,
-        );
+        let langName = "Language";
+        for (let i = 0; i < LANGUAGES.length; i++) {
+          if (LANGUAGES[i].code === firstErrorLanguage) {
+            langName = LANGUAGES[i].label;
+            break;
+          }
+        }
+        toast.error("Please fix missing fields in " + langName + ".");
       } else {
         toast.error("Please fill in all highlighted fields.");
       }
     }
 
     return isValid;
-  };
+  }
 
-  // --- SAVE ---
-  const handleSave = async () => {
+  async function handleSave() {
     if (!validateForm()) return;
 
     setSaving(true);
     try {
       const payload = {
-        ...data,
         buttonLink: String(data.buttonLink || "").trim(),
+        translations: {
+          en: {
+            topTag: data.translations.en.topTag,
+            title: data.translations.en.title,
+            description: data.translations.en.description,
+            buttonText: data.translations.en.buttonText,
+          },
+          ps: {
+            topTag: data.translations.ps.topTag,
+            title: data.translations.ps.title,
+            description: data.translations.ps.description,
+            buttonText: data.translations.ps.buttonText,
+          },
+          fa: {
+            topTag: data.translations.fa.topTag,
+            title: data.translations.fa.title,
+            description: data.translations.fa.description,
+            buttonText: data.translations.fa.buttonText,
+          },
+        },
       };
       const response = await axios.post(API, payload);
 
-      if (!response.data?.success) throw new Error("Failed to save");
+      if (!response.data || !response.data.success) {
+        throw new Error("Failed to save");
+      }
       toast.success("FAQ Section updated successfully.");
     } catch (error) {
       toast.error(error.message || "Failed to save section.");
     } finally {
       setSaving(false);
     }
-  };
+  }
 
   if (loading) {
     return (
@@ -233,13 +289,24 @@ export default function FAQSectionAdmin() {
   const currentT = data.translations[language];
   const currentE = errors[language];
 
-  const hasLanguageErrors = (code) => {
-    return Object.values(errors[code] || {}).some(Boolean);
-  };
+  function hasLanguageErrors(code) {
+    const vals = Object.values(errors[code] || {});
+    for (let i = 0; i < vals.length; i++) {
+      if (vals[i]) return true;
+    }
+    return false;
+  }
+
+  let editingLabel = "English";
+  for (let i = 0; i < LANGUAGES.length; i++) {
+    if (LANGUAGES[i].code === language) {
+      editingLabel = LANGUAGES[i].label;
+      break;
+    }
+  }
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#f7f9fc] pb-24 text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
-      {/* Header and language selector */}
+    <div className="min-h-screen space-y-5 bg-[#f7f9fc] pb-28 text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-[#e7f5f5] p-3 text-[#1e8a8a] dark:bg-[#162c32] dark:text-[#35b5b5]">
@@ -257,23 +324,27 @@ export default function FAQSectionAdmin() {
 
         <div className="flex flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-[#263442] dark:bg-[#111a23]">
-            {LANGUAGES.map((item) => (
-              <button
-                key={item.code}
-                type="button"
-                onClick={() => changeLanguage(item.code)}
-                className={`relative rounded-lg px-3 py-2 text-xs font-semibold ${
-                  language === item.code
-                    ? "bg-[#1e8a8a] text-white"
-                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#16212c]"
-                }`}
-              >
-                {item.label}
-                {hasLanguageErrors(item.code) && (
-                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
-                )}
-              </button>
-            ))}
+            {LANGUAGES.map(function (item) {
+              return (
+                <button
+                  key={item.code}
+                  type="button"
+                  onClick={function () {
+                    changeLanguage(item.code);
+                  }}
+                  className={`relative rounded-lg px-3 py-2 text-xs font-semibold ${
+                    language === item.code
+                      ? "bg-[#1e8a8a] text-white"
+                      : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#16212c]"
+                  }`}
+                >
+                  {item.label}
+                  {hasLanguageErrors(item.code) && (
+                    <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <AdminLanguageBall
@@ -283,7 +354,6 @@ export default function FAQSectionAdmin() {
         </div>
       </div>
 
-      {/* INFO BANNER: Q&A are from Home */}
       <div className="flex flex-col gap-3 rounded-2xl border border-[#1e8a8a]/20 bg-[#1e8a8a]/5 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-[#1e8a8a]/30 dark:bg-[#1e8a8a]/10">
         <div className="flex items-start gap-3">
           <Info size={20} className="mt-0.5 shrink-0 text-[#1e8a8a]" />
@@ -306,13 +376,12 @@ export default function FAQSectionAdmin() {
         </Link>
       </div>
 
-      {/* Presentation Text */}
       <section className={sectionClass}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="font-bold">Presentation Text</h2>
             <p className="mt-1 text-xs text-gray-500">
-              Editing: {LANGUAGES.find((item) => item.code === language)?.label}
+              Editing: {editingLabel}
             </p>
           </div>
         </div>
@@ -323,51 +392,43 @@ export default function FAQSectionAdmin() {
               <Type size={15} />
               Top Tagline
             </label>
-            <input
-              dir={inputDirection}
-              name="topTag"
-              value={currentT.topTag}
-              onChange={handleTranslationChange}
-              placeholder="e.g. COMMON QUESTIONS"
-              className={currentE.topTag ? inputErrorClass : inputClass}
-            />
+            <div
+              className={
+                currentE.topTag ? "rounded-md border border-red-500" : ""
+              }
+            >
+              <RichTextEditor
+                key={"topTag-" + language}
+                value={currentT.topTag}
+                onChange={function (val) {
+                  handleRichTextChange("topTag", val);
+                }}
+                dir={inputDirection}
+              />
+            </div>
             <FieldError message={currentE.topTag} />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="sm:col-span-2">
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <Type size={15} />
-                Main Title
-              </label>
-              <input
+          <div>
+            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
+              <Type size={15} />
+              Main Title
+            </label>
+            <div
+              className={
+                currentE.title ? "rounded-md border border-red-500" : ""
+              }
+            >
+              <RichTextEditor
+                key={"title-" + language}
+                value={currentT.title}
+                onChange={function (val) {
+                  handleRichTextChange("title", val);
+                }}
                 dir={inputDirection}
-                name="mainTitle"
-                value={currentT.mainTitle}
-                onChange={handleTranslationChange}
-                placeholder="e.g. Need Help? Start Here..."
-                className={currentE.mainTitle ? inputErrorClass : inputClass}
               />
-              <FieldError message={currentE.mainTitle} />
             </div>
-
-            <div className="sm:col-span-1">
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <Type size={15} />
-                Highlighted Word
-              </label>
-              <input
-                dir={inputDirection}
-                name="highlightedTitle"
-                value={currentT.highlightedTitle}
-                onChange={handleTranslationChange}
-                placeholder="e.g. Help?"
-                className={
-                  currentE.highlightedTitle ? inputErrorClass : inputClass
-                }
-              />
-              <FieldError message={currentE.highlightedTitle} />
-            </div>
+            <FieldError message={currentE.title} />
           </div>
 
           <div>
@@ -375,15 +436,20 @@ export default function FAQSectionAdmin() {
               <Type size={15} />
               Description
             </label>
-            <textarea
-              dir={inputDirection}
-              name="description"
-              value={currentT.description}
-              onChange={handleTranslationChange}
-              rows="3"
-              placeholder="Write description..."
-              className={currentE.description ? inputErrorClass : inputClass}
-            />
+            <div
+              className={
+                currentE.description ? "rounded-md border border-red-500" : ""
+              }
+            >
+              <RichTextEditor
+                key={"description-" + language}
+                value={currentT.description}
+                onChange={function (val) {
+                  handleRichTextChange("description", val);
+                }}
+                dir={inputDirection}
+              />
+            </div>
             <FieldError message={currentE.description} />
           </div>
 
@@ -393,14 +459,20 @@ export default function FAQSectionAdmin() {
                 <ChevronRight size={15} />
                 Button Text
               </label>
-              <input
-                dir={inputDirection}
-                name="buttonText"
-                value={currentT.buttonText}
-                onChange={handleTranslationChange}
-                placeholder="e.g. Request a Call"
-                className={currentE.buttonText ? inputErrorClass : inputClass}
-              />
+              <div
+                className={
+                  currentE.buttonText ? "rounded-md border border-red-500" : ""
+                }
+              >
+                <RichTextEditor
+                  key={"buttonText-" + language}
+                  value={currentT.buttonText}
+                  onChange={function (val) {
+                    handleRichTextChange("buttonText", val);
+                  }}
+                  dir={inputDirection}
+                />
+              </div>
               <FieldError message={currentE.buttonText} />
             </div>
 
@@ -425,32 +497,12 @@ export default function FAQSectionAdmin() {
         </div>
       </section>
 
-      {/* Sticky Save Bar */}
-      <div className="sticky bottom-4 z-40 mt-8 flex items-center justify-between rounded-2xl border border-gray-200 bg-white/90 px-5 py-4 shadow-lg backdrop-blur dark:border-[#263442] dark:bg-[#111a23]/90">
-        <div className="hidden items-center gap-3 sm:flex">
-          <div>
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-              Editing:{" "}
-              <span className="text-[#1e8a8a]">
-                {LANGUAGES.find((item) => item.code === language)?.label}
-              </span>
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Button link must start with / · Fill all fields in EN, PS, FA
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
-        >
-          <Save size={16} />
-          {saving ? "Saving..." : "Save Header"}
-        </button>
-      </div>
+      <AdminStickyFooter
+        onReload={loadData}
+        onSave={handleSave}
+        saving={saving}
+        busy={saving}
+      />
     </div>
   );
 }

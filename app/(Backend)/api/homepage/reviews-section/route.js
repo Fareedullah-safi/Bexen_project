@@ -10,9 +10,7 @@ import { NextResponse } from "next/server";
 const defaults = {
   section: {
     badgeText: { en: "CLIENTS FEEDBACK", ps: "", fa: "" },
-    highlightWord: { en: "Stories", ps: "", fa: "" },
-    headingLineOne: { en: "Success Stories Fuel", ps: "", fa: "" },
-    headingLineTwo: { en: "our Innovation.", ps: "", fa: "" },
+    title: { en: "Success Stories Fuel our Innovation.", ps: "", fa: "" },
     description: {
       en: "Manage the stats and review cards for your testimonial section.",
       ps: "",

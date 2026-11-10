@@ -11,9 +11,9 @@ const LANGUAGES = ["en", "ps", "fa"];
 const ARTICLE_FIELDS = ["day", "month", "category", "author", "title"];
 
 const defaultTitles = () => ({
-  en: { sectionTitle: "The Ultimate", highlightedTitle: "Resource." },
-  ps: { sectionTitle: "", highlightedTitle: "" },
-  fa: { sectionTitle: "", highlightedTitle: "" },
+  en: { title: "The Ultimate <strong>Resource.</strong>" },
+  ps: { title: "" },
+  fa: { title: "" },
 });
 
 function cleanText(value) {
@@ -42,9 +42,20 @@ function normalizeTitles(titles = {}) {
   const result = {};
 
   for (const lang of LANGUAGES) {
+    const langObj = titles?.[lang] || {};
+    let titleVal = cleanText(langObj.title);
+
+    if (!titleVal) {
+      const sec = cleanText(langObj.sectionTitle);
+      const high = cleanText(langObj.highlightedTitle);
+      if (sec || high) {
+        titleVal =
+          sec && high ? `${sec} <strong>${high}</strong>` : sec || high;
+      }
+    }
+
     result[lang] = {
-      sectionTitle: cleanText(titles?.[lang]?.sectionTitle),
-      highlightedTitle: cleanText(titles?.[lang]?.highlightedTitle),
+      title: titleVal,
     };
   }
 
@@ -61,8 +72,6 @@ function validateTranslations(translations) {
         return `${label}: please complete the ${field} field.`;
       }
     }
-
-    const day = Number(item.day);
   }
 
   return "";
@@ -72,12 +81,8 @@ function validateTitles(titles) {
   for (const lang of LANGUAGES) {
     const label = { en: "English", ps: "Pashto", fa: "Dari" }[lang];
 
-    if (!titles[lang].sectionTitle) {
-      return `${label}: please complete the main section title.`;
-    }
-
-    if (!titles[lang].highlightedTitle) {
-      return `${label}: please complete the highlighted title.`;
+    if (!titles[lang].title) {
+      return `${label}: please complete the section title.`;
     }
   }
 
@@ -126,10 +131,6 @@ export async function GET() {
     await connectDB();
 
     const section = await BlogSection.findOne().lean();
-
-    console.log("Blog section found:", Boolean(section));
-    console.log("Posts count:", section?.posts?.length);
-    console.log("Posts data:", JSON.stringify(section?.posts, null, 2));
 
     return NextResponse.json({
       success: true,

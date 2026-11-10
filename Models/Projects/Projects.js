@@ -12,8 +12,7 @@ const translationSchema = new mongoose.Schema(
 const headerSchema = new mongoose.Schema(
   {
     badgeText: { type: translationSchema, default: () => ({}) },
-    headingLine: { type: translationSchema, default: () => ({}) },
-    highlightWord: { type: translationSchema, default: () => ({}) },
+    title: { type: translationSchema, default: () => ({}) },
     description: { type: translationSchema, default: () => ({}) },
     buttonText: { type: translationSchema, default: () => ({}) },
     buttonLink: { type: String, default: "/projects" },

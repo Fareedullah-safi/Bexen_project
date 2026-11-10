@@ -1,19 +1,15 @@
 import { requireEditPermission } from "@/Lib/AdminPermission/adminPermissions";
-import dbConnect from "@/Lib/mongoDB"; // your MongoDB connection utility
+import dbConnect from "@/Lib/mongoDB";
 import AboutSection from "@/Models/About-Page-Models/MissionVision/MissionVision";
 import { NextResponse } from "next/server";
 
-// GET: Fetch the section data
 export async function GET() {
   try {
     await dbConnect();
-    // Fetch the single document (or create one if empty)
     let data = await AboutSection.findOne();
 
     if (!data) {
-      data = await AboutSection.create({
-        translations: { en: {}, ps: {}, fa: {} },
-      });
+      data = await AboutSection.create({});
     }
 
     return NextResponse.json({ success: true, data });
@@ -25,19 +21,17 @@ export async function GET() {
   }
 }
 
-// POST/PUT: Update or Create section data
 export async function POST(req) {
   try {
     const permission = await requireEditPermission();
-    
-      if (!permission.authorized) {
-        return permission.response;
-      }
-    
+
+    if (!permission.authorized) {
+      return permission.response;
+    }
+
     await dbConnect();
     const body = await req.json();
 
-    // Upsert (Update if exists, create if not)
     const updatedData = await AboutSection.findOneAndUpdate({}, body, {
       new: true,
       upsert: true,

@@ -1,11 +1,9 @@
 import mongoose from "mongoose";
 
-// Header only (EN, PS, FA) — no question/answer here
 const HeaderTranslationSchema = new mongoose.Schema(
   {
     topTag: { type: String, default: "COMMON QUESTIONS" },
-    mainTitle: { type: String, default: "Need Help? Start Here..." },
-    highlightedTitle: { type: String, default: "Help?" },
+    title: { type: String, default: "Need Help? Start Here..." },
     description: {
       type: String,
       default:

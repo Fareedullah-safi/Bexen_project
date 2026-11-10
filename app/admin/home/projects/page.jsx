@@ -1,7 +1,9 @@
 "use client";
 
 import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import AdminStickyFooter from "@/app/Components/Admin/AdminStickyFooter";
 import Spinner from "@/app/Components/Admin/Spinner";
+import RichTextEditor from "@/Lib/PageBuilder/blocks/shared/RichTextEditor";
 import axios from "axios";
 import {
   ArrowDown,
@@ -11,7 +13,6 @@ import {
   Info,
   LoaderCircle,
   Plus,
-  Save,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -20,7 +21,18 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 /* ──────────────────────────────────────────────
-   Cloudinary permission check (reused everywhere)
+   Helper to strip HTML tags for validation
+   ────────────────────────────────────────────── */
+function stripHtml(html) {
+  if (!html) return "";
+  return html
+    .replace(/<[^>]*>?/gm, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+}
+
+/* ──────────────────────────────────────────────
+   Cloudinary permission check
    ────────────────────────────────────────────── */
 async function verifyUploadPermission() {
   try {
@@ -28,14 +40,14 @@ async function verifyUploadPermission() {
       cache: "no-store",
     });
     const data = await res.json();
-    return res.ok && data?.success === true;
-  } catch {
+    return res.ok && data.success === true;
+  } catch (error) {
     return false;
   }
 }
 
 /* ──────────────────────────────────────────────
-   Unified Cloudinary widget theme (dark / light)
+   Unified Cloudinary widget theme
    ────────────────────────────────────────────── */
 function cloudinaryStyles(theme) {
   const palettes = {
@@ -71,7 +83,11 @@ function cloudinaryStyles(theme) {
     },
   };
 
-  return { palette: palettes[theme] || palettes.light };
+  if (theme === "dark") {
+    return { palette: palettes.dark };
+  }
+
+  return { palette: palettes.light };
 }
 
 /* ────────────────────────────────────────────── */
@@ -92,19 +108,22 @@ const inputClass =
 
 const labelClass = "mb-2 block text-sm font-semibold text-[var(--foreground)]";
 
-const saveButtonClass =
-  "flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-[#1E8A8A] px-6 text-sm font-semibold text-white transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:opacity-60";
-
 const imageButtonClass =
   "flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#167777] disabled:cursor-not-allowed disabled:opacity-60";
 
-const translation = () => ({
-  en: "",
-  fa: "",
-  ps: "",
-});
+function translation() {
+  return {
+    en: "",
+    fa: "",
+    ps: "",
+  };
+}
 
-const normalizeTranslation = (value, fallback = "") => {
+function normalizeTranslation(value, fallback) {
+  if (!fallback) {
+    fallback = "";
+  }
+
   if (typeof value === "string") {
     return {
       en: value || fallback,
@@ -116,102 +135,116 @@ const normalizeTranslation = (value, fallback = "") => {
   return {
     ...translation(),
     ...(value || {}),
-    en: value?.en || fallback,
+    en: value && value.en ? value.en : fallback,
   };
-};
+}
 
-const emptyHeader = () => ({
-  badgeText: translation(),
-  headingLine: translation(),
-  highlightWord: translation(),
-  description: translation(),
-  buttonText: translation(),
-  buttonLink: "/projects",
-});
+function emptyHeader() {
+  return {
+    badgeText: translation(),
+    title: translation(),
+    description: translation(),
+    buttonText: translation(),
+    buttonLink: "/projects",
+  };
+}
 
-const newProject = () => ({
-  clientKey: `draft-${Date.now()}-${Math.random()}`,
-  tag: translation(),
-  title: translation(),
-  image: "",
-  publicId: "",
-});
+function newProject() {
+  return {
+    clientKey: "draft-" + Date.now() + "-" + Math.random(),
+    tag: translation(),
+    title: translation(),
+    image: "",
+    publicId: "",
+  };
+}
 
-const formatProject = (project) => ({
-  ...newProject(),
-  ...project,
-  clientKey: project._id || `draft-${Date.now()}-${Math.random()}`,
-  tag: normalizeTranslation(project.tag),
-  title: normalizeTranslation(project.title),
-  image: project.image || "",
-  publicId: project.publicId || "",
-});
+function formatProject(project) {
+  return {
+    ...newProject(),
+    ...project,
+    clientKey: project._id || "draft-" + Date.now() + "-" + Math.random(),
+    tag: normalizeTranslation(project.tag),
+    title: normalizeTranslation(project.title),
+    image: project.image || "",
+    publicId: project.publicId || "",
+  };
+}
 
-const normalizeHeader = (savedHeader = {}) => ({
-  ...emptyHeader(),
-  ...savedHeader,
-  badgeText: normalizeTranslation(savedHeader.badgeText, "PROUD PROJECTS"),
-  headingLine: normalizeTranslation(savedHeader.headingLine),
-  highlightWord: normalizeTranslation(savedHeader.highlightWord),
-  description: normalizeTranslation(savedHeader.description),
-  buttonText: normalizeTranslation(savedHeader.buttonText),
-  buttonLink: savedHeader.buttonLink || "/projects",
-});
+function normalizeHeader(savedHeader) {
+  if (!savedHeader) {
+    savedHeader = {};
+  }
+
+  return {
+    ...emptyHeader(),
+    ...savedHeader,
+    badgeText: normalizeTranslation(savedHeader.badgeText, "PROUD PROJECTS"),
+    title: normalizeTranslation(savedHeader.title || savedHeader.headingLine),
+    description: normalizeTranslation(savedHeader.description),
+    buttonText: normalizeTranslation(savedHeader.buttonText),
+    buttonLink: savedHeader.buttonLink || "/projects",
+  };
+}
 
 const headerFields = [
   {
     name: "badgeText",
     label: "Badge Text",
     placeholder: "PROUD PROJECTS",
+    rich: true,
   },
   {
-    name: "headingLine",
-    label: "Heading Line",
-    placeholder: "Breaking Boundaries,",
-  },
-  {
-    name: "highlightWord",
-    label: "Highlight Word",
-    placeholder: "Dreams.",
+    name: "title",
+    label: "Section Title",
+    placeholder: "Breaking Boundaries, Dreams.",
+    rich: true,
   },
   {
     name: "description",
     label: "Description",
     placeholder: "We work closely with our clients...",
-    textarea: true,
+    rich: true,
   },
   {
     name: "buttonText",
     label: "Button Text",
     placeholder: "More Projects",
+    rich: false,
   },
   {
     name: "buttonLink",
     label: "Button Link",
     placeholder: "/projects",
     shared: true,
+    rich: false,
   },
 ];
 
 function LanguageSelector({ language, setLanguage, disabled }) {
   return (
     <div className="inline-flex flex-wrap gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-1.5">
-      {LANGUAGES.map((item) => (
-        <button
-          key={item.code}
-          type="button"
-          disabled={disabled}
-          onClick={() => setLanguage(item.code)}
-          aria-pressed={language === item.code}
-          className={`min-h-10 rounded-xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-            language === item.code
-              ? "bg-[#1E8A8A] text-white"
-              : "text-[var(--muted)] hover:bg-[var(--accent-soft)]"
-          }`}
-        >
-          {item.label}
-        </button>
-      ))}
+      {LANGUAGES.map(function (item) {
+        return (
+          <button
+            key={item.code}
+            type="button"
+            disabled={disabled}
+            onClick={function () {
+              setLanguage(item.code);
+            }}
+            aria-pressed={language === item.code}
+            className={
+              "min-h-10 rounded-xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 " +
+              (language === item.code
+                ? "bg-[#1E8A8A] text-white"
+                : "text-[var(--muted)] hover:bg-[var(--accent-soft)]")
+            }
+          >
+            {item.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -236,11 +269,17 @@ function ProjectCard({
       <div className="mb-5 flex items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
         <div className="min-w-0">
           <p className="truncate font-bold text-[var(--foreground)]">
-            {index + 1}. {project.title[language] || "Untitled Project"}
+            {index + 1}.{" "}
+            {stripHtml(project.title[language]) || "Untitled Project"}
           </p>
 
           <p className="text-xs text-[var(--muted)]">
-            {LANGUAGES.find((item) => item.code === language)?.label} content
+            {
+              LANGUAGES.find(function (item) {
+                return item.code === language;
+              })?.label
+            }{" "}
+            content
           </p>
         </div>
 
@@ -250,7 +289,9 @@ function ProjectCard({
             title="Move up"
             aria-label="Move project up"
             disabled={busy || index === 0}
-            onClick={() => onMove(index, -1)}
+            onClick={function () {
+              onMove(index, -1);
+            }}
             className="rounded-xl border border-[var(--border)] p-2 transition hover:border-[#1E8A8A] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowUp size={16} />
@@ -261,7 +302,9 @@ function ProjectCard({
             title="Move down"
             aria-label="Move project down"
             disabled={busy || index === total - 1}
-            onClick={() => onMove(index, 1)}
+            onClick={function () {
+              onMove(index, 1);
+            }}
             className="rounded-xl border border-[var(--border)] p-2 transition hover:border-[#1E8A8A] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ArrowDown size={16} />
@@ -272,7 +315,9 @@ function ProjectCard({
             title="Delete project"
             aria-label="Delete project"
             disabled={busy}
-            onClick={() => onDelete(project)}
+            onClick={function () {
+              onDelete(project);
+            }}
             className="rounded-xl p-2 text-red-500 transition hover:bg-red-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Trash2 size={16} />
@@ -282,48 +327,35 @@ function ProjectCard({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
-          {[
-            {
-              field: "tag",
-              label: "Tag / Category",
-              placeholder: "e.g. Business",
-            },
-            {
-              field: "title",
-              label: "Project Title",
-              placeholder: "Project title in selected language",
-              textarea: true,
-            },
-          ].map((item) => (
-            <div key={item.field}>
-              <label className={labelClass}>{item.label}</label>
-
-              {item.textarea ? (
-                <textarea
-                  rows={3}
-                  dir={inputDirection}
-                  disabled={busy}
-                  value={project[item.field][language] || ""}
-                  onChange={(event) =>
-                    onChange(project.clientKey, item.field, event.target.value)
-                  }
-                  placeholder={item.placeholder}
-                  className={`${inputClass} resize-y`}
-                />
-              ) : (
-                <input
-                  dir={inputDirection}
-                  disabled={busy}
-                  value={project[item.field][language] || ""}
-                  onChange={(event) =>
-                    onChange(project.clientKey, item.field, event.target.value)
-                  }
-                  placeholder={item.placeholder}
-                  className={inputClass}
-                />
-              )}
+          <div>
+            <label className={labelClass}>Tag / Category</label>
+            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+              <RichTextEditor
+                key={"tag-" + project.clientKey + "-" + language}
+                value={project.tag[language] || ""}
+                onChange={function (val) {
+                  onChange(project.clientKey, "tag", val);
+                }}
+                placeholder="e.g. Business"
+                dir={inputDirection}
+              />
             </div>
-          ))}
+          </div>
+
+          <div>
+            <label className={labelClass}>Project Title</label>
+            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+              <RichTextEditor
+                key={"title-" + project.clientKey + "-" + language}
+                value={project.title[language] || ""}
+                onChange={function (val) {
+                  onChange(project.clientKey, "title", val);
+                }}
+                placeholder="Project title in selected language"
+                dir={inputDirection}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="min-w-0">
@@ -333,7 +365,7 @@ function ProjectCard({
             {project.image ? (
               <img
                 src={project.image}
-                alt={project.title[language] || "Project cover"}
+                alt={stripHtml(project.title[language]) || "Project cover"}
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -352,8 +384,10 @@ function ProjectCard({
           <button
             type="button"
             disabled={busy || !cloudinaryReady || checking}
-            onClick={() => onUploadImage(project)}
-            className={`${imageButtonClass} mt-4`}
+            onClick={function () {
+              onUploadImage(project);
+            }}
+            className={imageButtonClass + " mt-4"}
           >
             {checking ? (
               <LoaderCircle size={17} className="animate-spin" />
@@ -403,12 +437,14 @@ export default function ProjectsAdmin() {
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-  /* ── Detect dark / light theme for Cloudinary widget ── */
-  useEffect(() => {
-    const update = () =>
-      setTheme(
-        document.documentElement.classList.contains("dark") ? "dark" : "light",
-      );
+  useEffect(function () {
+    function update() {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
+    }
 
     update();
 
@@ -418,7 +454,9 @@ export default function ProjectsAdmin() {
       attributeFilter: ["class"],
     });
 
-    return () => observer.disconnect();
+    return function () {
+      observer.disconnect();
+    };
   }, []);
 
   async function loadData() {
@@ -426,8 +464,8 @@ export default function ProjectsAdmin() {
     setLoadError(false);
 
     try {
-      const { data } = await axios.get(API);
-      const saved = data.data || {};
+      const response = await axios.get(API);
+      const saved = response.data.data || {};
 
       setHeader(normalizeHeader(saved.header));
       setProjects((saved.projects || []).map(formatProject));
@@ -440,47 +478,55 @@ export default function ProjectsAdmin() {
     }
   }
 
-  useEffect(() => {
+  useEffect(function () {
     loadData();
   }, []);
 
-  useEffect(() => {
+  useEffect(function () {
     if (typeof window !== "undefined" && window.cloudinary) {
       setCloudinaryReady(true);
     }
   }, []);
 
   function updateHeader(field, value) {
-    setHeader((previous) => ({
-      ...previous,
-      [field]:
-        field === "buttonLink"
-          ? value
-          : {
-              ...previous[field],
-              [language]: value,
-            },
-    }));
+    setHeader(function (previous) {
+      if (field === "buttonLink") {
+        return {
+          ...previous,
+          [field]: value,
+        };
+      }
+
+      return {
+        ...previous,
+        [field]: {
+          ...previous[field],
+          [language]: value,
+        },
+      };
+    });
   }
 
   function updateProject(key, field, value) {
-    setProjects((previous) =>
-      previous.map((project) =>
-        project.clientKey === key
-          ? {
-              ...project,
-              [field]: {
-                ...project[field],
-                [language]: value,
-              },
-            }
-          : project,
-      ),
-    );
+    setProjects(function (previous) {
+      return previous.map(function (project) {
+        if (project.clientKey === key) {
+          return {
+            ...project,
+            [field]: {
+              ...project[field],
+              [language]: value,
+            },
+          };
+        }
+
+        return project;
+      });
+    });
   }
 
   function moveProject(index, direction) {
-    setProjects((previous) => {
+    setProjects(function (previous) {
       const nextIndex = index + direction;
 
       if (nextIndex < 0 || nextIndex >= previous.length) {
@@ -488,11 +534,9 @@ export default function ProjectsAdmin() {
       }
 
       const updated = [...previous];
-
-      [updated[index], updated[nextIndex]] = [
-        updated[nextIndex],
-        updated[index],
-      ];
+      const temp = updated[index];
+      updated[index] = updated[nextIndex];
+      updated[nextIndex] = temp;
 
       return updated;
     });
@@ -513,7 +557,6 @@ export default function ProjectsAdmin() {
       return;
     }
 
-    /* ── Permission check BEFORE opening the widget ── */
     setChecking(true);
     const allowed = await verifyUploadPermission();
     setChecking(false);
@@ -525,47 +568,48 @@ export default function ProjectsAdmin() {
 
     const widget = window.cloudinary.createUploadWidget(
       {
-        cloudName,
-        uploadPreset,
+        cloudName: cloudName,
+        uploadPreset: uploadPreset,
         folder: "homepage/projects",
         multiple: false,
         maxFiles: 1,
         resourceType: "image",
         clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
         maxFileSize: 5000000,
-        // sources: ["local", "url"],
         showAdvancedOptions: false,
         cropping: false,
         styles: cloudinaryStyles(theme),
       },
-      (error, result) => {
+      function (error, result) {
         if (error) {
           console.error("Cloudinary upload:", error);
           toast.error("Image upload failed. Please try again.");
           return;
         }
 
-        if (result?.event !== "success") return;
+        if (!result || result.event !== "success") return;
 
-        const imageUrl = result.info?.secure_url;
-        const publicId = result.info?.public_id;
+        const imageUrl = result.info && result.info.secure_url;
+        const publicId = result.info && result.info.public_id;
 
         if (!imageUrl || !publicId || !imageUrl.startsWith("https://")) {
           toast.error("Cloudinary did not return a valid image.");
           return;
         }
 
-        setProjects((previous) =>
-          previous.map((item) =>
-            item.clientKey === project.clientKey
-              ? {
-                  ...item,
-                  image: imageUrl,
-                  publicId,
-                }
-              : item,
-          ),
-        );
+        setProjects(function (previous) {
+          return previous.map(function (item) {
+            if (item.clientKey === project.clientKey) {
+              return {
+                ...item,
+                image: imageUrl,
+                publicId: publicId,
+              };
+            }
+
+            return item;
+          });
+        });
 
         toast.success(
           "Image uploaded. Click Save All Changes to save the project.",
@@ -577,54 +621,68 @@ export default function ProjectsAdmin() {
   }
 
   function validateAllLanguages() {
-    // Validate all translated header fields in all languages.
-    for (const lang of LANGUAGES) {
-      for (const field of headerFields) {
+    for (let i = 0; i < LANGUAGES.length; i += 1) {
+      const lang = LANGUAGES[i];
+
+      for (let j = 0; j < headerFields.length; j += 1) {
+        const field = headerFields[j];
+
         if (field.shared) continue;
 
-        if (!header[field.name]?.[lang.code]?.trim()) {
+        const val = header[field.name] && header[field.name][lang.code];
+        let isEmpty = false;
+
+        if (field.rich) {
+          isEmpty = !stripHtml(val);
+        } else {
+          isEmpty = !val || !val.trim();
+        }
+
+        if (isEmpty) {
           setLanguage(lang.code);
-
-          toast.error(`${field.label} is required in ${lang.label}.`);
-
+          toast.error(field.label + " is required in " + lang.label + ".");
           return false;
         }
       }
     }
 
-    // Validate all project translations in all languages.
     if (!projects.length) {
       toast.error("Add at least one project.");
       return false;
     }
 
-    for (const lang of LANGUAGES) {
+    for (let i = 0; i < LANGUAGES.length; i += 1) {
+      const lang = LANGUAGES[i];
+
       for (let index = 0; index < projects.length; index += 1) {
         const project = projects[index];
 
-        if (!project.tag?.[lang.code]?.trim()) {
+        if (!stripHtml(project.tag && project.tag[lang.code])) {
           setLanguage(lang.code);
-
           toast.error(
-            `Project ${index + 1}: Tag / Category is required in ${lang.label}.`,
+            "Project " +
+              (index + 1) +
+              ": Tag / Category is required in " +
+              lang.label +
+              ".",
           );
-
           return false;
         }
 
-        if (!project.title?.[lang.code]?.trim()) {
+        if (!stripHtml(project.title && project.title[lang.code])) {
           setLanguage(lang.code);
-
           toast.error(
-            `Project ${index + 1}: Project Title is required in ${lang.label}.`,
+            "Project " +
+              (index + 1) +
+              ": Project Title is required in " +
+              lang.label +
+              ".",
           );
-
           return false;
         }
       }
     }
 
-    // Validate the shared button link.
     if (
       typeof header.buttonLink !== "string" ||
       !/^\/(?!\/)[a-zA-Z0-9/_-]*$/.test(header.buttonLink.trim())
@@ -633,13 +691,18 @@ export default function ProjectsAdmin() {
       return false;
     }
 
-    // Validate the uploaded image and its Cloudinary public ID.
     for (let index = 0; index < projects.length; index += 1) {
       const project = projects[index];
 
-      if (!project.image?.startsWith("https://") || !project.publicId?.trim()) {
-        toast.error(`Upload a valid cover image for project ${index + 1}.`);
-
+      if (
+        !project.image ||
+        !project.image.startsWith("https://") ||
+        !project.publicId ||
+        !project.publicId.trim()
+      ) {
+        toast.error(
+          "Upload a valid cover image for project " + (index + 1) + ".",
+        );
         return false;
       }
     }
@@ -655,23 +718,30 @@ export default function ProjectsAdmin() {
     setSaving(true);
 
     try {
-      const { data } = await axios.post(API, {
-        header,
-        projects: projects.map((project, index) => ({
-          ...(project._id ? { _id: project._id } : {}),
-          tag: project.tag,
-          title: project.title,
-          image: project.image,
-          publicId: project.publicId,
-          order: index,
-        })),
+      const response = await axios.post(API, {
+        header: header,
+        projects: projects.map(function (project, index) {
+          const payload = {
+            tag: project.tag,
+            title: project.title,
+            image: project.image,
+            publicId: project.publicId,
+            order: index,
+          };
+
+          if (project._id) {
+            payload._id = project._id;
+          }
+
+          return payload;
+        }),
       });
 
-      if (!data.success) {
-        throw new Error(data.message || "Save failed.");
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Save failed.");
       }
 
-      const saved = data.data || {};
+      const saved = response.data.data || {};
 
       setHeader(normalizeHeader(saved.header || header));
       setProjects((saved.projects || []).map(formatProject));
@@ -680,11 +750,14 @@ export default function ProjectsAdmin() {
     } catch (error) {
       console.error("Save projects:", error);
 
-      toast.error(
-        error.response?.data?.message ||
-          error.message ||
-          "Failed to save projects.",
-      );
+      const message =
+        (error.response &&
+          error.response.data &&
+          error.response.data.message) ||
+        error.message ||
+        "Failed to save projects.";
+
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -694,9 +767,11 @@ export default function ProjectsAdmin() {
     if (busy) return;
 
     if (!project._id) {
-      setProjects((previous) =>
-        previous.filter((item) => item.clientKey !== project.clientKey),
-      );
+      setProjects(function (previous) {
+        return previous.filter(function (item) {
+          return item.clientKey !== project.clientKey;
+        });
+      });
 
       toast.success("Unsaved project removed.");
       return;
@@ -714,15 +789,23 @@ export default function ProjectsAdmin() {
         params: { id: project._id },
       });
 
-      setProjects((previous) =>
-        previous.filter((item) => item.clientKey !== project.clientKey),
-      );
+      setProjects(function (previous) {
+        return previous.filter(function (item) {
+          return item.clientKey !== project.clientKey;
+        });
+      });
 
       toast.success("Project deleted.");
     } catch (error) {
       console.error("Delete project:", error);
 
-      toast.error(error.response?.data?.message || "Failed to delete project.");
+      const message =
+        (error.response &&
+          error.response.data &&
+          error.response.data.message) ||
+        "Failed to delete project.";
+
+      toast.error(message);
     } finally {
       setDeleting(false);
     }
@@ -758,15 +841,16 @@ export default function ProjectsAdmin() {
       <Script
         src="https://upload-widget.cloudinary.com/global/all.js"
         strategy="afterInteractive"
-        onLoad={() => setCloudinaryReady(true)}
-        onError={() => {
+        onLoad={function () {
+          setCloudinaryReady(true);
+        }}
+        onError={function () {
           setCloudinaryReady(false);
           toast.error("Could not load the Cloudinary image uploader.");
         }}
       />
 
-      <div className="w-full">
-        {/* Heading followed by all three language buttons and the language ball. */}
+      <div className="w-full pb-28">
         <div className="mb-10 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
@@ -806,77 +890,94 @@ export default function ProjectsAdmin() {
             </h2>
 
             <div className="grid gap-5 md:grid-cols-2">
-              {headerFields.map((field) => (
-                <div
-                  key={field.name}
-                  className={field.textarea ? "md:col-span-2" : ""}
-                >
-                  <label className={labelClass}>
-                    {field.label}
+              {headerFields.map(function (field) {
+                return (
+                  <div
+                    key={field.name}
+                    className={
+                      field.name === "description" || field.name === "title"
+                        ? "md:col-span-2"
+                        : ""
+                    }
+                  >
+                    <label className={labelClass}>
+                      {field.label}
 
-                    {field.shared && (
-                      <span className="ml-2 text-xs font-normal text-[var(--muted)]">
-                        Shared across languages
-                      </span>
+                      {field.shared && (
+                        <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+                          Shared across languages
+                        </span>
+                      )}
+                    </label>
+
+                    {field.rich ? (
+                      <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+                        <RichTextEditor
+                          key={field.name + "-" + language}
+                          value={
+                            (header[field.name] &&
+                              header[field.name][language]) ||
+                            ""
+                          }
+                          onChange={function (val) {
+                            updateHeader(field.name, val);
+                          }}
+                          placeholder={field.placeholder}
+                          dir={inputDirection}
+                        />
+                      </div>
+                    ) : (
+                      <input
+                        dir={field.shared ? "ltr" : inputDirection}
+                        value={
+                          field.shared
+                            ? header[field.name] || ""
+                            : (header[field.name] &&
+                                header[field.name][language]) ||
+                              ""
+                        }
+                        onChange={function (event) {
+                          updateHeader(field.name, event.target.value);
+                        }}
+                        placeholder={field.placeholder}
+                        className={inputClass}
+                      />
                     )}
-                  </label>
-
-                  {field.textarea ? (
-                    <textarea
-                      rows={3}
-                      dir={inputDirection}
-                      value={header[field.name]?.[language] || ""}
-                      onChange={(event) =>
-                        updateHeader(field.name, event.target.value)
-                      }
-                      placeholder={field.placeholder}
-                      className={`${inputClass} resize-y`}
-                    />
-                  ) : (
-                    <input
-                      dir={field.shared ? "ltr" : inputDirection}
-                      value={
-                        field.shared
-                          ? header[field.name] || ""
-                          : header[field.name]?.[language] || ""
-                      }
-                      onChange={(event) =>
-                        updateHeader(field.name, event.target.value)
-                      }
-                      placeholder={field.placeholder}
-                      className={inputClass}
-                    />
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Live preview */}
             <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-6">
-              <span className="rounded-lg bg-[var(--surface)] px-3 py-1 text-xs font-bold">
-                {header.badgeText?.[language] || "PROUD PROJECTS"}
-              </span>
+              <span
+                className="inline-block rounded-lg bg-[var(--surface)] px-3 py-1 text-xs font-bold"
+                dangerouslySetInnerHTML={{
+                  __html:
+                    (header.badgeText && header.badgeText[language]) ||
+                    "PROUD PROJECTS",
+                }}
+              />
 
-              <p
+              <div
                 dir={inputDirection}
-                className="mt-3 text-2xl text-[var(--foreground)]"
-              >
-                {header.headingLine?.[language] || "Breaking Boundaries,"}
+                className="mt-3 text-2xl font-bold text-[var(--foreground)]"
+                dangerouslySetInnerHTML={{
+                  __html:
+                    (header.title && header.title[language]) ||
+                    "Breaking Boundaries, Dreams.",
+                }}
+              />
 
-                <br />
-
-                <span className="text-[#1E8A8A]">
-                  {header.highlightWord?.[language] || "Dreams."}
-                </span>
-              </p>
-
-              <p
+              <div
                 dir={inputDirection}
                 className="mt-2 text-sm text-[var(--muted)]"
-              >
-                {header.description?.[language] ||
-                  "Section description preview"}
-              </p>
+                dangerouslySetInnerHTML={{
+                  __html:
+                    (header.description && header.description[language]) ||
+                    "Section description preview",
+                }}
+              />
             </div>
           </section>
 
@@ -893,67 +994,52 @@ export default function ProjectsAdmin() {
             )}
 
             <div className="space-y-6">
-              {projects.map((project, index) => (
-                <ProjectCard
-                  key={project.clientKey}
-                  project={project}
-                  index={index}
-                  total={projects.length}
-                  language={language}
-                  busy={busy}
-                  cloudinaryReady={cloudinaryReady}
-                  checking={checking}
-                  onChange={updateProject}
-                  onMove={moveProject}
-                  onDelete={deleteProject}
-                  onUploadImage={uploadProjectImage}
-                />
-              ))}
+              {projects.map(function (project, index) {
+                return (
+                  <ProjectCard
+                    key={project.clientKey}
+                    project={project}
+                    index={index}
+                    total={projects.length}
+                    language={language}
+                    busy={busy}
+                    cloudinaryReady={cloudinaryReady}
+                    checking={checking}
+                    onChange={updateProject}
+                    onMove={moveProject}
+                    onDelete={deleteProject}
+                    onUploadImage={uploadProjectImage}
+                  />
+                );
+              })}
             </div>
 
             <button
               type="button"
               disabled={busy}
-              onClick={() =>
-                setProjects((previous) => [...previous, newProject()])
-              }
+              onClick={function () {
+                setProjects(function (previous) {
+                  return [...previous, newProject()];
+                });
+              }}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] py-4 text-sm font-semibold text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Plus size={18} />
               Add New Large Project
             </button>
-
-            {/* Save bar */}
-            <footer className="sticky bottom-4 z-10 mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-[#111B27]/95">
-              <div>
-                <p className="text-sm font-semibold text-[var(--foreground)]">
-                  Ready to save your changes?
-                </p>
-
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  All three languages, the section header, project order, and
-                  uploaded images will be saved together.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={saveAll}
-                disabled={busy}
-                className={saveButtonClass}
-              >
-                {saving ? (
-                  <LoaderCircle size={18} className="animate-spin" />
-                ) : (
-                  <Save size={18} />
-                )}
-
-                {saving ? "Saving All..." : "Save All Changes"}
-              </button>
-            </footer>
           </section>
         </div>
       </div>
+
+      <AdminStickyFooter
+        onReload={loadData}
+        onSave={saveAll}
+        saving={saving}
+        busy={busy}
+        saveLabel="Save All Changes"
+        savingLabel="Saving All..."
+        reloadLabel="Reload Saved Data"
+      />
     </>
   );
 }

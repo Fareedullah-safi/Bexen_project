@@ -68,17 +68,9 @@ const ReviewSectionSchema = new mongoose.Schema(
         type: TranslationSchema,
         required: [true, "Badge text is required"],
       },
-      highlightWord: {
+      title: {
         type: TranslationSchema,
-        required: [true, "Highlight word is required"],
-      },
-      headingLineOne: {
-        type: TranslationSchema,
-        required: [true, "First heading line is required"],
-      },
-      headingLineTwo: {
-        type: TranslationSchema,
-        required: [true, "Second heading line is required"],
+        required: [true, "Section title is required"],
       },
       description: {
         type: TranslationSchema,

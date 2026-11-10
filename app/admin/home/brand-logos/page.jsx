@@ -1,15 +1,14 @@
 "use client";
 
+import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
 import Spinner from "@/app/Components/Admin/Spinner";
+import RichTextEditor from "@/Lib/PageBuilder/blocks/shared/RichTextEditor";
 import axios from "axios";
 import { ImagePlus, Trash2Icon, Upload, X } from "lucide-react";
 import Script from "next/script";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// ==========================================
-// PERMISSION HELPER
-// ==========================================
 async function verifyUploadPermission() {
   try {
     const res = await fetch("/api/admin/cloudinary/verify", {
@@ -25,9 +24,6 @@ async function verifyUploadPermission() {
   }
 }
 
-// ==========================================
-// CLOUDINARY WIDGET THEME
-// ==========================================
 function cloudinaryStyles(theme) {
   const palettes = {
     dark: {
@@ -64,6 +60,17 @@ function cloudinaryStyles(theme) {
   return { palette: palettes[theme] || palettes.light };
 }
 
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .trim();
+}
+
+function richWrapperClass() {
+  return "overflow-hidden rounded-2xl border border-[var(--border)] transition-colors";
+}
+
 const LANGUAGES = [
   { code: "en", label: "English" },
   { code: "ps", label: "پښتو" },
@@ -77,9 +84,7 @@ const EMPTY_TITLES = {
 };
 
 export default function BrandLogos() {
-  // All picked (unsaved) logos from Cloudinary
   const [pickedLogos, setPickedLogos] = useState([]);
-
   const [titleDrafts, setTitleDrafts] = useState(EMPTY_TITLES);
   const [titleLanguage, setTitleLanguage] = useState("en");
   const [savedData, setSavedData] = useState([]);
@@ -88,13 +93,12 @@ export default function BrandLogos() {
   const [isFetching, setIsFetching] = useState(true);
   const [isChangingTitle, setIsChangingTitle] = useState(false);
   const [isFetchingTitle, setIsFetchingTitle] = useState(true);
-
-  // Theme + permission-check state
   const [theme, setTheme] = useState("light");
   const [checking, setChecking] = useState(false);
   const [widgetReady, setWidgetReady] = useState(false);
 
-  // Theme watcher
+  const isRtl = titleLanguage === "ps" || titleLanguage === "fa";
+
   useEffect(() => {
     const update = () => {
       if (document.documentElement.classList.contains("dark")) {
@@ -112,7 +116,6 @@ export default function BrandLogos() {
     return () => observer.disconnect();
   }, []);
 
-  // Remove one picked (unsaved) logo by its publicId
   const handleRemovePicked = (publicId) => {
     const filtered = [];
     for (let i = 0; i < pickedLogos.length; i++) {
@@ -123,7 +126,6 @@ export default function BrandLogos() {
     setPickedLogos(filtered);
   };
 
-  // Clear all picked (unsaved) logos
   const handleClearAll = () => {
     setPickedLogos([]);
   };
@@ -131,20 +133,16 @@ export default function BrandLogos() {
   const allBoxData = async () => {
     try {
       setIsFetching(true);
-
       const { data } = await axios.get("/api/homepage/brand-logos", {
         headers: { "Cache-Control": "no-cache" },
         params: { _t: Date.now() },
       });
-
       if (!data?.success) {
         throw new Error(data?.message || "Failed to load saved logos");
       }
-
       setSavedData(Array.isArray(data.data) ? data.data : []);
     } catch (error) {
       console.error("Fetch brand logos error:", error);
-
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -158,29 +156,24 @@ export default function BrandLogos() {
   const getSectionTitles = async () => {
     try {
       setIsFetchingTitle(true);
-
       const results = await Promise.all(
         LANGUAGES.map(async ({ code }) => {
           const { data } = await axios.get("/api/homepage/brand-logos/title", {
             params: { lang: code, _t: Date.now() },
             headers: { "Cache-Control": "no-cache" },
           });
-
           if (!data?.success) {
             throw new Error(data?.message || `Failed to load ${code} title`);
           }
-
           return [code, typeof data.title === "string" ? data.title : ""];
         }),
       );
-
       setTitleDrafts({
         ...EMPTY_TITLES,
         ...Object.fromEntries(results),
       });
     } catch (error) {
       console.error("Fetch language titles error:", error);
-
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -191,22 +184,17 @@ export default function BrandLogos() {
     }
   };
 
-  // Open the Cloudinary widget (with permission check + theme)
   const openCloudinary = async () => {
     if (!widgetReady || !window.cloudinary) {
       toast.error("Cloudinary is still loading...");
       return;
     }
-
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
     if (!cloudName || !uploadPreset) {
       toast.error("Cloudinary configuration is missing.");
       return;
     }
-
-    // Permission check BEFORE opening widget
     setChecking(true);
     const allowed = await verifyUploadPermission();
     setChecking(false);
@@ -214,7 +202,6 @@ export default function BrandLogos() {
       toast.error("You don't have permission to upload images.");
       return;
     }
-
     const widget = window.cloudinary.createUploadWidget(
       {
         cloudName,
@@ -232,14 +219,11 @@ export default function BrandLogos() {
           return;
         }
         if (result?.event === "success") {
-          // Add each successfully uploaded image to the picked list
           const newLogo = {
             url: result.info.secure_url,
             publicId: result.info.public_id,
           };
-
           setPickedLogos((prev) => {
-            // Avoid duplicates (same publicId)
             for (let i = 0; i < prev.length; i++) {
               if (prev[i].publicId === newLogo.publicId) {
                 return prev;
@@ -247,28 +231,21 @@ export default function BrandLogos() {
             }
             return [...prev, newLogo];
           });
-
           toast.success("Logo added. Upload more or click Save.");
         }
       },
     );
-
     widget.open();
   };
 
-  // Save all picked logos to the database
   const handleSubmit = async () => {
     if (isSaving) return;
-
     if (pickedLogos.length === 0) {
       toast.error("Please upload at least one brand logo first.");
       return;
     }
-
     try {
       setIsSaving(true);
-
-      // Build the logos array for the API
       const logosPayload = [];
       for (let i = 0; i < pickedLogos.length; i++) {
         logosPayload.push({
@@ -276,26 +253,20 @@ export default function BrandLogos() {
           publicId: pickedLogos[i].publicId,
         });
       }
-
       const { data: saveResult } = await axios.post(
         "/api/homepage/brand-logos",
         { logos: logosPayload },
       );
-
       if (!saveResult?.success) {
         throw new Error(
           saveResult?.message || "Failed to save logos to the database",
         );
       }
-
       setPickedLogos([]);
-
       toast.success("All brand logos saved successfully");
-
       await allBoxData();
     } catch (error) {
       console.error("Brand logos save error:", error);
-
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -306,66 +277,55 @@ export default function BrandLogos() {
     }
   };
 
-  // All three language titles are required.
   const handleTitleSubmit = async () => {
     if (isChangingTitle || isFetchingTitle) return;
 
     const translations = {
-      en: titleDrafts.en ?? "",
-      ps: titleDrafts.ps ?? "",
-      fa: titleDrafts.fa ?? "",
+      en: titleDrafts.en || "",
+      ps: titleDrafts.ps || "",
+      fa: titleDrafts.fa || "",
     };
 
     const missingLanguage = LANGUAGES.find(
-      ({ code }) => !translations[code].trim(),
+      ({ code }) => !stripHtml(translations[code]),
     );
 
     if (missingLanguage) {
       setTitleLanguage(missingLanguage.code);
-
       toast.error(`Please enter the section title in ${missingLanguage.label}`);
-
       return;
     }
 
     try {
       setIsChangingTitle(true);
-
       const { data } = await axios.post("/api/homepage/brand-logos/title", {
         translations,
       });
-
       if (!data?.success) {
         throw new Error(data?.message || "Failed to update language titles");
       }
-
       const savedTranslations = data?.translations;
-
       if (savedTranslations) {
         setTitleDrafts({
           en:
             typeof savedTranslations.en === "string"
               ? savedTranslations.en
-              : (savedTranslations.en?.title ?? translations.en),
-
+              : savedTranslations.en?.title || translations.en,
           ps:
             typeof savedTranslations.ps === "string"
               ? savedTranslations.ps
-              : (savedTranslations.ps?.title ?? translations.ps),
-
+              : savedTranslations.ps?.title || translations.ps,
           fa:
             typeof savedTranslations.fa === "string"
               ? savedTranslations.fa
-              : (savedTranslations.fa?.title ?? translations.fa),
+              : savedTranslations.fa?.title || translations.fa,
         });
       } else {
         setTitleDrafts(translations);
       }
-
       toast.success("All language titles updated successfully");
     } catch (error) {
       console.error("Update language titles error:", error);
-
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -378,24 +338,18 @@ export default function BrandLogos() {
 
   const handleDeleteSavedLogo = async (publicId, _id) => {
     if (deletingLogo) return;
-
     try {
       setDeletingLogo(publicId);
-
       const { data } = await axios.delete("/api/homepage/brand-logos", {
         data: { publicId, logoId: _id },
       });
-
       if (!data?.success) {
         throw new Error(data?.message || "Failed to delete logo");
       }
-
       toast.success("Logo deleted successfully");
-
       await allBoxData();
     } catch (error) {
       console.error("Delete logo error:", error);
-
       toast.error(
         error.response?.data?.message ||
           error.message ||
@@ -425,8 +379,7 @@ export default function BrandLogos() {
   }
 
   return (
-    <div className="w-full bg-[var(--background)] text-[var(--foreground)]">
-      {/* Cloudinary script */}
+    <div className="w-full bg-[var(--background)] pb-28 text-[var(--foreground)]">
       <Script
         src="https://upload-widget.cloudinary.com/latest/global/all.js"
         strategy="lazyOnload"
@@ -434,14 +387,17 @@ export default function BrandLogos() {
         onError={() => toast.error("Unable to load Cloudinary.")}
       />
 
+      <AdminLanguageBall
+        language={titleLanguage}
+        onLanguageChange={setTitleLanguage}
+      />
+
       <div className="mb-10 flex items-center gap-4">
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
           <ImagePlus size={27} />
         </div>
-
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Brand Logos</h1>
-
           <p className="mt-1 text-base text-[var(--muted)]">
             Manage the brand logos displayed on your homepage.
           </p>
@@ -449,26 +405,23 @@ export default function BrandLogos() {
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
-        {/* Section title editor */}
         <div className="border-b border-[var(--border)] p-7 sm:p-8">
           <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <label className="block text-base font-semibold">
                 Section Title
               </label>
-
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Select a language and enter its required title.
+                Select a language and enter its required title. Use the editor
+                for bold, color, and line breaks.
               </p>
             </div>
-
             <div
               className="inline-flex flex-wrap items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--background)] p-1.5 shadow-sm"
               aria-label="Title language"
             >
               {LANGUAGES.map((language) => {
                 const isActive = titleLanguage === language.code;
-
                 return (
                   <button
                     key={language.code}
@@ -483,7 +436,6 @@ export default function BrandLogos() {
                     }`}
                   >
                     {language.label}
-
                     {isActive && (
                       <span className="ml-2 h-1.5 w-1.5 rounded-full bg-white" />
                     )}
@@ -493,24 +445,24 @@ export default function BrandLogos() {
             </div>
           </div>
 
-          <input
-            dir={titleLanguage === "en" ? "ltr" : "rtl"}
-            type="text"
-            required
-            value={titleDrafts[titleLanguage] ?? ""}
-            onChange={(e) =>
-              setTitleDrafts((prev) => ({
-                ...prev,
-                [titleLanguage]: e.target.value,
-              }))
-            }
-            placeholder={`Enter ${
-              LANGUAGES.find((language) => language.code === titleLanguage)
-                ?.label
-            } title`}
-            disabled={isChangingTitle}
-            className="w-full rounded-2xl border border-[var(--border)] bg-[var(--background)] px-5 py-4 text-base text-[var(--foreground)] transition outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10 disabled:cursor-not-allowed disabled:opacity-60"
-          />
+          <div className={richWrapperClass()}>
+            <RichTextEditor
+              key={"title-" + titleLanguage}
+              value={titleDrafts[titleLanguage] || ""}
+              onChange={(html) =>
+                setTitleDrafts((prev) => ({
+                  ...prev,
+                  [titleLanguage]: html,
+                }))
+              }
+              isRtl={isRtl}
+              placeholder={`Enter ${
+                LANGUAGES.find((language) => language.code === titleLanguage)
+                  ?.label
+              } title`}
+              minHeight={120}
+            />
+          </div>
 
           <button
             type="button"
@@ -529,23 +481,20 @@ export default function BrandLogos() {
           </button>
         </div>
 
-        {/* Logo uploader (Cloudinary, unlimited) */}
+        {/* Logo uploader */}
         <div className="p-7 sm:p-8">
           <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-bold">Brand Logos</h2>
-
               <p className="mt-1 text-sm text-[var(--muted)]">
                 Upload as many brand logos as you need via Cloudinary.
               </p>
             </div>
-
             <span className="w-fit rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent)]">
               {pickedLogos.length} picked
             </span>
           </div>
 
-          {/* Picked logos preview grid */}
           {pickedLogos.length > 0 && (
             <div className="mb-6">
               <div className="mb-3 flex items-center justify-between">
@@ -561,7 +510,6 @@ export default function BrandLogos() {
                   <X size={14} /> Clear all
                 </button>
               </div>
-
               <div className="flex flex-wrap gap-4">
                 {pickedLogos.map((logo) => (
                   <div
@@ -591,12 +539,10 @@ export default function BrandLogos() {
             </div>
           )}
 
-          {/* Upload area */}
           <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border-2 border-dashed border-[var(--border)] bg-[var(--background)] p-8 transition hover:border-[var(--accent)]/40">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
               <ImagePlus size={29} />
             </div>
-
             <div className="text-center">
               <p className="text-sm font-semibold text-[var(--foreground)]">
                 {pickedLogos.length === 0
@@ -607,7 +553,6 @@ export default function BrandLogos() {
                 JPG, PNG, WEBP or SVG · Maximum 5 MB each · Unlimited uploads
               </p>
             </div>
-
             <button
               type="button"
               onClick={openCloudinary}
@@ -651,23 +596,19 @@ export default function BrandLogos() {
         </div>
       </div>
 
-      {/* Previously saved logos remain visible and deletable. */}
       {savedData.length > 0 && (
         <div className="mt-8 rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
           <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-bold">Saved Brand Logos</h2>
-
               <p className="mt-1 text-sm text-[var(--muted)]">
                 Logos currently saved in your database.
               </p>
             </div>
-
             <span className="w-fit rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent)]">
               {savedLogoCount} saved
             </span>
           </div>
-
           {isFetching ? (
             <div className="flex min-h-40 items-center justify-center">
               <Spinner />
@@ -677,7 +618,6 @@ export default function BrandLogos() {
               {savedData.flatMap((item) =>
                 item.logos?.map((logo) => {
                   const deleteKey = `${item._id}-${logo._id}`;
-
                   return (
                     <div
                       key={deleteKey}
@@ -700,7 +640,6 @@ export default function BrandLogos() {
                           <Trash2Icon size={16} />
                         )}
                       </button>
-
                       {logo.url ? (
                         <img
                           src={logo.url}

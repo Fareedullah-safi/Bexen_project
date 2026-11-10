@@ -1,9 +1,63 @@
 "use client";
 
+import { fixData } from "@/Lib/fixText";
 import axios from "axios";
 import { Minus, PhoneCallIcon, Plus } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+
+const SECTION_NINE_STYLES = `
+  .section-nine-rt .rt-inline p,
+  .section-nine-rt .rt-inline h1,
+  .section-nine-rt .rt-inline h2,
+  .section-nine-rt .rt-inline h3,
+  .section-nine-rt .rt-inline h4,
+  .section-nine-rt .rt-inline h5,
+  .section-nine-rt .rt-inline h6 {
+    display: inline;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .section-nine-rt .rt-inline br {
+    display: none;
+  }
+  .section-nine-rt .rt-desc p {
+    margin: 0.35em 0;
+  }
+  .section-nine-rt .rt-desc p:first-child {
+    margin-top: 0;
+  }
+  .section-nine-rt .rt-desc p:last-child {
+    margin-bottom: 0;
+  }
+  .section-nine-rt .rt-tight p {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .section-nine-rt .rt-inline,
+  .section-nine-rt .rt-desc {
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+  .section-nine-rt a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  .section-nine-rt ul,
+  .section-nine-rt ol {
+    margin: 0.25em 0;
+    padding-left: 1.25em;
+  }
+  .section-nine-rt strong,
+  .section-nine-rt b {
+    font-weight: 700;
+  }
+`;
+
+function stripTags(value) {
+  if (typeof value !== "string") return "";
+  return value.replace(/<[^>]*>/g, "").trim();
+}
 
 const getText = (value, language = "en") => {
   if (typeof value === "string" || typeof value === "number") {
@@ -46,7 +100,7 @@ export default function SectionNine() {
         const res = await axios.get("/api/homepage/faq");
 
         if (res.data.success && res.data.data) {
-          setFaqData(res.data.data);
+          setFaqData(fixData(res.data.data));
         }
       } catch (error) {
         console.error(
@@ -82,7 +136,7 @@ export default function SectionNine() {
   const phoneNumber = getText(faqData.phoneNumber, language);
 
   return (
-    <section className="min-h-screen w-full bg-[#ECF0F0] px-6 py-16 lg:px-12">
+    <section className="section-nine-rt min-h-screen w-full bg-[#ECF0F0] px-6 py-16 lg:px-12">
       <div className="flex w-full flex-col gap-8 lg:flex-row">
         {/* Image */}
         <div className="relative w-full self-start lg:w-1/2">
@@ -93,7 +147,7 @@ export default function SectionNine() {
             {faqData.imageURL && (
               <Image
                 src={faqData.imageURL}
-                alt={headingLineOne || "Company"}
+                alt={stripTags(headingLineOne) || "Company"}
                 fill
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover transition-transform duration-700 hover:scale-105"
@@ -103,14 +157,26 @@ export default function SectionNine() {
             <div className="absolute inset-0 bg-linear-to-t from-[#0C1E21]/60 via-transparent to-transparent" />
 
             {(headingLineOne || headingLineTwo) && (
-              <h2
+              <div
+                role="heading"
+                aria-level={2}
                 className="wow animate__animated animate__fadeInUp absolute top-8 left-8 z-10 text-4xl leading-tight font-medium text-white md:text-5xl"
                 data-wow-delay="0.3s"
               >
-                {headingLineOne}
+                {headingLineOne && (
+                  <span
+                    className="rt-inline rt-tight"
+                    dangerouslySetInnerHTML={{ __html: headingLineOne }}
+                  />
+                )}
                 {headingLineOne && headingLineTwo && <br />}
-                {headingLineTwo}
-              </h2>
+                {headingLineTwo && (
+                  <span
+                    className="rt-inline rt-tight"
+                    dangerouslySetInnerHTML={{ __html: headingLineTwo }}
+                  />
+                )}
+              </div>
             )}
           </div>
 
@@ -122,11 +188,21 @@ export default function SectionNine() {
             >
               <div className="w-60 rounded-2xl bg-[#1E8A8A] px-6 py-6 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
                 {(callHeadingLineOne || callHeadingLineTwo) && (
-                  <p className="text-2xl font-bold text-white">
-                    {callHeadingLineOne}
+                  <div className="text-2xl font-bold text-white">
+                    {callHeadingLineOne && (
+                      <span
+                        className="rt-inline rt-tight"
+                        dangerouslySetInnerHTML={{ __html: callHeadingLineOne }}
+                      />
+                    )}
                     {callHeadingLineOne && callHeadingLineTwo && <br />}
-                    {callHeadingLineTwo}
-                  </p>
+                    {callHeadingLineTwo && (
+                      <span
+                        className="rt-inline rt-tight"
+                        dangerouslySetInnerHTML={{ __html: callHeadingLineTwo }}
+                      />
+                    )}
+                  </div>
                 )}
 
                 {phoneNumber && (
@@ -138,11 +214,14 @@ export default function SectionNine() {
                     <a
                       href={
                         faqData.phoneHref ||
-                        `tel:${phoneNumber.replace(/[^\d+]/g, "")}`
+                        `tel:${stripTags(phoneNumber).replace(/[^\d+]/g, "")}`
                       }
                       className="group/phone relative w-fit text-xl font-semibold text-white"
                     >
-                      {phoneNumber}
+                      <span
+                        className="rt-inline"
+                        dangerouslySetInnerHTML={{ __html: phoneNumber }}
+                      />
                       <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-cyan-500 transition-all duration-300 group-hover/phone:w-full" />
                     </a>
                   </div>
@@ -169,9 +248,12 @@ export default function SectionNine() {
                   aria-expanded={isOpen}
                   className="flex w-full cursor-pointer items-center justify-between gap-5 px-6 py-6 text-left"
                 >
-                  <span className="text-lg font-semibold text-[#102326] md:text-xl">
-                    {getText(faq.question, language)}
-                  </span>
+                  <span
+                    className="rt-inline text-lg font-semibold text-[#102326] md:text-xl"
+                    dangerouslySetInnerHTML={{
+                      __html: getText(faq.question, language),
+                    }}
+                  />
 
                   <span
                     className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-all duration-500 ${
@@ -199,9 +281,12 @@ export default function SectionNine() {
                       <span className="h-1 w-1 rounded-full bg-[#1E8A8A]" />
                     </div>
 
-                    <p className="py-5 text-base leading-7 text-zinc-600 md:text-lg">
-                      {getText(faq.answer, language)}
-                    </p>
+                    <div
+                      className="rt-desc py-5 text-base leading-7 text-zinc-600 md:text-lg"
+                      dangerouslySetInnerHTML={{
+                        __html: getText(faq.answer, language),
+                      }}
+                    />
                   </div>
                 </div>
               </div>
@@ -209,6 +294,8 @@ export default function SectionNine() {
           })}
         </div>
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: SECTION_NINE_STYLES }} />
     </section>
   );
 }

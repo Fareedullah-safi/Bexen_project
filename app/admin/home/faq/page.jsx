@@ -1,15 +1,17 @@
 "use client";
 
 import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import AdminStickyFooter from "@/app/Components/Admin/AdminStickyFooter";
 import Spinner from "@/app/Components/Admin/Spinner";
+import RichTextEditor from "@/Lib/PageBuilder/blocks/shared/RichTextEditor";
 import axios from "axios";
-import { ImagePlus, LoaderCircle, Save, Upload } from "lucide-react";
+import { ImagePlus, LoaderCircle, Upload } from "lucide-react";
 import Script from "next/script";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 /* ──────────────────────────────────────────────
-   Cloudinary permission check (reused everywhere)
+   Cloudinary permission check
    ────────────────────────────────────────────── */
 async function verifyUploadPermission() {
   try {
@@ -17,14 +19,14 @@ async function verifyUploadPermission() {
       cache: "no-store",
     });
     const data = await res.json();
-    return res.ok && data?.success === true;
-  } catch {
+    return res.ok && data && data.success === true;
+  } catch (error) {
     return false;
   }
 }
 
 /* ──────────────────────────────────────────────
-   Unified Cloudinary widget theme (dark / light)
+   Unified Cloudinary widget theme
    ────────────────────────────────────────────── */
 function cloudinaryStyles(theme) {
   const palettes = {
@@ -60,7 +62,11 @@ function cloudinaryStyles(theme) {
     },
   };
 
-  return { palette: palettes[theme] || palettes.light };
+  if (palettes[theme]) {
+    return { palette: palettes[theme] };
+  }
+
+  return { palette: palettes.light };
 }
 
 /* ────────────────────────────────────────────── */
@@ -79,21 +85,21 @@ const languageNames = {
   fa: "Dari",
 };
 
-const emptyTranslation = {
-  en: "",
-  ps: "",
-  fa: "",
-};
+function emptyTranslation() {
+  return {
+    en: "",
+    ps: "",
+    fa: "",
+  };
+}
 
 const defaultFormData = {
-  headingLineOne: { ...emptyTranslation },
-  headingLineTwo: { ...emptyTranslation },
+  title: emptyTranslation(),
   imageURL: "",
   imagePublicId: "",
-  callHeadingLineOne: { ...emptyTranslation },
-  callHeadingLineTwo: { ...emptyTranslation },
-  phoneNumber: { ...emptyTranslation },
-  phoneHref: { ...emptyTranslation },
+  callTitle: emptyTranslation(),
+  phoneNumber: emptyTranslation(),
+  phoneHref: emptyTranslation(),
   faqs: [],
 };
 
@@ -106,43 +112,115 @@ const cardClass =
 const labelClass =
   "mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300";
 
-const toTranslation = (value) => {
+function stripHtml(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toTranslation(value) {
   if (typeof value === "string") {
     return { en: value, ps: "", fa: "" };
   }
 
   return {
-    en: value?.en || "",
-    ps: value?.ps || "",
-    fa: value?.fa || "",
+    en: (value && value.en) || "",
+    ps: (value && value.ps) || "",
+    fa: (value && value.fa) || "",
   };
-};
+}
 
-const formatFaqData = (data) => ({
-  ...defaultFormData,
-  ...data,
-  headingLineOne: toTranslation(data?.headingLineOne),
-  headingLineTwo: toTranslation(data?.headingLineTwo),
-  callHeadingLineOne: toTranslation(data?.callHeadingLineOne),
-  callHeadingLineTwo: toTranslation(data?.callHeadingLineTwo),
-  phoneNumber: toTranslation(data?.phoneNumber),
-  phoneHref: toTranslation(data?.phoneHref),
-  imageURL: data?.imageURL || "",
-  imagePublicId: data?.imagePublicId || "",
-  faqs: Array.isArray(data?.faqs)
-    ? data.faqs.map((faq, index) => ({
-        ...faq,
-        id: faq.id || String(index + 1),
-        question: toTranslation(faq.question),
-        answer: toTranslation(faq.answer),
-      }))
-    : [],
-});
+function combineLegacyLines(lineOne, lineTwo) {
+  const result = emptyTranslation();
+  const one = toTranslation(lineOne);
+  const two = toTranslation(lineTwo);
+  const langs = ["en", "ps", "fa"];
 
-// Validate a telephone link in international or local digit format.
-const isValidPhoneHref = (value) => {
-  return /^tel:\+?[0-9]{7,15}$/.test(value.trim());
-};
+  for (let i = 0; i < langs.length; i += 1) {
+    const lang = langs[i];
+    const parts = [];
+
+    if (one[lang] && stripHtml(one[lang])) {
+      parts.push(one[lang]);
+    }
+
+    if (two[lang] && stripHtml(two[lang])) {
+      parts.push(two[lang]);
+    }
+
+    if (parts.length === 1) {
+      result[lang] = parts[0];
+    } else if (parts.length === 2) {
+      result[lang] = parts[0] + " " + parts[1];
+    }
+  }
+
+  return result;
+}
+
+function resolveTitle(data) {
+  if (!data) {
+    return emptyTranslation();
+  }
+
+  if (data.title) {
+    const title = toTranslation(data.title);
+    if (stripHtml(title.en) || stripHtml(title.ps) || stripHtml(title.fa)) {
+      return title;
+    }
+  }
+
+  return combineLegacyLines(data.headingLineOne, data.headingLineTwo);
+}
+
+function resolveCallTitle(data) {
+  if (!data) {
+    return emptyTranslation();
+  }
+
+  if (data.callTitle) {
+    const title = toTranslation(data.callTitle);
+    if (stripHtml(title.en) || stripHtml(title.ps) || stripHtml(title.fa)) {
+      return title;
+    }
+  }
+
+  return combineLegacyLines(data.callHeadingLineOne, data.callHeadingLineTwo);
+}
+
+function formatFaqData(data) {
+  if (!data) {
+    data = {};
+  }
+
+  return {
+    ...defaultFormData,
+    ...data,
+    title: resolveTitle(data),
+    callTitle: resolveCallTitle(data),
+    phoneNumber: toTranslation(data.phoneNumber),
+    phoneHref: toTranslation(data.phoneHref),
+    imageURL: data.imageURL || "",
+    imagePublicId: data.imagePublicId || "",
+    faqs: Array.isArray(data.faqs)
+      ? data.faqs.map(function (faq, index) {
+          return {
+            ...faq,
+            id: faq.id || String(index + 1),
+            question: toTranslation(faq.question),
+            answer: toTranslation(faq.answer),
+          };
+        })
+      : [],
+  };
+}
+
+function isValidPhoneHref(value) {
+  return /^tel:\+?[0-9]{7,15}$/.test(String(value).trim());
+}
 
 export default function FaqAdminPanel() {
   const [formData, setFormData] = useState(defaultFormData);
@@ -162,12 +240,17 @@ export default function FaqAdminPanel() {
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
-  /* ── Detect dark / light theme for Cloudinary widget ── */
-  useEffect(() => {
-    const update = () =>
-      setTheme(
-        document.documentElement.classList.contains("dark") ? "dark" : "light",
-      );
+  const busy = isSaving || checking;
+  const inputDirection = language === "en" ? "ltr" : "rtl";
+
+  useEffect(function () {
+    function update() {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
+    }
 
     update();
 
@@ -177,71 +260,73 @@ export default function FaqAdminPanel() {
       attributeFilter: ["class"],
     });
 
-    return () => observer.disconnect();
+    return function () {
+      observer.disconnect();
+    };
   }, []);
 
-  // In case the script is already loaded (e.g. navigating back to the page).
-  useEffect(() => {
+  useEffect(function () {
     if (typeof window !== "undefined" && window.cloudinary) {
       setCloudinaryReady(true);
     }
   }, []);
 
-  // Synchronize with the admin language selector.
-  useEffect(() => {
+  useEffect(function () {
     const savedLanguage = localStorage.getItem("admin-content-language");
 
-    if (validationOrder.includes(savedLanguage)) {
+    if (validationOrder.indexOf(savedLanguage) !== -1) {
       setLanguage(savedLanguage);
     }
 
-    const handleLanguageChange = (event) => {
-      const nextLanguage =
-        typeof event.detail === "string"
-          ? event.detail
-          : event.detail?.language;
+    function handleLanguageChange(event) {
+      let nextLanguage = null;
 
-      if (validationOrder.includes(nextLanguage)) {
+      if (typeof event.detail === "string") {
+        nextLanguage = event.detail;
+      } else if (event.detail && event.detail.language) {
+        nextLanguage = event.detail.language;
+      }
+
+      if (validationOrder.indexOf(nextLanguage) !== -1) {
         setLanguage(nextLanguage);
       }
-    };
+    }
 
     window.addEventListener("admin-language-change", handleLanguageChange);
 
-    return () => {
+    return function () {
       window.removeEventListener("admin-language-change", handleLanguageChange);
     };
   }, []);
 
-  // Load FAQ data.
-  useEffect(() => {
-    const fetchFaqData = async () => {
-      try {
-        setIsFetching(true);
+  async function loadFaqData() {
+    try {
+      setIsFetching(true);
 
-        const response = await axios.get("/api/homepage/faq");
+      const response = await axios.get("/api/homepage/faq");
 
-        if (response.data?.success && response.data?.data) {
-          const data = formatFaqData(response.data.data);
+      if (response.data && response.data.success && response.data.data) {
+        const data = formatFaqData(response.data.data);
 
-          setFormData(data);
-          setSavedImageURL(data.imageURL);
-          setSavedImagePublicId(data.imagePublicId);
-        }
-      } catch (error) {
-        console.error("Failed to load FAQ:", error);
-        toast.error("Failed to load FAQ section.");
-      } finally {
-        setIsFetching(false);
+        setFormData(data);
+        setSavedImageURL(data.imageURL);
+        setSavedImagePublicId(data.imagePublicId);
+        setImageError("");
       }
-    };
+    } catch (error) {
+      console.error("Failed to load FAQ:", error);
+      toast.error("Failed to load FAQ section.");
+    } finally {
+      setIsFetching(false);
+    }
+  }
 
-    fetchFaqData();
+  useEffect(function () {
+    loadFaqData();
   }, []);
 
-  // Change language and notify other admin components.
-  const changeLanguage = (code) => {
-    if (!validationOrder.includes(code)) return;
+  function changeLanguage(code) {
+    if (validationOrder.indexOf(code) === -1) return;
 
     setLanguage(code);
     localStorage.setItem("admin-content-language", code);
@@ -251,48 +336,59 @@ export default function FaqAdminPanel() {
         detail: { language: code },
       }),
     );
-  };
+  }
 
-  const updateField = (field, value) => {
-    setFormData((previous) => ({
-      ...previous,
-      [field]: {
-        ...previous[field],
-        [language]: value,
-      },
-    }));
-  };
+  function updateField(field, value) {
+    setFormData(function (previous) {
+      const fieldObj = previous[field] || emptyTranslation();
 
-  const updateFaq = (index, field, value) => {
-    setFormData((previous) => ({
-      ...previous,
-      faqs: previous.faqs.map((faq, faqIndex) =>
-        faqIndex === index
-          ? {
+      return {
+        ...previous,
+        [field]: {
+          ...fieldObj,
+          [language]: value,
+        },
+      };
+    });
+  }
+
+  function updateFaq(index, field, value) {
+    setFormData(function (previous) {
+      return {
+        ...previous,
+        faqs: previous.faqs.map(function (faq, faqIndex) {
+          if (faqIndex === index) {
+            const fieldObj = faq[field] || emptyTranslation();
+
+            return {
               ...faq,
               [field]: {
-                ...faq[field],
+                ...fieldObj,
                 [language]: value,
               },
-            }
-          : faq,
-      ),
-    }));
-  };
+            };
+          }
 
-  const handleImageUrlChange = (value) => {
-    setFormData((previous) => ({
-      ...previous,
-      imageURL: value,
-      imagePublicId: "",
-    }));
+          return faq;
+        }),
+      };
+    });
+  }
+
+  function handleImageUrlChange(value) {
+    setFormData(function (previous) {
+      return {
+        ...previous,
+        imageURL: value,
+        imagePublicId: "",
+      };
+    });
 
     setImageError("");
-  };
+  }
 
-  // Open the Cloudinary upload widget.
   async function openCloudinaryWidget() {
-    if (isSaving || checking) return;
+    if (busy) return;
 
     if (!cloudName || !uploadPreset) {
       toast.error(
@@ -306,7 +402,6 @@ export default function FaqAdminPanel() {
       return;
     }
 
-    /* ── Permission check BEFORE opening the widget ── */
     setChecking(true);
     const allowed = await verifyUploadPermission();
     setChecking(false);
@@ -318,10 +413,9 @@ export default function FaqAdminPanel() {
 
     const widget = window.cloudinary.createUploadWidget(
       {
-        cloudName,
-        uploadPreset,
+        cloudName: cloudName,
+        uploadPreset: uploadPreset,
         folder: "bexon/images",
-        // sources: ["local", "url", "camera"],
         multiple: false,
         maxFiles: 1,
         resourceType: "image",
@@ -331,165 +425,190 @@ export default function FaqAdminPanel() {
         showAdvancedOptions: false,
         styles: cloudinaryStyles(theme),
       },
-      (error, result) => {
+      function (error, result) {
         if (error) {
           console.error("Cloudinary upload:", error);
           toast.error("Image upload failed. Please try again.");
           return;
         }
 
-        if (result?.event !== "success") return;
+        if (!result || result.event !== "success") return;
 
-        const imageUrl = result.info?.secure_url;
-        const publicId = result.info?.public_id;
+        const imageUrl = result.info && result.info.secure_url;
+        const publicId = result.info && result.info.public_id;
 
         if (!imageUrl || !publicId || !imageUrl.startsWith("https://")) {
           toast.error("Cloudinary did not return a valid image.");
           return;
         }
 
-        setFormData((previous) => ({
-          ...previous,
-          imageURL: imageUrl,
-          imagePublicId: publicId,
-        }));
+        setFormData(function (previous) {
+          return {
+            ...previous,
+            imageURL: imageUrl,
+            imagePublicId: publicId,
+          };
+        });
 
         setImageError("");
-
-        toast.success("Image uploaded. Click Update Changes to save it.");
+        toast.success("Image uploaded. Click Save All Changes to save it.");
       },
     );
 
     widget.open();
   }
 
-  // Validate all languages in order: English -> Pashto -> Dari.
-  const validateForm = () => {
+  function validateForm() {
     const requiredFields = [
       {
-        value: formData.headingLineOne,
-        label: "First headline",
+        value: formData.title,
+        label: "Section title",
+        rich: true,
       },
       {
-        value: formData.headingLineTwo,
-        label: "Second headline",
-      },
-      {
-        value: formData.callHeadingLineOne,
-        label: "First call heading",
-      },
-      {
-        value: formData.callHeadingLineTwo,
-        label: "Second call heading",
+        value: formData.callTitle,
+        label: "Call title",
+        rich: true,
       },
       {
         value: formData.phoneNumber,
         label: "Phone number",
+        rich: true,
       },
       {
         value: formData.phoneHref,
         label: "Phone link",
+        rich: false,
       },
     ];
 
-    for (const lang of validationOrder) {
-      for (const field of requiredFields) {
-        const value = field.value?.[lang]?.trim() || "";
+    for (let i = 0; i < validationOrder.length; i += 1) {
+      const lang = validationOrder[i];
+
+      for (let j = 0; j < requiredFields.length; j += 1) {
+        const field = requiredFields[j];
+        const raw = (field.value && field.value[lang]) || "";
+        let value = "";
+
+        if (field.rich) {
+          value = stripHtml(raw);
+        } else {
+          value = String(raw).trim();
+        }
 
         if (!value) {
+          setLanguage(lang);
           toast.error(
-            `Please complete the ${languageNames[lang]} — ${field.label} field.`,
+            "Please complete the " +
+              languageNames[lang] +
+              " — " +
+              field.label +
+              " field.",
           );
           return false;
         }
 
         if (field.label === "Phone link" && !isValidPhoneHref(value)) {
+          setLanguage(lang);
           toast.error(
-            `Please enter a valid ${languageNames[lang]} phone link, e.g. tel:+93700123456.`,
+            "Please enter a valid " +
+              languageNames[lang] +
+              " phone link, e.g. tel:+93700123456.",
           );
           return false;
         }
       }
 
-      for (let index = 0; index < formData.faqs.length; index++) {
+      for (let index = 0; index < formData.faqs.length; index += 1) {
         const faq = formData.faqs[index];
 
         if (!faq.id) {
-          toast.error(`FAQ ${index + 1} is missing its ID.`);
+          toast.error("FAQ " + (index + 1) + " is missing its ID.");
           return false;
         }
 
-        if (!faq.question?.[lang]?.trim()) {
+        if (!stripHtml((faq.question && faq.question[lang]) || "")) {
+          setLanguage(lang);
           toast.error(
-            `Please complete the ${languageNames[lang]} — FAQ ${index + 1} question field.`,
+            "Please complete the " +
+              languageNames[lang] +
+              " — FAQ " +
+              (index + 1) +
+              " question field.",
           );
           return false;
         }
 
-        if (!faq.answer?.[lang]?.trim()) {
+        if (!stripHtml((faq.answer && faq.answer[lang]) || "")) {
+          setLanguage(lang);
           toast.error(
-            `Please complete the ${languageNames[lang]} — FAQ ${index + 1} answer field.`,
+            "Please complete the " +
+              languageNames[lang] +
+              " — FAQ " +
+              (index + 1) +
+              " answer field.",
           );
           return false;
         }
       }
     }
 
-    if (!formData.imageURL?.trim() && !savedImageURL) {
+    if (!(formData.imageURL && formData.imageURL.trim()) && !savedImageURL) {
       toast.error("Please upload or enter an FAQ background image.");
       return false;
     }
 
     return true;
-  };
+  }
 
-  // Save FAQ data. Image is already uploaded by the Cloudinary widget.
-  const handleAllUpdates = async () => {
+  async function handleAllUpdates() {
+    if (busy) return;
     if (!validateForm()) return;
 
     try {
       setIsSaving(true);
 
-      const previousPublicId = savedImagePublicId;
+      const payload = {
+        title: formData.title,
+        callTitle: formData.callTitle,
+        phoneNumber: formData.phoneNumber,
+        phoneHref: formData.phoneHref,
+        imageURL: formData.imageURL,
+        imagePublicId: formData.imagePublicId,
+        faqs: formData.faqs,
+      };
 
-      const response = await axios.put("/api/homepage/faq", formData);
+      const response = await axios.put("/api/homepage/faq", payload);
 
-      if (!response.data?.success) {
-        throw new Error(response.data?.message || "Failed to update FAQ.");
+      if (!response.data || !response.data.success) {
+        throw new Error(
+          (response.data && response.data.message) || "Failed to update FAQ.",
+        );
       }
 
-      const savedData = formatFaqData(response.data?.data || formData);
+      const savedData = formatFaqData(response.data.data || formData);
 
       setFormData(savedData);
       setSavedImageURL(savedData.imageURL);
       setSavedImagePublicId(savedData.imagePublicId);
       setImageError("");
 
-      // If the image changed, delete the old one from Cloudinary.
-      if (previousPublicId && previousPublicId !== savedData.imagePublicId) {
-        try {
-          await axios.delete("/api/homepage/faq/delete-image", {
-            data: { publicId: previousPublicId },
-          });
-        } catch (deleteError) {
-          console.error("Failed to delete previous FAQ image:", deleteError);
-        }
-      }
-
       toast.success("FAQ updated successfully.");
     } catch (error) {
       console.error("Failed to update FAQ:", error);
 
-      toast.error(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          error.message ||
-          "Failed to update FAQ.",
-      );
+      const message =
+        (error.response &&
+          error.response.data &&
+          (error.response.data.message || error.response.data.error)) ||
+        error.message ||
+        "Failed to update FAQ.";
+
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
-  };
+  }
 
   if (isFetching) {
     return (
@@ -502,13 +621,15 @@ export default function FaqAdminPanel() {
   return (
     <main
       dir="ltr"
-      className="-m-4 space-y-6 bg-[var(--background)] p-4 text-[var(--foreground)] sm:p-6"
+      className="-m-4 space-y-6 bg-[var(--background)] p-4 pb-28 text-[var(--foreground)] sm:p-6"
     >
       <Script
         src="https://upload-widget.cloudinary.com/global/all.js"
         strategy="afterInteractive"
-        onLoad={() => setCloudinaryReady(true)}
-        onError={() => {
+        onLoad={function () {
+          setCloudinaryReady(true);
+        }}
+        onError={function () {
           setCloudinaryReady(false);
           toast.error("Could not load the Cloudinary image uploader.");
         }}
@@ -531,20 +652,25 @@ export default function FaqAdminPanel() {
               onLanguageChange={changeLanguage}
             />
 
-            {languages.map((item) => (
-              <button
-                key={item.code}
-                type="button"
-                onClick={() => changeLanguage(item.code)}
-                className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${
-                  language === item.code
-                    ? "border-[#1E8A8A] bg-[#1E8A8A] text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-[#1E8A8A] dark:border-white/10 dark:bg-[#16212C] dark:text-slate-300"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
+            {languages.map(function (item) {
+              return (
+                <button
+                  key={item.code}
+                  type="button"
+                  onClick={function () {
+                    changeLanguage(item.code);
+                  }}
+                  className={
+                    "rounded-xl border px-4 py-2 text-sm font-medium transition " +
+                    (language === item.code
+                      ? "border-[#1E8A8A] bg-[#1E8A8A] text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-[#1E8A8A] dark:border-white/10 dark:bg-[#16212C] dark:text-slate-300")
+                  }
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -554,40 +680,24 @@ export default function FaqAdminPanel() {
         <div className="mb-6">
           <h2 className="text-lg font-semibold">Section Settings</h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Update the FAQ section headings.
+            Update the FAQ section title. Use Quill highlight/color for
+            emphasis.
           </p>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2">
-          <div>
-            <label className={labelClass}>
-              First Headline ({languageNames[language]})
-            </label>
-            <input
-              type="text"
-              value={formData.headingLineOne[language]}
-              onChange={(event) =>
-                updateField("headingLineOne", event.target.value)
-              }
-              placeholder="Enter first headline"
-              dir={language === "en" ? "ltr" : "rtl"}
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              Second Headline ({languageNames[language]})
-            </label>
-            <input
-              type="text"
-              value={formData.headingLineTwo[language]}
-              onChange={(event) =>
-                updateField("headingLineTwo", event.target.value)
-              }
-              placeholder="Enter second headline"
-              dir={language === "en" ? "ltr" : "rtl"}
-              className={inputClass}
+        <div>
+          <label className={labelClass}>
+            Section Title ({languageNames[language]})
+          </label>
+          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+            <RichTextEditor
+              key={"title-" + language}
+              value={(formData.title && formData.title[language]) || ""}
+              onChange={function (value) {
+                updateField("title", value);
+              }}
+              placeholder="Enter section title"
+              dir={inputDirection}
             />
           </div>
         </div>
@@ -609,7 +719,9 @@ export default function FaqAdminPanel() {
                 src={formData.imageURL || savedImageURL}
                 alt="FAQ background preview"
                 className="h-64 w-full object-cover"
-                onError={() => setImageError("Unable to load image preview.")}
+                onError={function () {
+                  setImageError("Unable to load image preview.");
+                }}
               />
             ) : (
               <div className="flex flex-col items-center gap-3 p-6 text-center">
@@ -627,7 +739,9 @@ export default function FaqAdminPanel() {
               <input
                 type="url"
                 value={formData.imageURL}
-                onChange={(event) => handleImageUrlChange(event.target.value)}
+                onChange={function (event) {
+                  handleImageUrlChange(event.target.value);
+                }}
                 placeholder="https://example.com/image.jpg"
                 dir="ltr"
                 className={inputClass}
@@ -644,7 +758,7 @@ export default function FaqAdminPanel() {
               <button
                 type="button"
                 onClick={openCloudinaryWidget}
-                disabled={!cloudinaryReady || checking || isSaving}
+                disabled={!cloudinaryReady || busy}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#176f6f] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {checking ? (
@@ -682,57 +796,47 @@ export default function FaqAdminPanel() {
         <div className="mb-6">
           <h2 className="text-lg font-semibold">Contact Section</h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Manage the contact headings and phone details.
+            Manage the call title and phone details.
           </p>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
-          <div>
+          <div className="md:col-span-2">
             <label className={labelClass}>
-              First Call Heading ({languageNames[language]})
+              Call Title ({languageNames[language]})
             </label>
-            <input
-              type="text"
-              value={formData.callHeadingLineOne[language]}
-              onChange={(event) =>
-                updateField("callHeadingLineOne", event.target.value)
-              }
-              placeholder="Enter first call heading"
-              dir={language === "en" ? "ltr" : "rtl"}
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              Second Call Heading ({languageNames[language]})
-            </label>
-            <input
-              type="text"
-              value={formData.callHeadingLineTwo[language]}
-              onChange={(event) =>
-                updateField("callHeadingLineTwo", event.target.value)
-              }
-              placeholder="Enter second call heading"
-              dir={language === "en" ? "ltr" : "rtl"}
-              className={inputClass}
-            />
+            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+              <RichTextEditor
+                key={"callTitle-" + language}
+                value={
+                  (formData.callTitle && formData.callTitle[language]) || ""
+                }
+                onChange={function (value) {
+                  updateField("callTitle", value);
+                }}
+                placeholder="Enter call title"
+                dir={inputDirection}
+              />
+            </div>
           </div>
 
           <div>
             <label className={labelClass}>
               Phone Number ({languageNames[language]})
             </label>
-            <input
-              type="text"
-              value={formData.phoneNumber[language]}
-              onChange={(event) =>
-                updateField("phoneNumber", event.target.value)
-              }
-              placeholder="Enter phone number"
-              dir={language === "en" ? "ltr" : "rtl"}
-              className={inputClass}
-            />
+            <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+              <RichTextEditor
+                key={"phoneNumber-" + language}
+                value={
+                  (formData.phoneNumber && formData.phoneNumber[language]) || ""
+                }
+                onChange={function (value) {
+                  updateField("phoneNumber", value);
+                }}
+                placeholder="Enter phone number"
+                dir={inputDirection}
+              />
+            </div>
           </div>
 
           <div>
@@ -741,8 +845,10 @@ export default function FaqAdminPanel() {
             </label>
             <input
               type="text"
-              value={formData.phoneHref[language]}
-              onChange={(event) => updateField("phoneHref", event.target.value)}
+              value={(formData.phoneHref && formData.phoneHref[language]) || ""}
+              onChange={function (event) {
+                updateField("phoneHref", event.target.value);
+              }}
               placeholder="tel:+93700123456"
               dir="ltr"
               className={inputClass}
@@ -771,75 +877,71 @@ export default function FaqAdminPanel() {
           </div>
         ) : (
           <div className="space-y-5">
-            {formData.faqs.map((faq, index) => (
-              <div
-                key={faq.id || index}
-                className="rounded-xl border border-slate-200 p-4 sm:p-5 dark:border-white/10"
-              >
-                <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  FAQ {index + 1}
-                </h3>
+            {formData.faqs.map(function (faq, index) {
+              return (
+                <div
+                  key={faq.id || index}
+                  className="rounded-xl border border-slate-200 p-4 sm:p-5 dark:border-white/10"
+                >
+                  <h3 className="mb-4 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    FAQ {index + 1}
+                  </h3>
 
-                <div className="space-y-5">
-                  <div>
-                    <label className={labelClass}>
-                      Question ({languageNames[language]})
-                    </label>
-                    <input
-                      type="text"
-                      value={faq.question[language]}
-                      onChange={(event) =>
-                        updateFaq(index, "question", event.target.value)
-                      }
-                      placeholder="Enter FAQ question"
-                      dir={language === "en" ? "ltr" : "rtl"}
-                      className={inputClass}
-                    />
-                  </div>
+                  <div className="space-y-5">
+                    <div>
+                      <label className={labelClass}>
+                        Question ({languageNames[language]})
+                      </label>
+                      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+                        <RichTextEditor
+                          key={
+                            "faq-question-" + (faq.id || index) + "-" + language
+                          }
+                          value={(faq.question && faq.question[language]) || ""}
+                          onChange={function (value) {
+                            updateFaq(index, "question", value);
+                          }}
+                          placeholder="Enter FAQ question"
+                          dir={inputDirection}
+                        />
+                      </div>
+                    </div>
 
-                  <div>
-                    <label className={labelClass}>
-                      Answer ({languageNames[language]})
-                    </label>
-                    <textarea
-                      value={faq.answer[language]}
-                      onChange={(event) =>
-                        updateFaq(index, "answer", event.target.value)
-                      }
-                      placeholder="Enter FAQ answer"
-                      rows={4}
-                      dir={language === "en" ? "ltr" : "rtl"}
-                      className={inputClass}
-                    />
+                    <div>
+                      <label className={labelClass}>
+                        Answer ({languageNames[language]})
+                      </label>
+                      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
+                        <RichTextEditor
+                          key={
+                            "faq-answer-" + (faq.id || index) + "-" + language
+                          }
+                          value={(faq.answer && faq.answer[language]) || ""}
+                          onChange={function (value) {
+                            updateFaq(index, "answer", value);
+                          }}
+                          placeholder="Enter FAQ answer"
+                          dir={inputDirection}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
 
-      {/* Save Changes */}
-      <div className="sticky bottom-4 z-10 flex justify-end rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur dark:border-white/10 dark:bg-[#111B27]/95">
-        <button
-          type="button"
-          onClick={handleAllUpdates}
-          disabled={isSaving || checking}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1E8A8A] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#176f6f] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSaving ? (
-            <>
-              <Spinner />
-              Saving Changes...
-            </>
-          ) : (
-            <>
-              <Save size={18} />
-              Update Changes
-            </>
-          )}
-        </button>
-      </div>
+      <AdminStickyFooter
+        onReload={loadFaqData}
+        onSave={handleAllUpdates}
+        saving={isSaving}
+        busy={busy}
+        saveLabel="Save All Changes"
+        savingLabel="Saving Changes..."
+        reloadLabel="Reload Saved Data"
+      />
     </main>
   );
 }

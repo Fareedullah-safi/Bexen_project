@@ -1,3 +1,4 @@
+
 import mongoose, { Schema } from "mongoose";
 
 const TranslationSchema = new Schema(
@@ -27,15 +28,7 @@ const SolutionsSchema = new Schema(
       type: TranslationSchema,
       default: () => ({}),
     },
-    headingOne: {
-      type: TranslationSchema,
-      default: () => ({}),
-    },
-    headingTwo: {
-      type: TranslationSchema,
-      default: () => ({}),
-    },
-    highlight: {
+    title: {
       type: TranslationSchema,
       default: () => ({}),
     },

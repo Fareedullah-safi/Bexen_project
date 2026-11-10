@@ -1,7 +1,52 @@
 "use client";
 
+import { fixData } from "@/Lib/fixText";
 import { ArrowUpRight } from "lucide-react";
 import { useEffect, useState } from "react";
+
+const SECTION_SEVEN_STYLES = `
+  .section-seven-rt .rt-inline p,
+  .section-seven-rt .rt-inline h1,
+  .section-seven-rt .rt-inline h2,
+  .section-seven-rt .rt-inline h3,
+  .section-seven-rt .rt-inline h4,
+  .section-seven-rt .rt-inline h5,
+  .section-seven-rt .rt-inline h6 {
+    display: inline;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .section-seven-rt .rt-inline br {
+    display: none;
+  }
+  .section-seven-rt .rt-desc p {
+    margin: 0.25em 0;
+  }
+  .section-seven-rt .rt-desc p:first-child {
+    margin-top: 0;
+  }
+  .section-seven-rt .rt-desc p:last-child {
+    margin-bottom: 0;
+  }
+  .section-seven-rt .rt-inline,
+  .section-seven-rt .rt-desc {
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+  .section-seven-rt a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  .section-seven-rt ul,
+  .section-seven-rt ol {
+    margin: 0.25em 0;
+    padding-left: 1.25em;
+  }
+  .section-seven-rt strong,
+  .section-seven-rt b {
+    font-weight: 700;
+  }
+`;
 
 export default function SectionSeven() {
   const [stats, setStats] = useState([]);
@@ -44,9 +89,11 @@ export default function SectionSeven() {
           return;
         }
 
-        if (result.success && Array.isArray(result.data?.stats)) {
+        const data = fixData(result.data);
+
+        if (result.success && data && Array.isArray(data.stats)) {
           setStats(
-            result.data.stats
+            data.stats
               .map((stat) => ({
                 value: getLocalizedText(stat.value, language),
                 title: getLocalizedText(stat.label, language),
@@ -101,7 +148,7 @@ export default function SectionSeven() {
   if (stats.length === 0) return null;
 
   return (
-    <section className="relative z-20 -mt-20 w-full px-4 py-16 sm:px-6 md:px-10 lg:px-12 xl:px-16">
+    <section className="section-seven-rt relative z-20 -mt-20 w-full px-4 py-16 sm:px-6 md:px-10 lg:px-12 xl:px-16">
       <div className="mx-auto w-full max-w-7xl">
         <div className="grid grid-cols-1 overflow-hidden rounded-3xl border border-white/15 bg-[#1E8A8A] shadow-2xl sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat, index) => (
@@ -131,21 +178,25 @@ export default function SectionSeven() {
               {/* Bottom */}
               <div className="relative mt-6">
                 <div className="flex items-end gap-2">
-                  <span className="text-5xl leading-none font-medium tracking-tight text-white sm:text-7xl">
-                    {stat.value}
-                  </span>
+                  <div
+                    className="rt-inline text-5xl leading-none font-medium tracking-tight text-white sm:text-7xl"
+                    dangerouslySetInnerHTML={{ __html: stat.value || "" }}
+                  />
                 </div>
 
                 <div className="mt-4 h-px w-10 bg-white/30 transition-all duration-500 group-hover:w-16 group-hover:bg-white/60" />
 
-                <p className="mt-3 text-sm font-medium tracking-wide text-white/75 sm:text-base">
-                  {stat.title}
-                </p>
+                <div
+                  className="rt-desc mt-3 text-sm font-medium tracking-wide text-white/75 sm:text-base"
+                  dangerouslySetInnerHTML={{ __html: stat.title || "" }}
+                />
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: SECTION_SEVEN_STYLES }} />
     </section>
   );
 }

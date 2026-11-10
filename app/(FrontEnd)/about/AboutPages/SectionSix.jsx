@@ -1,16 +1,54 @@
 "use client";
 
+import { sanitizeData } from "@/Lib/sanitizeText";
 import { ArrowRight, Box, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+
+const SECTION_SIX_STYLES = `
+  .rt-inline p {
+    display: inline;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .rt-inline h1,
+  .rt-inline h2,
+  .rt-inline h3,
+  .rt-inline h4,
+  .rt-inline h5,
+  .rt-inline h6 {
+    display: inline;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+  }
+  .rt-desc p {
+    margin: 0 0 0.5em 0 !important;
+    padding: 0 !important;
+  }
+  .rt-desc p:last-child {
+    margin-bottom: 0 !important;
+  }
+  .rt-tight p {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .rt-inline,
+  .rt-desc,
+  .rt-tight {
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+`;
 
 const defaultHeader = {
   buttonLink: "/contact",
   translations: {
     en: {
       topTag: "COMMON QUESTIONS",
-      mainTitle: "Need Help? Start",
-      highlightedTitle: "Here...",
+      title: 'Need Help? Start <span style="color:#1E8A8A">Here...</span>',
       description:
         "We stay ahead of the curve, leveraging cutting-edge technologies and strategies to keep you competitive.",
       buttonText: "Request a Call",
@@ -73,13 +111,25 @@ function pickLang(value, lang) {
   return value[lang] || value.en || "";
 }
 
+function resolveTitle(content) {
+  if (content && content.title) return content.title;
+  const main = content && content.mainTitle ? content.mainTitle : "";
+  const hi =
+    content && content.highlightedTitle ? content.highlightedTitle : "";
+  if (main && hi) {
+    return main + ' <span style="color:#1E8A8A">' + hi + "</span>";
+  }
+  if (main) return main;
+  if (hi) return hi;
+  return "";
+}
+
 export default function SectionSix() {
   const [open, setOpen] = useState(null);
   const [lang, setLang] = useState("en");
   const [headerData, setHeaderData] = useState(defaultHeader);
   const [faqs, setFaqs] = useState(defaultFaqs);
 
-  // Listen to site-language in localStorage and update instantly
   useEffect(() => {
     const syncLang = () => {
       const next = getSiteLanguage();
@@ -111,7 +161,6 @@ export default function SectionSix() {
     };
   }, []);
 
-  // Fetch APIs once
   useEffect(() => {
     const fetchHeader = async () => {
       try {
@@ -120,66 +169,66 @@ export default function SectionSix() {
         const payload = json?.data || json;
         if (!payload) return;
 
-        if (payload.translations) {
+        const cleaned = sanitizeData(payload);
+
+        if (cleaned.translations) {
           setHeaderData({
-            buttonLink: payload.buttonLink || defaultHeader.buttonLink,
+            buttonLink: cleaned.buttonLink || defaultHeader.buttonLink,
             translations: {
               en: {
                 ...defaultHeader.translations.en,
-                ...(payload.translations.en || {}),
+                ...(cleaned.translations.en || {}),
               },
-              ps: payload.translations.ps || undefined,
-              fa: payload.translations.fa || undefined,
+              ps: cleaned.translations.ps || undefined,
+              fa: cleaned.translations.fa || undefined,
             },
           });
         } else {
           setHeaderData({
-            buttonLink: payload.buttonLink || defaultHeader.buttonLink,
+            buttonLink: cleaned.buttonLink || defaultHeader.buttonLink,
             translations: {
               en: {
                 topTag:
-                  pickLang(payload.topTag, "en") ||
+                  pickLang(cleaned.topTag, "en") ||
                   defaultHeader.translations.en.topTag,
-                mainTitle:
-                  pickLang(payload.mainTitle || payload.headingLineOne, "en") ||
-                  defaultHeader.translations.en.mainTitle,
-                highlightedTitle:
-                  pickLang(
-                    payload.highlightedTitle || payload.headingLineTwo,
-                    "en",
-                  ) || defaultHeader.translations.en.highlightedTitle,
+                title:
+                  resolveTitle(cleaned) || defaultHeader.translations.en.title,
                 description:
-                  pickLang(payload.description, "en") ||
+                  pickLang(cleaned.description, "en") ||
                   defaultHeader.translations.en.description,
                 buttonText:
-                  pickLang(payload.buttonText, "en") ||
+                  pickLang(cleaned.buttonText, "en") ||
                   defaultHeader.translations.en.buttonText,
               },
               ps: {
-                topTag: pickLang(payload.topTag, "ps"),
-                mainTitle: pickLang(
-                  payload.mainTitle || payload.headingLineOne,
-                  "ps",
-                ),
-                highlightedTitle: pickLang(
-                  payload.highlightedTitle || payload.headingLineTwo,
-                  "ps",
-                ),
-                description: pickLang(payload.description, "ps"),
-                buttonText: pickLang(payload.buttonText, "ps"),
+                topTag: pickLang(cleaned.topTag, "ps"),
+                title: resolveTitle({
+                  mainTitle: pickLang(
+                    cleaned.mainTitle || cleaned.headingLineOne,
+                    "ps",
+                  ),
+                  highlightedTitle: pickLang(
+                    cleaned.highlightedTitle || cleaned.headingLineTwo,
+                    "ps",
+                  ),
+                }),
+                description: pickLang(cleaned.description, "ps"),
+                buttonText: pickLang(cleaned.buttonText, "ps"),
               },
               fa: {
-                topTag: pickLang(payload.topTag, "fa"),
-                mainTitle: pickLang(
-                  payload.mainTitle || payload.headingLineOne,
-                  "fa",
-                ),
-                highlightedTitle: pickLang(
-                  payload.highlightedTitle || payload.headingLineTwo,
-                  "fa",
-                ),
-                description: pickLang(payload.description, "fa"),
-                buttonText: pickLang(payload.buttonText, "fa"),
+                topTag: pickLang(cleaned.topTag, "fa"),
+                title: resolveTitle({
+                  mainTitle: pickLang(
+                    cleaned.mainTitle || cleaned.headingLineOne,
+                    "fa",
+                  ),
+                  highlightedTitle: pickLang(
+                    cleaned.highlightedTitle || cleaned.headingLineTwo,
+                    "fa",
+                  ),
+                }),
+                description: pickLang(cleaned.description, "fa"),
+                buttonText: pickLang(cleaned.buttonText, "fa"),
               },
             },
           });
@@ -199,7 +248,7 @@ export default function SectionSix() {
           : payload?.faqs || payload?.data?.faqs || [];
 
         if (Array.isArray(list) && list.length > 0) {
-          setFaqs(list);
+          setFaqs(sanitizeData(list));
         }
       } catch (error) {
         console.error("Failed to fetch homepage FAQs:", error);
@@ -210,13 +259,16 @@ export default function SectionSix() {
     fetchFaqs();
   }, []);
 
-  // Data according to site-language
   const rawContent = headerData?.translations?.[lang];
   const content =
-    rawContent && (rawContent.mainTitle || rawContent.topTag)
-      ? { ...defaultHeader.translations.en, ...rawContent }
-      : headerData?.translations?.en || defaultHeader.translations.en;
+    rawContent &&
+    (rawContent.title || rawContent.mainTitle || rawContent.topTag)
+      ? sanitizeData({ ...defaultHeader.translations.en, ...rawContent })
+      : sanitizeData(
+          headerData?.translations?.en || defaultHeader.translations.en,
+        );
 
+  const titleHtml = resolveTitle(content);
   const isRTL = lang === "ps" || lang === "fa";
   const buttonLink = headerData.buttonLink || "/contact";
 
@@ -226,6 +278,8 @@ export default function SectionSix() {
       lang={lang}
       className="relative w-full overflow-hidden bg-[#ECF0F0] px-4 py-16 sm:px-6 sm:py-20 md:px-8 lg:px-10 lg:py-24 xl:px-16"
     >
+      <style dangerouslySetInnerHTML={{ __html: SECTION_SIX_STYLES }} />
+
       <div className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-[#1E8A8A]/5 blur-3xl" />
       <div className="pointer-events-none absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-[#1E8A8A]/5 blur-3xl" />
 
@@ -242,28 +296,30 @@ export default function SectionSix() {
                 size={17}
                 className="transition-transform duration-500 group-hover:rotate-180"
               />
-              <span className="text-zinc-900 uppercase">{content.topTag}</span>
+              <span
+                className="rt-inline rt-tight text-zinc-900 uppercase"
+                dangerouslySetInnerHTML={{ __html: content.topTag || "" }}
+              />
             </span>
           </div>
 
-          <h2
+          <div
             data-wow-duration="0.9s"
             data-wow-delay="0.15s"
             data-wow-offset="100"
-            className="wow animate__animated animate__fadeInLeft mt-6 max-w-xl text-4xl leading-[1.05] font-medium tracking-tight text-[#102326] sm:text-5xl lg:text-[56px]"
-          >
-            {content.mainTitle}{" "}
-            <span className="text-[#1E8A8A]">{content.highlightedTitle}</span>
-          </h2>
+            role="heading"
+            aria-level={2}
+            className="wow animate__animated animate__fadeInLeft rt-inline rt-tight mt-6 max-w-xl text-4xl leading-[1.05] font-medium tracking-tight text-[#102326] sm:text-5xl lg:text-[56px]"
+            dangerouslySetInnerHTML={{ __html: titleHtml || "" }}
+          />
 
-          <p
+          <div
             data-wow-duration="0.9s"
             data-wow-delay="0.28s"
             data-wow-offset="100"
-            className="wow animate__animated animate__fadeInUp mt-6 max-w-lg text-sm leading-7 text-[#102326]/60 sm:text-base sm:leading-8"
-          >
-            {content.description}
-          </p>
+            className="wow animate__animated animate__fadeInUp rt-desc mt-6 max-w-lg text-sm leading-7 text-[#102326]/60 sm:text-base sm:leading-8"
+            dangerouslySetInnerHTML={{ __html: content.description || "" }}
+          />
 
           <div
             data-wow-duration="0.9s"
@@ -279,9 +335,12 @@ export default function SectionSix() {
                 }`}
               >
                 <span className="overflow-hidden leading-none">
-                  <span className="block whitespace-nowrap transition-transform duration-400 ease-in-out [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-[30px]">
-                    {content.buttonText}
-                  </span>
+                  <span
+                    className="rt-inline rt-tight block whitespace-nowrap transition-transform duration-400 ease-in-out [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-[30px]"
+                    dangerouslySetInnerHTML={{
+                      __html: content.buttonText || "",
+                    }}
+                  />
                 </span>
 
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#0C1E21] transition-transform duration-300 group-hover/button:scale-105 sm:h-12 sm:w-12">
@@ -308,7 +367,7 @@ export default function SectionSix() {
 
               return (
                 <div
-                  key={faq.id || question || index}
+                  key={faq.id || index}
                   data-wow-duration="0.8s"
                   data-wow-delay={`${0.12 + index * 0.1}s`}
                   data-wow-offset="100"
@@ -322,9 +381,10 @@ export default function SectionSix() {
                       isRTL ? "text-right" : "text-left"
                     }`}
                   >
-                    <span className="pr-2 text-base leading-7 font-semibold text-[#102326] sm:text-lg md:text-xl">
-                      {question}
-                    </span>
+                    <span
+                      className="rt-inline rt-tight pr-2 text-base leading-7 font-semibold text-[#102326] sm:text-lg md:text-xl"
+                      dangerouslySetInnerHTML={{ __html: question || "" }}
+                    />
 
                     <span
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-all duration-500 sm:h-11 sm:w-11 ${
@@ -355,9 +415,10 @@ export default function SectionSix() {
                         <span className="h-1 w-1 shrink-0 rounded-full bg-[#1E8A8A]" />
                       </div>
 
-                      <p className="pt-4 pb-5 text-sm leading-7 text-zinc-500 sm:pb-6 sm:text-base sm:leading-8">
-                        {answer}
-                      </p>
+                      <div
+                        className="rt-desc pt-4 pb-5 text-sm leading-7 text-zinc-500 sm:pb-6 sm:text-base sm:leading-8"
+                        dangerouslySetInnerHTML={{ __html: answer || "" }}
+                      />
                     </div>
                   </div>
                 </div>

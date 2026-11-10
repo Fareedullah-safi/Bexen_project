@@ -6,6 +6,26 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+const STYLES = `
+  .mv-rt-tight p {
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline;
+  }
+  .mv-rt-desc p {
+    margin: 0 0 0.5rem 0 !important;
+  }
+  .mv-rt-desc p:last-child {
+    margin-bottom: 0 !important;
+  }
+  .mv-rt-tight,
+  .mv-rt-desc,
+  .mv-rt-inline {
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+`;
+
 const defaultData = {
   image:
     "https://res.cloudinary.com/dbz6ftcwo/image/upload/v1793183536/bexon/about/y7rvbnak6sbxnzg0rbey.jpg",
@@ -15,9 +35,8 @@ const defaultData = {
   translations: {
     en: {
       topTag: "CHOOSE THE BEST",
-      mainTitle:
-        "Driving Innovation and Excellence for Sustainable Corporate Success",
-      highlightedTitle: "Worldwide.",
+      title:
+        'Driving Innovation and Excellence for Sustainable Corporate Success <span style="color:#1E8A8A">Worldwide.</span>',
       missionTitle: "Our Mission",
       missionDesc:
         "Our mission is to empower businesses through innovative best solutions, exceptional service.",
@@ -42,6 +61,15 @@ const defaultData = {
   },
 };
 
+function stripHtml(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getSiteLanguage() {
   if (typeof window === "undefined") return "en";
   try {
@@ -53,11 +81,29 @@ function getSiteLanguage() {
   return "en";
 }
 
+function resolveTitle(content) {
+  if (!content) return "";
+
+  if (content.title && stripHtml(content.title)) {
+    return content.title;
+  }
+
+  const mainTitle = content.mainTitle || "";
+  const highlightedTitle = content.highlightedTitle || "";
+
+  if (mainTitle && highlightedTitle) {
+    return (
+      mainTitle + ' <span style="color:#1E8A8A">' + highlightedTitle + "</span>"
+    );
+  }
+
+  return mainTitle || highlightedTitle || "";
+}
+
 export default function SectionTwo() {
   const [data, setData] = useState(defaultData);
   const [lang, setLang] = useState("en");
 
-  // Listen to site-language in localStorage and update instantly
   useEffect(() => {
     const syncLang = () => {
       const next = getSiteLanguage();
@@ -66,15 +112,12 @@ export default function SectionTwo() {
 
     syncLang();
 
-    // Same-tab changes (storage event does NOT fire in the same tab)
     const intervalId = setInterval(syncLang, 300);
 
-    // Cross-tab changes
     const onStorage = (e) => {
       if (e.key === "site-language") syncLang();
     };
 
-    // Optional custom event from your language switcher
     const onLangChange = () => syncLang();
 
     window.addEventListener("storage", onStorage);
@@ -93,7 +136,6 @@ export default function SectionTwo() {
     };
   }, []);
 
-  // Fetch dynamic data once
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -109,13 +151,13 @@ export default function SectionTwo() {
     fetchData();
   }, []);
 
-  // Data according to site-language
   const content =
     data?.translations?.[lang] ||
     data?.translations?.en ||
     defaultData.translations.en;
 
   const isRTL = lang === "ps" || lang === "fa";
+  const titleHtml = resolveTitle(content);
 
   return (
     <section
@@ -123,6 +165,8 @@ export default function SectionTwo() {
       dir={isRTL ? "rtl" : "ltr"}
       lang={lang}
     >
+      <style dangerouslySetInnerHTML={{ __html: STYLES }} />
+
       <div className="relative overflow-hidden rounded-2xl bg-[#dce8e8] sm:rounded-3xl">
         <div
           className="pointer-events-none absolute top-0 left-0 z-0 h-[55%] w-[55%] opacity-[0.09]"
@@ -167,10 +211,10 @@ export default function SectionTwo() {
               className="wow animate__animated animate__fadeInUp"
             >
               <ProgressBox
-                title={content.progressTitle}
-                label1={content.progressLabel1}
+                title={stripHtml(content.progressTitle)}
+                label1={stripHtml(content.progressLabel1)}
                 value1={data.progressValue1}
-                label2={content.progressLabel2}
+                label2={stripHtml(content.progressLabel2)}
                 value2={data.progressValue2}
               />
             </div>
@@ -188,21 +232,22 @@ export default function SectionTwo() {
                   size={18}
                   className="shrink-0 text-[#1E8A8A] transition-transform duration-300 group-hover:rotate-180"
                 />
-                <span className="text-xs font-bold tracking-wide text-zinc-950 uppercase sm:text-sm md:text-base">
-                  {content.topTag}
-                </span>
+                <span
+                  className="mv-rt-tight text-xs font-bold tracking-wide text-zinc-950 uppercase sm:text-sm md:text-base"
+                  dangerouslySetInnerHTML={{ __html: content.topTag || "" }}
+                />
               </span>
             </div>
 
-            <h2
+            <div
               data-wow-duration="0.9s"
               data-wow-delay="0.2s"
               data-wow-offset="100"
-              className="wow animate__animated animate__fadeInRight text-2xl leading-tight font-medium text-[#102326] sm:text-3xl md:text-4xl xl:text-5xl"
-            >
-              {content.mainTitle}{" "}
-              <span className="text-[#1E8A8A]">{content.highlightedTitle}</span>
-            </h2>
+              role="heading"
+              aria-level={2}
+              className="wow animate__animated animate__fadeInRight mv-rt-tight text-2xl leading-tight font-medium text-[#102326] sm:text-3xl md:text-4xl xl:text-5xl"
+              dangerouslySetInnerHTML={{ __html: titleHtml }}
+            />
 
             <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2">
               <div
@@ -211,12 +256,20 @@ export default function SectionTwo() {
                 data-wow-offset="100"
                 className="wow animate__animated animate__fadeInUp flex flex-col gap-4 rounded-2xl bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:p-6"
               >
-                <h3 className="text-lg font-bold text-[#0C1E21] sm:text-xl">
-                  {content.missionTitle}
-                </h3>
-                <p className="text-sm leading-relaxed text-[#0C1E21]/70 sm:text-[15px]">
-                  {content.missionDesc}
-                </p>
+                <div
+                  role="heading"
+                  aria-level={3}
+                  className="mv-rt-tight text-lg font-bold text-[#0C1E21] sm:text-xl"
+                  dangerouslySetInnerHTML={{
+                    __html: content.missionTitle || "",
+                  }}
+                />
+                <div
+                  className="mv-rt-desc text-sm leading-relaxed text-[#0C1E21]/70 sm:text-[15px]"
+                  dangerouslySetInnerHTML={{
+                    __html: content.missionDesc || "",
+                  }}
+                />
                 <ul className="flex flex-col gap-2">
                   {(content.missionList || []).map((item, i) => (
                     <li
@@ -227,7 +280,10 @@ export default function SectionTwo() {
                         size={17}
                         className="shrink-0 text-[#1D8B8A]"
                       />
-                      {item}
+                      <span
+                        className="mv-rt-inline mv-rt-tight"
+                        dangerouslySetInnerHTML={{ __html: item || "" }}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -239,12 +295,20 @@ export default function SectionTwo() {
                 data-wow-offset="100"
                 className="wow animate__animated animate__fadeInUp flex flex-col gap-4 rounded-2xl bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:p-6"
               >
-                <h3 className="text-lg font-bold text-[#0C1E21] sm:text-xl">
-                  {content.visionTitle}
-                </h3>
-                <p className="text-sm leading-relaxed text-[#0C1E21]/70 sm:text-[15px]">
-                  {content.visionDesc}
-                </p>
+                <div
+                  role="heading"
+                  aria-level={3}
+                  className="mv-rt-tight text-lg font-bold text-[#0C1E21] sm:text-xl"
+                  dangerouslySetInnerHTML={{
+                    __html: content.visionTitle || "",
+                  }}
+                />
+                <div
+                  className="mv-rt-desc text-sm leading-relaxed text-[#0C1E21]/70 sm:text-[15px]"
+                  dangerouslySetInnerHTML={{
+                    __html: content.visionDesc || "",
+                  }}
+                />
                 <ul className="flex flex-col gap-2">
                   {(content.visionList || []).map((item, i) => (
                     <li
@@ -255,7 +319,10 @@ export default function SectionTwo() {
                         size={17}
                         className="shrink-0 text-[#1D8B8A]"
                       />
-                      {item}
+                      <span
+                        className="mv-rt-inline mv-rt-tight"
+                        dangerouslySetInnerHTML={{ __html: item || "" }}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -276,9 +343,12 @@ export default function SectionTwo() {
                   }`}
                 >
                   <span className="overflow-hidden leading-none">
-                    <span className="block transition-transform duration-300 [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-[30px]">
-                      {content.buttonText}
-                    </span>
+                    <span
+                      className="mv-rt-tight block transition-transform duration-300 [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-[30px]"
+                      dangerouslySetInnerHTML={{
+                        __html: content.buttonText || "",
+                      }}
+                    />
                   </span>
 
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0C1E21] sm:h-11 sm:w-11">

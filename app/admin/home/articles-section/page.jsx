@@ -1,7 +1,9 @@
 "use client";
 
 import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import AdminStickyFooter from "@/app/Components/Admin/AdminStickyFooter";
 import Spinner from "@/app/Components/Admin/Spinner";
+import RichTextEditor from "@/Lib/PageBuilder/blocks/shared/RichTextEditor";
 import axios from "axios";
 import {
   BookOpen,
@@ -11,21 +13,23 @@ import {
   ImagePlus,
   Link as LinkIcon,
   Loader2,
-  LoaderCircle,
   Plus,
   Save,
-  Tag,
   Trash2,
-  Type,
-  UserRound,
+  Upload,
 } from "lucide-react";
+import Image from "next/image";
 import Script from "next/script";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 /* ──────────────────────────────────────────────
-   Cloudinary permission check (reused everywhere)
+   Cloudinary Configuration & Permission
    ────────────────────────────────────────────── */
+
+const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
 async function verifyUploadPermission() {
   try {
     const res = await fetch("/api/admin/cloudinary/verify", {
@@ -38,9 +42,6 @@ async function verifyUploadPermission() {
   }
 }
 
-/* ──────────────────────────────────────────────
-   Unified Cloudinary widget theme (dark / light)
-   ────────────────────────────────────────────── */
 function cloudinaryStyles(theme) {
   const palettes = {
     dark: {
@@ -78,14 +79,179 @@ function cloudinaryStyles(theme) {
   return { palette: palettes[theme] || palettes.light };
 }
 
-/* ────────────────────────────────────────────── */
+/* ==================== Image Picker ==================== */
+
+function ImagePicker({
+  value,
+  publicId,
+  onChange,
+  disabled,
+  cloudinaryReady,
+  theme,
+}) {
+  const [imageError, setImageError] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [value]);
+
+  async function openCloudinaryWidget() {
+    if (!CLOUD_NAME || !UPLOAD_PRESET) {
+      toast.error(
+        "Configure NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET.",
+      );
+      return;
+    }
+
+    if (!cloudinaryReady || !window.cloudinary) {
+      toast.error("Cloudinary is still loading. Try again shortly.");
+      return;
+    }
+
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
+    const widget = window.cloudinary.createUploadWidget(
+      {
+        cloudName: CLOUD_NAME,
+        uploadPreset: UPLOAD_PRESET,
+        folder: "homepage/articles",
+        multiple: false,
+        maxFiles: 1,
+        resourceType: "image",
+        clientAllowedFormats: ["png", "jpg", "jpeg", "webp"],
+        maxFileSize: 5 * 1024 * 1024,
+        showUploadMoreButton: false,
+        cropping: false,
+        theme: "minimal",
+        styles: cloudinaryStyles(theme),
+      },
+      (error, result) => {
+        if (error) {
+          toast.error(error.message || "Cloudinary upload failed");
+          return;
+        }
+
+        if (result?.event !== "success") return;
+
+        const uploaded = result.info;
+
+        if (
+          !uploaded?.secure_url ||
+          !uploaded?.public_id ||
+          !uploaded.secure_url.startsWith("https://")
+        ) {
+          toast.error("Cloudinary did not return valid secure image details.");
+          return;
+        }
+
+        onChange({
+          image: uploaded.secure_url,
+          publicId: uploaded.public_id,
+        });
+
+        setImageError(false);
+        toast.success("Image uploaded successfully");
+      },
+    );
+
+    widget.open();
+  }
+
+  function removeImage() {
+    onChange({
+      image: "",
+      publicId: "",
+    });
+
+    setImageError(false);
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+      {value && !imageError ? (
+        <div className="relative flex h-52 items-center justify-center bg-[var(--background)] p-4">
+          <div className="relative h-full w-full">
+            <Image
+              src={value}
+              alt="Article preview"
+              fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              unoptimized
+              onError={() => setImageError(true)}
+              className="rounded-xl object-cover"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={removeImage}
+            disabled={disabled}
+            title="Remove image"
+            className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface)] text-red-500 shadow-md transition hover:bg-red-500 hover:text-white disabled:opacity-40"
+          >
+            <Trash2 size={16} />
+          </button>
+
+          {publicId && (
+            <span className="absolute top-3 left-3 max-w-[75%] truncate rounded-lg bg-[#1E8A8A] px-2.5 py-1 text-[11px] font-bold text-white">
+              CLOUDINARY IMAGE
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="flex h-52 flex-col items-center justify-center bg-[var(--background)] text-[var(--muted)]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+            <ImagePlus size={28} />
+          </div>
+
+          <p className="mt-3 text-sm font-medium text-[var(--foreground)]">
+            {imageError ? "Unable to load image" : "No image selected"}
+          </p>
+        </div>
+      )}
+
+      <div className="p-4">
+        <button
+          type="button"
+          onClick={openCloudinaryWidget}
+          disabled={disabled || checking}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0C1E21] py-3 text-sm font-semibold text-white transition hover:bg-[#1E8A8A] disabled:opacity-40"
+        >
+          {checking ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Checking...
+            </>
+          ) : (
+            <>
+              <Upload size={16} />
+              {value && !imageError ? "Change Image" : "Upload with Cloudinary"}
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────
+   Constants & Configuration
+   ────────────────────────────────────────────── */
 
 const API = "/api/homepage/articles-section";
 
 const LANGUAGES = [
   { code: "en", label: "English" },
-  { code: "ps", label: "پښتو" },
   { code: "fa", label: "دری" },
+  { code: "ps", label: "پښتو" },
 ];
 
 const MONTHS = [
@@ -104,10 +270,9 @@ const MONTHS = [
 ];
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#1e8a8a] dark:border-[#263442] dark:bg-[#16212c] dark:text-gray-100";
+  "w-full rounded-2xl border border-[var(--border)] bg-[var(--background)] px-4 py-3 text-sm outline-none transition focus:border-[#1E8A8A]";
 
-const sectionClass =
-  "rounded-2xl border border-gray-200 bg-white p-5 dark:border-[#263442] dark:bg-[#111a23]";
+const labelClass = "mb-2 block text-sm font-semibold text-[var(--foreground)]";
 
 const emptyTranslation = () => ({
   day: "",
@@ -129,12 +294,20 @@ const emptyArticle = () => ({
 });
 
 const emptyTitles = () => ({
-  en: { sectionTitle: "The Ultimate", highlightedTitle: "Resource." },
-  ps: { sectionTitle: "", highlightedTitle: "" },
-  fa: { sectionTitle: "", highlightedTitle: "" },
+  en: { title: "The Ultimate <strong>Resource.</strong>" },
+  ps: { title: "" },
+  fa: { title: "" },
 });
 
-// Allow EN digits + Pashto/Dari digits (۲۴, ۱۸, ۱۶…) → validate 1–31
+function stripHtml(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function parseLocalizedNumber(value) {
   if (!value) return NaN;
   const str = String(value).trim();
@@ -181,17 +354,25 @@ function normalizeArticle(item) {
 function normalizeTitles(value = {}) {
   const defaults = emptyTitles();
 
-  if (value.sectionTitle || value.highlightedTitle) {
-    defaults.en.sectionTitle = value.sectionTitle || defaults.en.sectionTitle;
-    defaults.en.highlightedTitle =
-      value.highlightedTitle || defaults.en.highlightedTitle;
-    return defaults;
-  }
+  if (!value) return defaults;
+
+  const extract = (langObj, defaultTitle) => {
+    if (langObj?.title) return langObj.title;
+
+    if (langObj?.sectionTitle || langObj?.highlightedTitle) {
+      return `${langObj.sectionTitle || ""} <strong>${langObj.highlightedTitle || ""}</strong>`.trim();
+    }
+    return defaultTitle;
+  };
 
   return {
-    en: { ...defaults.en, ...value.en },
-    ps: { ...defaults.ps, ...value.ps },
-    fa: { ...defaults.fa, ...value.fa },
+    en: {
+      title:
+        extract(value.en, defaults.en.title) ||
+        extract(value, defaults.en.title),
+    },
+    ps: { title: extract(value.ps, "") },
+    fa: { title: extract(value.fa, "") },
   };
 }
 
@@ -216,6 +397,10 @@ function validateLink(value) {
   }
 }
 
+/* ──────────────────────────────────────────────
+   Main Component
+   ────────────────────────────────────────────── */
+
 export default function BlogSectionAdmin() {
   const [article, setArticle] = useState(emptyArticle);
   const [titles, setTitles] = useState(emptyTitles);
@@ -228,15 +413,10 @@ export default function BlogSectionAdmin() {
   const [editingId, setEditingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
-  const [checking, setChecking] = useState(false);
   const [theme, setTheme] = useState("light");
-
-  const widgetRef = useRef(null);
-  const uploadTarget = useRef(null);
 
   const inputDirection = language === "en" ? "ltr" : "rtl";
 
-  /* ── Detect dark / light theme for Cloudinary widget ── */
   useEffect(() => {
     const update = () =>
       setTheme(
@@ -254,34 +434,30 @@ export default function BlogSectionAdmin() {
     return () => observer.disconnect();
   }, []);
 
-  /* ── Rebuild the widget when theme flips so palette stays in sync ── */
-  useEffect(() => {
-    widgetRef.current = null;
-  }, [theme]);
+  async function loadArticles() {
+    setLoading(true);
+    try {
+      const response = await axios.get(API);
 
-  useEffect(() => {
-    async function loadArticles() {
-      try {
-        const response = await axios.get(API);
-
-        if (!response.data?.success) {
-          throw new Error(response.data?.message || "Could not load articles.");
-        }
-
-        const data = response.data.data || {};
-        setArticles((data.posts || []).map(normalizeArticle));
-        setTitles(normalizeTitles(data.Titles || {}));
-      } catch (error) {
-        toast.error(
-          error.response?.data?.message ||
-            error.message ||
-            "Failed to load articles.",
-        );
-      } finally {
-        setLoading(false);
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || "Could not load articles.");
       }
-    }
 
+      const data = response.data.data || {};
+      setArticles((data.posts || []).map(normalizeArticle));
+      setTitles(normalizeTitles(data.Titles || {}));
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to load articles.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
     loadArticles();
   }, []);
 
@@ -326,9 +502,25 @@ export default function BlogSectionAdmin() {
     }));
   }
 
-  function handleTitleChange(event) {
-    const { name, value } = event.target;
+  function setArticleField(name, value) {
+    if (["link", "image", "publicId"].includes(name)) {
+      setArticle((current) => ({ ...current, [name]: value }));
+      return;
+    }
 
+    setArticle((current) => ({
+      ...current,
+      translations: {
+        ...current.translations,
+        [language]: {
+          ...current.translations[language],
+          [name]: value,
+        },
+      },
+    }));
+  }
+
+  function setTitleField(name, value) {
     setTitles((current) => ({
       ...current,
       [language]: { ...current[language], [name]: value },
@@ -358,90 +550,14 @@ export default function BlogSectionAdmin() {
     );
   }
 
-  async function uploadImage(articleId = null) {
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-
-    if (!cloudinaryReady || !window.cloudinary) {
-      toast.error("Image uploader is not ready.");
-      return;
-    }
-
-    if (!cloudName || !uploadPreset) {
-      toast.error("Check your Cloudinary environment variables.");
-      return;
-    }
-
-    if (checking) return;
-
-    /* ── Permission check BEFORE opening the widget ── */
-    setChecking(true);
-    const allowed = await verifyUploadPermission();
-    setChecking(false);
-
-    if (!allowed) {
-      toast.error("You don't have permission to upload images.");
-      return;
-    }
-
-    uploadTarget.current = articleId;
-
-    if (!widgetRef.current) {
-      widgetRef.current = window.cloudinary.createUploadWidget(
-        {
-          cloudName,
-          uploadPreset,
-          folder: "bexon/images",
-          multiple: false,
-          maxFileSize: 5 * 1024 * 1024,
-          clientAllowedFormats: ["jpg", "jpeg", "png", "webp", "gif"],
-          styles: cloudinaryStyles(theme),
-        },
-        (error, result) => {
-          if (error) {
-            toast.error("Image upload failed.");
-            return;
-          }
-
-          if (result?.event !== "success") return;
-
-          const image = result.info.secure_url;
-          const publicId = result.info.public_id || "";
-          const id = uploadTarget.current;
-
-          if (id) {
-            setArticles((current) =>
-              current.map((item) =>
-                item._id === id ? { ...item, image, publicId } : item,
-              ),
-            );
-          } else {
-            setArticle((current) => ({ ...current, image, publicId }));
-          }
-
-          toast.success("Image uploaded successfully.");
-        },
-      );
-    }
-
-    widgetRef.current.open();
-  }
-
   function validateTitles() {
     for (const item of LANGUAGES) {
       const heading = titles[item.code];
 
-      if (!heading.sectionTitle.trim()) {
+      if (!stripHtml(heading.title)) {
         return {
           language: item.code,
-          message: `Enter the Main Title in ${item.label}.`,
-        };
-      }
-
-      if (!heading.highlightedTitle.trim()) {
-        return {
-          language: item.code,
-          message: `Enter the Highlighted Title in ${item.label}.`,
+          message: `Enter the Section Title in ${item.label}.`,
         };
       }
     }
@@ -470,8 +586,15 @@ export default function BlogSectionAdmin() {
         };
       }
 
-      for (const field of ["month", "category", "author", "title"]) {
-        if (!String(fields[field] || "").trim()) {
+      if (!String(fields.month || "").trim()) {
+        return {
+          language: lang.code,
+          message: `Please enter the article month in ${lang.label}.`,
+        };
+      }
+
+      for (const field of ["category", "author", "title"]) {
+        if (!stripHtml(fields[field] || "")) {
           return {
             language: lang.code,
             message: `Please enter the article ${field} in ${lang.label}.`,
@@ -513,7 +636,6 @@ export default function BlogSectionAdmin() {
     toast.error(error.message);
   }
 
-  // —— Save headings only ——
   async function handleSaveTitles() {
     const error = validateTitles();
     if (error) {
@@ -539,7 +661,6 @@ export default function BlogSectionAdmin() {
     }
   }
 
-  // —— Add new article ——
   async function handleAddArticle() {
     const articleError = validateArticle(article);
     if (articleError) return showValidationError(articleError);
@@ -561,11 +682,7 @@ export default function BlogSectionAdmin() {
       toast.success("Article added successfully.");
       setArticle(emptyArticle());
 
-      const data = await axios.get(API);
-      if (data.data?.success) {
-        setArticles((data.data.data.posts || []).map(normalizeArticle));
-        setTitles(normalizeTitles(data.data.data.Titles || {}));
-      }
+      await loadArticles();
     } catch (error) {
       toast.error(
         error.response?.data?.message ||
@@ -577,7 +694,6 @@ export default function BlogSectionAdmin() {
     }
   }
 
-  // —— Update one article ——
   async function handleUpdateArticle(item) {
     const error = validateArticle(item);
     if (error) return showValidationError(error);
@@ -605,7 +721,6 @@ export default function BlogSectionAdmin() {
     }
   }
 
-  // —— ONE-CLICK: Save ALL (titles + every existing article) ——
   async function handleSaveAll() {
     if (savingAll) return;
 
@@ -620,13 +735,11 @@ export default function BlogSectionAdmin() {
     setSavingAll(true);
 
     try {
-      // 1) Save headings
       const titlesRes = await axios.put(API, { Titles: titles });
       if (!titlesRes.data?.success) {
         throw new Error(titlesRes.data?.message || "Failed to save headings.");
       }
 
-      // 2) Save every article
       for (const item of articles) {
         const res = await axios.put(API, {
           _id: item._id,
@@ -651,7 +764,6 @@ export default function BlogSectionAdmin() {
     }
   }
 
-  // —— Delete immediately (no modal) ——
   async function handleDeleteArticle(item) {
     if (deletingId) return;
 
@@ -684,49 +796,58 @@ export default function BlogSectionAdmin() {
 
   if (loading) {
     return (
-      <div className="flex min-h-96 items-center justify-center bg-[var(--background)]">
+      <div className="flex min-h-96 w-full flex-col items-center justify-center gap-3 bg-[var(--background)]">
         <Spinner />
+        <p className="text-sm font-medium text-[var(--muted)]">
+          Loading articles...
+        </p>
       </div>
     );
   }
 
   const currentTranslation = article.translations[language];
-  const isBusy = saving || savingAll || !!editingId || !!deletingId;
+  const isBusy =
+    saving || savingAll || Boolean(editingId) || Boolean(deletingId);
+  const selectedLanguage =
+    LANGUAGES.find((item) => item.code === language) || LANGUAGES[0];
 
   return (
-    <div className="relative min-h-screen space-y-5 bg-[#f7f9fc] pb-28 text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
+    <div className="min-h-screen w-full bg-[var(--background)] pb-28 text-[var(--foreground)]">
       <Script
-        src="https://upload-widget.cloudinary.com/global/all.js"
+        src="https://upload-widget.cloudinary.com/latest/global/all.js"
         strategy="afterInteractive"
         onLoad={() => setCloudinaryReady(true)}
-        onError={() => toast.error("Could not load Cloudinary.")}
+        onError={() => toast.error("Could not load Cloudinary widget.")}
       />
 
-      {/* Header + language */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-[#e7f5f5] p-3 text-[#1e8a8a] dark:bg-[#162c32] dark:text-[#35b5b5]">
-            <BookOpen size={23} />
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#1E8A8A]/10 text-[#1E8A8A]">
+            <BookOpen size={27} />
           </div>
+
           <div>
-            <h1 className="text-xl font-bold sm:text-2xl">Blog Section</h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <h1 className="text-3xl font-bold tracking-tight">Blog Section</h1>
+
+            <p className="mt-1 text-base text-[var(--muted)]">
               Manage your multilingual blog content.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-[#263442] dark:bg-[#111a23]">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex w-fit max-w-full flex-wrap items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1">
             {LANGUAGES.map((item) => (
               <button
                 key={item.code}
                 type="button"
+                disabled={isBusy}
                 onClick={() => changeLanguage(item.code)}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                aria-pressed={language === item.code}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                   language === item.code
-                    ? "bg-[#1e8a8a] text-white"
-                    : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#16212c]"
+                    ? "bg-[#1E8A8A] text-white"
+                    : "text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]"
                 }`}
               >
                 {item.label}
@@ -741,395 +862,485 @@ export default function BlogSectionAdmin() {
         </div>
       </div>
 
-      {/* Section headings */}
-      <section className={sectionClass}>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-bold">Section Heading</h2>
-            <p className="mt-1 text-xs text-gray-500">
-              Editing: {LANGUAGES.find((item) => item.code === language)?.label}
-            </p>
+      <p className="-mt-5 mb-6 text-xs text-[var(--muted)]">
+        Editing:{" "}
+        <span className="font-semibold text-[var(--foreground)]">
+          {selectedLanguage.label}
+        </span>{" "}
+        · Other translations remain unchanged. All languages are required before
+        saving.
+      </p>
+
+      <div className="space-y-6">
+        {/* Section Heading */}
+        <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
+                01
+              </span>
+              <h2 className="text-lg font-bold">Section Heading</h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveTitles}
+              disabled={isBusy}
+              className="flex items-center gap-2 rounded-xl bg-[#1E8A8A] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#167575] disabled:opacity-60"
+            >
+              {saving ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Save size={16} />
+              )}
+              Save Headings
+            </button>
           </div>
+
+          <div>
+            <label className={labelClass}>Section Title</label>
+            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+              <RichTextEditor
+                key={"title-heading-" + language}
+                value={titles[language].title}
+                onChange={(value) => setTitleField("title", value)}
+                placeholder="The Ultimate Resource."
+                dir={inputDirection}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Add New Article */}
+        <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
+                02
+              </span>
+              <h2 className="text-lg font-bold">Add New Article</h2>
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-5">
+              <div>
+                <label className={labelClass}>Article Title</label>
+                <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+                  <RichTextEditor
+                    key={"new-article-title-" + language}
+                    value={currentTranslation.title}
+                    onChange={(value) => setArticleField("title", value)}
+                    placeholder="Enter article title"
+                    dir={inputDirection}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label className={labelClass}>Day Number</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-3 flex items-center text-[var(--muted)]">
+                      <CalendarDays size={16} />
+                    </span>
+                    <input
+                      dir={inputDirection}
+                      name="day"
+                      type="text"
+                      value={currentTranslation.day}
+                      onChange={handleArticleChange}
+                      placeholder="24 / ۲۴"
+                      className={`pl-10 ${inputClass}`}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-[var(--muted)]">
+                    Accepts 1–31
+                  </p>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Month</label>
+                  <select
+                    dir={inputDirection}
+                    name="month"
+                    value={currentTranslation.month}
+                    onChange={handleArticleChange}
+                    className={inputClass}
+                  >
+                    <option value="">Select month</option>
+                    {MONTHS.map((month) => (
+                      <option key={month} value={month}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Category</label>
+                <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+                  <RichTextEditor
+                    key={"new-article-category-" + language}
+                    value={currentTranslation.category}
+                    onChange={(value) => setArticleField("category", value)}
+                    placeholder="ENTER CATEGORY"
+                    dir={inputDirection}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Author</label>
+                <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+                  <RichTextEditor
+                    key={"new-article-author-" + language}
+                    value={currentTranslation.author}
+                    onChange={(value) => setArticleField("author", value)}
+                    placeholder="Author Name"
+                    dir={inputDirection}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Article Link (Global)</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-[var(--muted)]">
+                    <LinkIcon size={16} />
+                  </span>
+                  <input
+                    dir="ltr"
+                    name="link"
+                    value={article.link}
+                    onChange={handleArticleChange}
+                    placeholder="/resources/my-article"
+                    className={`pl-10 ${inputClass}`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>Article Image</label>
+              <ImagePicker
+                value={article.image}
+                publicId={article.publicId}
+                disabled={isBusy}
+                cloudinaryReady={cloudinaryReady}
+                theme={theme}
+                onChange={(uploaded) => {
+                  setArticleField("image", uploaded.image);
+                  setArticleField("publicId", uploaded.publicId);
+                }}
+              />
+            </div>
+          </div>
+
           <button
             type="button"
-            onClick={handleSaveTitles}
+            onClick={handleAddArticle}
             disabled={isBusy}
-            className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[var(--border)] py-4 text-sm font-semibold text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A] disabled:opacity-40"
           >
             {saving ? (
-              <Loader2 size={16} className="animate-spin" />
+              <Loader2 size={18} className="animate-spin" />
             ) : (
-              <Save size={16} />
+              <Plus size={18} />
             )}
-            Save Headings
+            {saving ? "Saving..." : "Add New Article"}
           </button>
-        </div>
+        </section>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[
-            ["sectionTitle", "Main Title", "The Ultimate"],
-            ["highlightedTitle", "Highlighted Title", "Resource."],
-          ].map(([name, label, placeholder]) => (
-            <div key={name}>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                <Type size={15} />
-                {label}
-              </label>
-              <input
-                dir={inputDirection}
-                name={name}
-                value={titles[language][name]}
-                onChange={handleTitleChange}
-                placeholder={placeholder}
-                maxLength={80}
-                className={inputClass}
-              />
+        {/* Existing Articles */}
+        <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-7 shadow-sm sm:p-8">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#1E8A8A]/10 text-sm font-bold text-[#1E8A8A]">
+                03
+              </span>
+              <h2 className="text-lg font-bold">Existing Articles</h2>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Add article */}
-      <section className={sectionClass}>
-        <h2 className="mb-4 flex items-center justify-between font-bold">
-          Add New Article
-          <Plus size={19} className="text-[#1e8a8a]" />
-        </h2>
-
-        <button
-          type="button"
-          onClick={() => uploadImage()}
-          disabled={!cloudinaryReady || isBusy || checking}
-          className="flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] disabled:opacity-60"
-        >
-          {checking ? (
-            <LoaderCircle size={16} className="animate-spin" />
-          ) : (
-            <ImagePlus size={16} />
-          )}
-          {checking
-            ? "Checking..."
-            : cloudinaryReady
-              ? "Upload Image"
-              : cloudinaryReady}
-        </button>
-
-        {article.image && (
-          <img
-            src={article.image}
-            alt="New article"
-            className="mt-3 h-36 w-full rounded-xl border object-cover sm:w-64"
-          />
-        )}
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {[
-            ["day", "Day", "24 / ۲۴"],
-            ["category", "Category", "BUSINESS"],
-            ["author", "Author", "Admin"],
-            ["title", "Article Title", "Enter article title"],
-          ].map(([name, label, placeholder]) => (
-            <div key={name} className={name === "title" ? "sm:col-span-2" : ""}>
-              <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-                {name === "day" ? (
-                  <CalendarDays size={15} />
-                ) : name === "category" ? (
-                  <Tag size={15} />
-                ) : name === "author" ? (
-                  <UserRound size={15} />
-                ) : (
-                  <Type size={15} />
-                )}
-                {label}
-              </label>
-              <input
-                dir={inputDirection}
-                name={name}
-                type="text"
-                value={currentTranslation[name]}
-                onChange={handleArticleChange}
-                placeholder={placeholder}
-                className={inputClass}
-              />
-            </div>
-          ))}
-
-          <div>
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <CalendarDays size={15} />
-              Month
-            </label>
-            <select
-              dir={inputDirection}
-              name="month"
-              value={currentTranslation.month}
-              onChange={handleArticleChange}
-              className={inputClass}
-            >
-              <option value="">Select month</option>
-              {MONTHS.map((month) => (
-                <option key={month} value={month}>
-                  {month}
-                </option>
-              ))}
-            </select>
+            <span className="w-fit rounded-full bg-[#1E8A8A]/10 px-4 py-2 text-sm font-semibold text-[#1E8A8A]">
+              {articles.length} articles
+            </span>
           </div>
 
-          <div className="sm:col-span-2">
-            <label className="mb-2 flex items-center gap-2 text-sm font-medium">
-              <LinkIcon size={15} />
-              Article Link (shared across languages)
-            </label>
-            <input
-              dir="ltr"
-              name="link"
-              value={article.link}
-              onChange={handleArticleChange}
-              placeholder="/resources/my-article"
-              className={inputClass}
-            />
-          </div>
-        </div>
-
-        <p className="mt-3 text-xs text-gray-500">
-          Complete English, Pashto, and Dari using the language selector above.
-          Day accepts 1–31 or ۲۴ / ۱۸ / ۱۶.
-        </p>
-
-        <button
-          type="button"
-          onClick={handleAddArticle}
-          disabled={isBusy}
-          className="mt-5 flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {saving ? (
-            <Loader2 size={17} className="animate-spin" />
+          {articles.length === 0 ? (
+            <p className="py-8 text-center text-sm font-medium text-[var(--muted)]">
+              No articles found. Add one above.
+            </p>
           ) : (
-            <Plus size={17} />
-          )}
-          {saving ? "Saving..." : "Add Article"}
-        </button>
-      </section>
+            <div className="space-y-4">
+              {articles.map((item) => {
+                const fields = item.translations[language];
+                const expanded = expandedId === item._id;
+                const plainTitle =
+                  stripHtml(fields.title) || "Untitled article";
+                const plainCategory =
+                  stripHtml(fields.category) || "No category";
+                const plainAuthor = stripHtml(fields.author);
 
-      {/* Existing articles */}
-      <section className={sectionClass}>
-        <h2 className="mb-4 font-bold">
-          Existing Articles ({articles.length})
-        </h2>
-
-        {articles.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-500">
-            No articles found.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {articles.map((item) => {
-              const fields = item.translations[language];
-              const expanded = expandedId === item._id;
-
-              return (
-                <div
-                  key={item._id}
-                  className="overflow-hidden rounded-xl border border-gray-200 dark:border-[#263442]"
-                >
-                  <div className="flex items-center gap-3 p-3">
-                    {item.image && (
-                      <img
-                        src={item.image}
-                        alt={fields.title || "Article"}
-                        className="h-14 w-16 rounded-lg object-cover"
-                      />
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId(expanded ? null : item._id)}
-                      className="min-w-0 flex-1 text-left"
-                    >
-                      <p className="truncate text-sm font-semibold">
-                        {fields.title || "Untitled article"}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {fields.category || "No category"} · {fields.author} ·{" "}
-                        {fields.day} {fields.month}
-                      </p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId(expanded ? null : item._id)}
-                      aria-label="Toggle article editor"
-                    >
-                      {expanded ? (
-                        <ChevronUp size={18} />
+                return (
+                  <div
+                    key={item._id}
+                    className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--background)] p-5 sm:p-6"
+                  >
+                    <div className="flex items-center gap-4">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={plainTitle}
+                          className="h-16 w-20 shrink-0 rounded-xl object-cover shadow-sm"
+                        />
                       ) : (
-                        <ChevronDown size={18} />
+                        <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]">
+                          <ImagePlus size={20} />
+                        </div>
                       )}
-                    </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteArticle(item)}
-                      disabled={isBusy}
-                      aria-label="Delete article"
-                      className="p-2 text-red-500 disabled:opacity-50"
-                    >
-                      {deletingId === item._id ? (
-                        <Loader2 size={17} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={17} />
-                      )}
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedId(expanded ? null : item._id)
+                        }
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <p className="truncate text-base font-semibold text-[var(--foreground)]">
+                          {plainTitle}
+                        </p>
+                        <p className="mt-1 truncate text-xs font-medium text-[var(--muted)]">
+                          {plainCategory} · {plainAuthor} · {fields.day}{" "}
+                          {fields.month}
+                        </p>
+                      </button>
 
-                  {expanded && (
-                    <div className="grid gap-4 border-t border-gray-200 p-4 sm:grid-cols-2 dark:border-[#263442]">
-                      <div className="sm:col-span-2">
+                      <div className="flex shrink-0 items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => uploadImage(item._id)}
-                          disabled={!cloudinaryReady || isBusy || checking}
-                          className="flex items-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] disabled:opacity-60"
+                          onClick={() =>
+                            setExpandedId(expanded ? null : item._id)
+                          }
+                          aria-label="Toggle article editor"
+                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[#1E8A8A] hover:text-[#1E8A8A]"
                         >
-                          {checking ? (
-                            <LoaderCircle size={16} className="animate-spin" />
+                          {expanded ? (
+                            <ChevronUp size={16} />
                           ) : (
-                            <ImagePlus size={16} />
+                            <ChevronDown size={16} />
                           )}
-                          {checking ? "Checking..." : "Replace Image"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteArticle(item)}
+                          disabled={isBusy}
+                          aria-label="Delete article"
+                          className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--surface)] text-red-500 shadow-sm transition hover:bg-red-500 hover:text-white disabled:opacity-40"
+                        >
+                          {deletingId === item._id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
                         </button>
                       </div>
+                    </div>
 
-                      {["day", "month", "category", "author", "title"].map(
-                        (field) => (
-                          <div
-                            key={field}
-                            className={field === "title" ? "sm:col-span-2" : ""}
-                          >
-                            <label className="mb-2 block text-sm font-medium">
-                              {field === "day"
-                                ? "Day"
-                                : field === "month"
-                                  ? "Month"
-                                  : field === "category"
-                                    ? "Category"
-                                    : field === "author"
-                                      ? "Author"
-                                      : "Article Title"}
-                            </label>
-                            {field === "month" ? (
-                              <select
-                                dir={inputDirection}
-                                value={fields.month}
-                                onChange={(event) =>
-                                  handleExistingChange(
-                                    item._id,
-                                    field,
-                                    event.target.value,
-                                  )
-                                }
-                                className={inputClass}
-                              >
-                                <option value="">Select month</option>
-                                {MONTHS.map((month) => (
-                                  <option key={month} value={month}>
-                                    {month}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
+                    {expanded && (
+                      <div className="mt-6 border-t border-[var(--border)] pt-6">
+                        <div className="grid gap-6 lg:grid-cols-2">
+                          <div className="space-y-5">
+                            <div>
+                              <label className={labelClass}>
+                                Article Title
+                              </label>
+                              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+                                <RichTextEditor
+                                  key={
+                                    "existing-title-" +
+                                    item._id +
+                                    "-" +
+                                    language
+                                  }
+                                  value={fields.title}
+                                  onChange={(value) =>
+                                    handleExistingChange(
+                                      item._id,
+                                      "title",
+                                      value,
+                                    )
+                                  }
+                                  dir={inputDirection}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid gap-5 sm:grid-cols-2">
+                              <div>
+                                <label className={labelClass}>Day Number</label>
+                                <input
+                                  dir={inputDirection}
+                                  type="text"
+                                  value={fields.day}
+                                  onChange={(event) =>
+                                    handleExistingChange(
+                                      item._id,
+                                      "day",
+                                      event.target.value,
+                                    )
+                                  }
+                                  className={inputClass}
+                                />
+                              </div>
+
+                              <div>
+                                <label className={labelClass}>Month</label>
+                                <select
+                                  dir={inputDirection}
+                                  value={fields.month}
+                                  onChange={(event) =>
+                                    handleExistingChange(
+                                      item._id,
+                                      "month",
+                                      event.target.value,
+                                    )
+                                  }
+                                  className={inputClass}
+                                >
+                                  <option value="">Select month</option>
+                                  {MONTHS.map((month) => (
+                                    <option key={month} value={month}>
+                                      {month}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className={labelClass}>Category</label>
+                              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+                                <RichTextEditor
+                                  key={
+                                    "existing-category-" +
+                                    item._id +
+                                    "-" +
+                                    language
+                                  }
+                                  value={fields.category}
+                                  onChange={(value) =>
+                                    handleExistingChange(
+                                      item._id,
+                                      "category",
+                                      value,
+                                    )
+                                  }
+                                  dir={inputDirection}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className={labelClass}>Author</label>
+                              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+                                <RichTextEditor
+                                  key={
+                                    "existing-author-" +
+                                    item._id +
+                                    "-" +
+                                    language
+                                  }
+                                  value={fields.author}
+                                  onChange={(value) =>
+                                    handleExistingChange(
+                                      item._id,
+                                      "author",
+                                      value,
+                                    )
+                                  }
+                                  dir={inputDirection}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className={labelClass}>Article Link</label>
                               <input
-                                dir={inputDirection}
-                                type="text"
-                                value={fields[field]}
+                                dir="ltr"
+                                value={item.link}
                                 onChange={(event) =>
                                   handleExistingChange(
                                     item._id,
-                                    field,
+                                    "link",
                                     event.target.value,
                                   )
                                 }
                                 className={inputClass}
                               />
-                            )}
-                            `
+                            </div>
                           </div>
-                        ),
-                      )}
 
-                      <div className="sm:col-span-2">
-                        <label className="mb-2 block text-sm font-medium">
-                          Article Link
-                        </label>
-                        <input
-                          dir="ltr"
-                          value={item.link}
-                          onChange={(event) =>
-                            handleExistingChange(
-                              item._id,
-                              "link",
-                              event.target.value,
-                            )
-                          }
-                          className={inputClass}
-                        />
+                          <div>
+                            <label className={labelClass}>Article Image</label>
+                            <ImagePicker
+                              value={item.image}
+                              publicId={item.publicId}
+                              disabled={isBusy}
+                              cloudinaryReady={cloudinaryReady}
+                              theme={theme}
+                              onChange={(uploaded) => {
+                                handleExistingChange(
+                                  item._id,
+                                  "image",
+                                  uploaded.image,
+                                );
+                                handleExistingChange(
+                                  item._id,
+                                  "publicId",
+                                  uploaded.publicId,
+                                );
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateArticle(item)}
+                            disabled={isBusy}
+                            className="flex items-center gap-2 rounded-xl bg-[#1E8A8A] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#167575] disabled:opacity-60"
+                          >
+                            {editingId === item._id ? (
+                              <Loader2 size={17} className="animate-spin" />
+                            ) : (
+                              <Save size={17} />
+                            )}
+                            {editingId === item._id
+                              ? "Saving..."
+                              : "Save Article"}
+                          </button>
+                        </div>
                       </div>
-
-                      <div className="flex justify-end sm:col-span-2">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateArticle(item)}
-                          disabled={isBusy}
-                          className="flex items-center gap-2 rounded-xl bg-[#1e8a8a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                        >
-                          {editingId === item._id ? (
-                            <Loader2 size={17} className="animate-spin" />
-                          ) : (
-                            <Save size={17} />
-                          )}
-                          {editingId === item._id
-                            ? "Saving..."
-                            : "Save Article"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* =========================
-          STICKY SAVE-ALL BAR
-         ========================= */}
-      {/* Save all changes */}
-      <footer className="sticky bottom-4 z-10 flex flex-col justify-between gap-4 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center dark:border-white/10 dark:bg-[#111B27]/95">
-        <div>
-          <p className="text-sm font-semibold">Ready to save your changes?</p>
-
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            One click updates headings + all {articles.length} article
-            {articles.length === 1 ? "" : "s"} in every language.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleSaveAll}
-          disabled={isBusy}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#1e8a8a]/25 transition hover:bg-[#187575] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {savingAll ? (
-            <LoaderCircle size={18} className="animate-spin" />
-          ) : (
-            <Save size={18} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
+        </section>
+      </div>
 
-          {savingAll ? "Saving..." : "Save Changes"}
-        </button>
-      </footer>
+      <AdminStickyFooter
+        onReload={loadArticles}
+        onSave={handleSaveAll}
+        saving={savingAll}
+        busy={isBusy}
+        saveLabel="Save All Changes"
+        savingLabel="Saving All..."
+      />
     </div>
   );
 }

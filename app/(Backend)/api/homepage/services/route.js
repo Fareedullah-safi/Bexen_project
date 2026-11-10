@@ -84,9 +84,7 @@ export async function POST(req) {
       {},
       {
         badge: translate(body.badge),
-        headingOne: translate(body.headingOne),
-        headingTwo: translate(body.headingTwo),
-        highlight: translate(body.highlight),
+        title: translate(body.title),
         solutions,
       },
       { returnDocument: "after", upsert: true, runValidators: true },

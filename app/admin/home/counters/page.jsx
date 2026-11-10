@@ -1,7 +1,9 @@
 "use client";
 
 import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import AdminStickyFooter from "@/app/Components/Admin/AdminStickyFooter";
 import Spinner from "@/app/Components/Admin/Spinner";
+import RichTextEditor from "@/Lib/PageBuilder/blocks/shared/RichTextEditor";
 import axios from "axios";
 import {
   ChevronDown,
@@ -10,7 +12,6 @@ import {
   LoaderCircle,
   MessageSquareQuote,
   Plus,
-  Save,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -19,7 +20,18 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 /* ──────────────────────────────────────────────
-   Cloudinary permission check (reused everywhere)
+   Strip HTML for validation
+   ────────────────────────────────────────────── */
+function stripHtml(html) {
+  if (!html) return "";
+  return html
+    .replace(/<[^>]*>?/gm, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+}
+
+/* ──────────────────────────────────────────────
+   Cloudinary permission check
    ────────────────────────────────────────────── */
 async function verifyUploadPermission() {
   try {
@@ -34,7 +46,7 @@ async function verifyUploadPermission() {
 }
 
 /* ──────────────────────────────────────────────
-   Unified Cloudinary widget theme (dark / light)
+   Unified Cloudinary widget theme
    ────────────────────────────────────────────── */
 function cloudinaryStyles(theme) {
   const palettes = {
@@ -95,9 +107,7 @@ const translation = (englishText = "") => ({
 
 const initialSection = {
   badgeText: translation("CLIENTS FEEDBACK"),
-  highlightWord: translation("Stories"),
-  headingLineOne: translation("Success Stories Fuel"),
-  headingLineTwo: translation("our Innovation."),
+  title: translation("Success Stories Fuel our Innovation."),
   description: translation(
     "Manage the stats and review cards for your testimonial section.",
   ),
@@ -110,7 +120,6 @@ const initialStats = [
   { value: translation("100+"), label: translation("Awards Archived") },
 ];
 
-// Create a new review before it has a MongoDB ID.
 function emptyReview() {
   return {
     _id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -122,7 +131,6 @@ function emptyReview() {
   };
 }
 
-// Make sure every translated field has en, ps, and fa properties.
 function getTranslation(value) {
   if (value && typeof value === "object") {
     return {
@@ -132,7 +140,6 @@ function getTranslation(value) {
     };
   }
 
-  // Support older records where a field was stored as a string.
   return {
     en: typeof value === "string" ? value : "",
     ps: "",
@@ -140,7 +147,6 @@ function getTranslation(value) {
   };
 }
 
-// Prepare a review returned by MongoDB for the frontend.
 function normalizeReview(review) {
   return {
     ...review,
@@ -170,12 +176,8 @@ export default function ReviewsAdminPanel() {
   const cloudinaryWidget = useRef(null);
   const uploadTarget = useRef("draft");
 
-  // RTL for Pashto/Dari; LTR for English.
+  const busy = saving || checking;
   const inputDirection = language === "en" ? "ltr" : "rtl";
-
-  // Bexon styling.
-  const input =
-    "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-[#0C1E21] outline-none placeholder:text-gray-400 focus:border-[#1E8A8A] focus:ring-2 focus:ring-[#1E8A8A]/10 dark:border-white/10 dark:bg-[#16212C] dark:text-white dark:placeholder:text-gray-500";
 
   const card =
     "rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7 dark:border-white/10 dark:bg-[#111B27]";
@@ -189,15 +191,12 @@ export default function ReviewsAdminPanel() {
   const primaryButton =
     "inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#1E8A8A] to-[#176F6F] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50";
 
-  // --------------------------------------------------
-  // Detect dark / light theme for Cloudinary widget.
-  // --------------------------------------------------
-
   useEffect(() => {
-    const update = () =>
+    function update() {
       setTheme(
         document.documentElement.classList.contains("dark") ? "dark" : "light",
       );
+    }
 
     update();
 
@@ -207,84 +206,67 @@ export default function ReviewsAdminPanel() {
       attributeFilter: ["class"],
     });
 
-    return () => observer.disconnect();
-  }, []);
-
-  // --------------------------------------------------
-  // 1. GET: Load section, statistics, and reviews.
-  // --------------------------------------------------
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadData() {
-      setLoading(true);
-
-      try {
-        const response = await axios.get("/api/homepage/reviews-section");
-
-        if (!response.data.success || !response.data.data) {
-          throw new Error(response.data.message || "Failed to load reviews.");
-        }
-
-        if (cancelled) return;
-
-        const data = response.data.data;
-
-        setSection((previous) => ({
-          ...previous,
-          ...Object.fromEntries(
-            Object.entries(data.section || {}).map(([key, value]) => [
-              key,
-              getTranslation(value),
-            ]),
-          ),
-        }));
-
-        // An empty array is valid when there are no statistics.
-        if (Array.isArray(data.stats)) {
-          setStats(
-            data.stats.map((stat) => ({
-              value: getTranslation(stat.value),
-              label: getTranslation(stat.label),
-            })),
-          );
-        }
-
-        if (Array.isArray(data.reviews)) {
-          setReviews(data.reviews.map(normalizeReview));
-        }
-      } catch (error) {
-        if (!cancelled) {
-          toast.error(
-            error.response?.data?.message ||
-              error.message ||
-              "Failed to load reviews.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadData();
-
-    return () => {
-      cancelled = true;
+    return function () {
+      observer.disconnect();
     };
   }, []);
 
-  // --------------------------------------------------
-  // 2. Cloudinary image upload setup.
-  // --------------------------------------------------
+  async function loadData() {
+    setLoading(true);
+
+    try {
+      const response = await axios.get("/api/homepage/reviews-section");
+
+      if (!response.data.success || !response.data.data) {
+        throw new Error(response.data.message || "Failed to load reviews.");
+      }
+
+      const data = response.data.data;
+
+      setSection(function (previous) {
+        return {
+          ...previous,
+          ...Object.fromEntries(
+            Object.entries(data.section || {}).map(function ([key, value]) {
+              return [key, getTranslation(value)];
+            }),
+          ),
+        };
+      });
+
+      if (Array.isArray(data.stats)) {
+        setStats(
+          data.stats.map(function (stat) {
+            return {
+              value: getTranslation(stat.value),
+              label: getTranslation(stat.label),
+            };
+          }),
+        );
+      }
+
+      if (Array.isArray(data.reviews)) {
+        setReviews(data.reviews.map(normalizeReview));
+      }
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to load reviews.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   function setupCloudinary() {
     if (!window.cloudinary || cloudinaryWidget.current) return;
 
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
     if (!cloudName || !uploadPreset) {
@@ -294,10 +276,9 @@ export default function ReviewsAdminPanel() {
 
     cloudinaryWidget.current = window.cloudinary.createUploadWidget(
       {
-        cloudName,
-        uploadPreset,
+        cloudName: cloudName,
+        uploadPreset: uploadPreset,
         folder: "bexon/images",
-        // sources: ["local", "camera", "url"],
         multiple: false,
         maxFileSize: 5 * 1024 * 1024,
         clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
@@ -306,36 +287,39 @@ export default function ReviewsAdminPanel() {
         showSkipCropButton: true,
         styles: cloudinaryStyles(theme),
       },
-      (error, result) => {
+      function (error, result) {
         if (error) {
           toast.error("Image upload failed.");
           return;
         }
 
-        if (result?.event !== "success") return;
+        if (!result || result.event !== "success") return;
 
         const image = result.info.secure_url;
         const publicId = result.info.public_id;
         const target = uploadTarget.current;
 
         if (target === "draft") {
-          setDraft((previous) => ({
-            ...previous,
-            image,
-            publicId,
-          }));
+          setDraft(function (previous) {
+            return {
+              ...previous,
+              image: image,
+              publicId: publicId,
+            };
+          });
         } else {
-          setReviews((previous) =>
-            previous.map((review) =>
-              review._id === target
-                ? {
-                    ...review,
-                    image,
-                    publicId,
-                  }
-                : review,
-            ),
-          );
+          setReviews(function (previous) {
+            return previous.map(function (review) {
+              if (review._id === target) {
+                return {
+                  ...review,
+                  image: image,
+                  publicId: publicId,
+                };
+              }
+              return review;
+            });
+          });
         }
 
         toast.success("Image uploaded successfully.");
@@ -345,15 +329,9 @@ export default function ReviewsAdminPanel() {
     setCloudinaryReady(true);
   }
 
-  // --------------------------------------------------
-  // Re-create the widget whenever the theme flips so
-  // the palette matches the current dark / light mode.
-  // --------------------------------------------------
-
   useEffect(() => {
     if (typeof window === "undefined" || !window.cloudinary) return;
 
-    // Drop the old widget so setupCloudinary can rebuild with the new theme.
     cloudinaryWidget.current = null;
     setupCloudinary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -367,7 +345,6 @@ export default function ReviewsAdminPanel() {
 
     if (checking) return;
 
-    /* ── Permission check BEFORE opening the widget ── */
     setChecking(true);
     const allowed = await verifyUploadPermission();
     setChecking(false);
@@ -381,92 +358,77 @@ export default function ReviewsAdminPanel() {
     cloudinaryWidget.current.open();
   }
 
-  // --------------------------------------------------
-  // 3. Update section content for the selected language.
-  // --------------------------------------------------
-
   function updateSection(field, value) {
-    setSection((previous) => ({
-      ...previous,
-      [field]: {
-        ...getTranslation(previous[field]),
-        [language]: value,
-      },
-    }));
+    setSection(function (previous) {
+      return {
+        ...previous,
+        [field]: {
+          ...getTranslation(previous[field]),
+          [language]: value,
+        },
+      };
+    });
   }
-
-  // --------------------------------------------------
-  // 4. Update a statistic.
-  // --------------------------------------------------
 
   function updateStat(index, field, value) {
-    setStats((previous) =>
-      previous.map((stat, currentIndex) =>
-        currentIndex === index
-          ? {
-              ...stat,
-              [field]: {
-                ...getTranslation(stat[field]),
-                [language]: value,
-              },
-            }
-          : stat,
-      ),
-    );
+    setStats(function (previous) {
+      return previous.map(function (stat, currentIndex) {
+        if (currentIndex === index) {
+          return {
+            ...stat,
+            [field]: {
+              ...getTranslation(stat[field]),
+              [language]: value,
+            },
+          };
+        }
+        return stat;
+      });
+    });
   }
-
-  // --------------------------------------------------
-  // 5. Update the new review form.
-  // --------------------------------------------------
 
   function updateDraft(field, value) {
-    setDraft((previous) => ({
-      ...previous,
-      [field]: {
-        ...getTranslation(previous[field]),
-        [language]: value,
-      },
-    }));
+    setDraft(function (previous) {
+      return {
+        ...previous,
+        [field]: {
+          ...getTranslation(previous[field]),
+          [language]: value,
+        },
+      };
+    });
   }
-
-  // --------------------------------------------------
-  // 6. Update an existing review.
-  // --------------------------------------------------
 
   function updateReview(reviewId, field, value) {
-    setReviews((previous) =>
-      previous.map((review) =>
-        review._id === reviewId
-          ? {
-              ...review,
-              [field]: {
-                ...getTranslation(review[field]),
-                [language]: value,
-              },
-            }
-          : review,
-      ),
-    );
+    setReviews(function (previous) {
+      return previous.map(function (review) {
+        if (review._id === reviewId) {
+          return {
+            ...review,
+            [field]: {
+              ...getTranslation(review[field]),
+              [language]: value,
+            },
+          };
+        }
+        return review;
+      });
+    });
   }
 
-  // --------------------------------------------------
-  // 7. Add a review to the local list.
-  // It is saved to MongoDB when Save Changes is clicked.
-  // --------------------------------------------------
-
   function handleAddReview() {
-    for (const lang of languages) {
+    for (let i = 0; i < languages.length; i += 1) {
+      const lang = languages[i];
+
       if (
-        !draft.name[lang.code].trim() ||
-        !draft.role[lang.code].trim() ||
-        !draft.text[lang.code].trim()
+        !stripHtml(draft.name[lang.code]) ||
+        !stripHtml(draft.role[lang.code]) ||
+        !stripHtml(draft.text[lang.code])
       ) {
         setLanguage(lang.code);
-
         toast.error(
           `Complete the name, role, and review text in ${lang.label}.`,
         );
-
         return;
       }
     }
@@ -476,23 +438,27 @@ export default function ReviewsAdminPanel() {
       return;
     }
 
-    setReviews((previous) => [draft, ...previous]);
+    setReviews(function (previous) {
+      return [draft, ...previous];
+    });
     setOpenReviewId(draft._id);
     setDraft(emptyReview());
 
     toast.success("Review added. Save changes to store it in Backend Storage.");
   }
 
-  // --------------------------------------------------
-  // 8. Validate all translations before saving.
-  // --------------------------------------------------
-
   function validateTranslations() {
-    for (const [field, value] of Object.entries(section)) {
+    const sectionEntries = Object.entries(section);
+
+    for (let i = 0; i < sectionEntries.length; i += 1) {
+      const field = sectionEntries[i][0];
+      const value = sectionEntries[i][1];
       const translated = getTranslation(value);
 
-      for (const lang of languages) {
-        if (!translated[lang.code].trim()) {
+      for (let j = 0; j < languages.length; j += 1) {
+        const lang = languages[j];
+
+        if (!stripHtml(translated[lang.code])) {
           setLanguage(lang.code);
           toast.error(`Complete "${field}" in ${lang.label}.`);
           return false;
@@ -500,25 +466,28 @@ export default function ReviewsAdminPanel() {
       }
     }
 
-    for (let index = 0; index < stats.length; index++) {
-      for (const field of ["value", "label"]) {
+    for (let index = 0; index < stats.length; index += 1) {
+      const fields = ["value", "label"];
+
+      for (let f = 0; f < fields.length; f += 1) {
+        const field = fields[f];
         const translated = getTranslation(stats[index][field]);
 
-        for (const lang of languages) {
-          if (!translated[lang.code].trim()) {
-            setLanguage(lang.code);
+        for (let j = 0; j < languages.length; j += 1) {
+          const lang = languages[j];
 
+          if (!stripHtml(translated[lang.code])) {
+            setLanguage(lang.code);
             toast.error(
               `Complete Statistic ${index + 1} ${field} in ${lang.label}.`,
             );
-
             return false;
           }
         }
       }
     }
 
-    for (let index = 0; index < reviews.length; index++) {
+    for (let index = 0; index < reviews.length; index += 1) {
       const review = reviews[index];
 
       if (!review.image) {
@@ -527,18 +496,21 @@ export default function ReviewsAdminPanel() {
         return false;
       }
 
-      for (const field of ["name", "role", "text"]) {
+      const fields = ["name", "role", "text"];
+
+      for (let f = 0; f < fields.length; f += 1) {
+        const field = fields[f];
         const translated = getTranslation(review[field]);
 
-        for (const lang of languages) {
-          if (!translated[lang.code].trim()) {
+        for (let j = 0; j < languages.length; j += 1) {
+          const lang = languages[j];
+
+          if (!stripHtml(translated[lang.code])) {
             setLanguage(lang.code);
             setOpenReviewId(review._id);
-
             toast.error(
               `Complete Review ${index + 1} ${field} in ${lang.label}.`,
             );
-
             return false;
           }
         }
@@ -548,38 +520,29 @@ export default function ReviewsAdminPanel() {
     return true;
   }
 
-  // --------------------------------------------------
-  // 9. Prepare data to send to the API.
-  // Do not send temporary frontend IDs to MongoDB.
-  // --------------------------------------------------
-
   function buildPayload() {
     return {
-      section,
-
-      stats: stats.map(({ value, label }) => ({
-        value,
-        label,
-      })),
-
-      reviews: reviews.map((review) => ({
-        ...(review._id && !String(review._id).startsWith("new-")
-          ? { _id: review._id }
-          : {}),
-
-        name: review.name,
-        role: review.role,
-        text: review.text,
-        image: review.image,
-        publicId: review.publicId || "",
-      })),
+      section: section,
+      stats: stats.map(function (item) {
+        return {
+          value: item.value,
+          label: item.label,
+        };
+      }),
+      reviews: reviews.map(function (review) {
+        return {
+          ...(review._id && !String(review._id).startsWith("new-")
+            ? { _id: review._id }
+            : {}),
+          name: review.name,
+          role: review.role,
+          text: review.text,
+          image: review.image,
+          publicId: review.publicId || "",
+        };
+      }),
     };
   }
-
-  // --------------------------------------------------
-  // 10. GET again after saving.
-  // This retrieves the real MongoDB IDs.
-  // --------------------------------------------------
 
   async function refreshData() {
     const response = await axios.get("/api/homepage/reviews-section");
@@ -592,30 +555,29 @@ export default function ReviewsAdminPanel() {
 
     const data = response.data.data;
 
-    setSection((previous) => ({
-      ...previous,
-      ...Object.fromEntries(
-        Object.entries(data.section || {}).map(([key, value]) => [
-          key,
-          getTranslation(value),
-        ]),
-      ),
-    }));
+    setSection(function (previous) {
+      return {
+        ...previous,
+        ...Object.fromEntries(
+          Object.entries(data.section || {}).map(function ([key, value]) {
+            return [key, getTranslation(value)];
+          }),
+        ),
+      };
+    });
 
     setStats(
-      (data.stats || []).map((stat) => ({
-        value: getTranslation(stat.value),
-        label: getTranslation(stat.label),
-      })),
+      (data.stats || []).map(function (stat) {
+        return {
+          value: getTranslation(stat.value),
+          label: getTranslation(stat.label),
+        };
+      }),
     );
 
     setReviews((data.reviews || []).map(normalizeReview));
     setOpenReviewId(null);
   }
-
-  // --------------------------------------------------
-  // 11. POST: Save all section data to MongoDB.
-  // --------------------------------------------------
 
   async function handleSave() {
     if (saving) return;
@@ -634,7 +596,6 @@ export default function ReviewsAdminPanel() {
       }
 
       await refreshData();
-
       toast.success("Reviews section saved successfully.");
     } catch (error) {
       toast.error(
@@ -647,11 +608,6 @@ export default function ReviewsAdminPanel() {
     }
   }
 
-  // --------------------------------------------------
-  // 12. DELETE: Remove an existing review.
-  // Unsaved reviews are removed locally.
-  // --------------------------------------------------
-
   async function handleDeleteReview(review) {
     if (saving) {
       toast.error("Please wait until saving is complete.");
@@ -659,9 +615,11 @@ export default function ReviewsAdminPanel() {
     }
 
     if (String(review._id).startsWith("new-")) {
-      setReviews((previous) =>
-        previous.filter((item) => item._id !== review._id),
-      );
+      setReviews(function (previous) {
+        return previous.filter(function (item) {
+          return item._id !== review._id;
+        });
+      });
 
       if (openReviewId === review._id) {
         setOpenReviewId(null);
@@ -682,9 +640,11 @@ export default function ReviewsAdminPanel() {
         throw new Error(response.data.message || "Failed to delete review.");
       }
 
-      setReviews((previous) =>
-        previous.filter((item) => item._id !== review._id),
-      );
+      setReviews(function (previous) {
+        return previous.filter(function (item) {
+          return item._id !== review._id;
+        });
+      });
 
       if (openReviewId === review._id) {
         setOpenReviewId(null);
@@ -700,10 +660,6 @@ export default function ReviewsAdminPanel() {
     }
   }
 
-  // --------------------------------------------------
-  // 13. Loading screen.
-  // --------------------------------------------------
-
   if (loading) {
     return (
       <div className="flex min-h-96 items-center justify-center bg-[var(--background)]">
@@ -712,17 +668,15 @@ export default function ReviewsAdminPanel() {
     );
   }
 
-  // --------------------------------------------------
-  // 14. Frontend UI.
-  // --------------------------------------------------
-
   return (
-    <div className="min-h-screen space-y-6 bg-[var(--background)] text-[var(--foreground)]">
+    <div className="min-h-screen space-y-6 bg-[var(--background)] pb-28 text-[var(--foreground)]">
       <Script
         src="https://upload-widget.cloudinary.com/global/all.js"
         strategy="afterInteractive"
         onLoad={setupCloudinary}
-        onError={() => toast.error("Could not load Cloudinary uploader.")}
+        onError={function () {
+          toast.error("Could not load Cloudinary uploader.");
+        }}
       />
 
       {/* Header */}
@@ -742,21 +696,33 @@ export default function ReviewsAdminPanel() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {languages.map((lang) => (
-              <button
-                key={lang.code}
-                type="button"
-                onClick={() => setLanguage(lang.code)}
-                className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                  language === lang.code
-                    ? "bg-[#1E8A8A] text-white shadow-sm"
-                    : "border border-gray-200 bg-white text-gray-600 hover:border-[#1E8A8A] dark:border-white/10 dark:bg-[#16212C] dark:text-gray-300"
-                }`}
-              >
-                {lang.label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap gap-2">
+              {languages.map(function (lang) {
+                return (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    onClick={function () {
+                      setLanguage(lang.code);
+                    }}
+                    disabled={busy}
+                    className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                      language === lang.code
+                        ? "bg-[#1E8A8A] text-white shadow-sm"
+                        : "border border-gray-200 bg-white text-gray-600 hover:border-[#1E8A8A] dark:border-white/10 dark:bg-[#16212C] dark:text-gray-300"
+                    }`}
+                  >
+                    {lang.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <AdminLanguageBall
+              language={language}
+              onLanguageChange={setLanguage}
+            />
           </div>
         </div>
       </section>
@@ -768,34 +734,39 @@ export default function ReviewsAdminPanel() {
         <div className="grid gap-5 md:grid-cols-2">
           {[
             ["badgeText", "Badge Text"],
-            ["highlightWord", "Highlighted Word"],
-            ["headingLineOne", "Heading Line One"],
-            ["headingLineTwo", "Heading Line Two"],
-          ].map(([field, title]) => (
-            <div key={field}>
-              <label className={label}>{title}</label>
-
-              <input
-                dir={inputDirection}
-                className={input}
-                value={getTranslation(section[field])[language]}
-                onChange={(event) => updateSection(field, event.target.value)}
-              />
-            </div>
-          ))}
+            ["title", "Section Title"],
+          ].map(function ([field, fieldTitle]) {
+            return (
+              <div key={field}>
+                <label className={label}>{fieldTitle}</label>
+                <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+                  <RichTextEditor
+                    key={field + "-" + language}
+                    value={getTranslation(section[field])[language]}
+                    onChange={function (val) {
+                      updateSection(field, val);
+                    }}
+                    dir={inputDirection}
+                    placeholder={fieldTitle}
+                  />
+                </div>
+              </div>
+            );
+          })}
 
           <div className="md:col-span-2">
             <label className={label}>Description</label>
-
-            <textarea
-              dir={inputDirection}
-              className={input}
-              rows={4}
-              value={getTranslation(section.description)[language]}
-              onChange={(event) =>
-                updateSection("description", event.target.value)
-              }
-            />
+            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+              <RichTextEditor
+                key={"description-" + language}
+                value={getTranslation(section.description)[language]}
+                onChange={function (val) {
+                  updateSection("description", val);
+                }}
+                dir={inputDirection}
+                placeholder="Section description"
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -805,38 +776,44 @@ export default function ReviewsAdminPanel() {
         <h2 className="mb-5 text-lg font-bold">Statistics</h2>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className="rounded-xl border border-gray-200 p-4 dark:border-white/10"
-            >
-              <h3 className="mb-4 text-sm font-semibold">
-                Statistic {index + 1}
-              </h3>
+          {stats.map(function (stat, index) {
+            return (
+              <div
+                key={index}
+                className="rounded-xl border border-gray-200 p-4 dark:border-white/10"
+              >
+                <h3 className="mb-4 text-sm font-semibold">
+                  Statistic {index + 1}
+                </h3>
 
-              <label className={label}>Value</label>
+                <label className={label}>Value</label>
+                <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+                  <RichTextEditor
+                    key={"stat-value-" + index + "-" + language}
+                    value={getTranslation(stat.value)[language]}
+                    onChange={function (val) {
+                      updateStat(index, "value", val);
+                    }}
+                    dir={inputDirection}
+                    placeholder="e.g. 93%"
+                  />
+                </div>
 
-              <input
-                dir={inputDirection}
-                className={input}
-                value={getTranslation(stat.value)[language]}
-                onChange={(event) =>
-                  updateStat(index, "value", event.target.value)
-                }
-              />
-
-              <label className={`${label} mt-4`}>Label</label>
-
-              <input
-                dir={inputDirection}
-                className={input}
-                value={getTranslation(stat.label)[language]}
-                onChange={(event) =>
-                  updateStat(index, "label", event.target.value)
-                }
-              />
-            </div>
-          ))}
+                <label className={`${label} mt-4`}>Label</label>
+                <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+                  <RichTextEditor
+                    key={"stat-label-" + index + "-" + language}
+                    value={getTranslation(stat.label)[language]}
+                    onChange={function (val) {
+                      updateStat(index, "label", val);
+                    }}
+                    dir={inputDirection}
+                    placeholder="e.g. Projects Completed"
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -847,39 +824,47 @@ export default function ReviewsAdminPanel() {
         <div className="grid gap-5 md:grid-cols-2">
           <div>
             <label className={label}>Client Name *</label>
-
-            <input
-              dir={inputDirection}
-              className={input}
-              value={draft.name[language]}
-              onChange={(event) => updateDraft("name", event.target.value)}
-              placeholder="Enter client name"
-            />
+            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+              <RichTextEditor
+                key={"draft-name-" + language}
+                value={draft.name[language]}
+                onChange={function (val) {
+                  updateDraft("name", val);
+                }}
+                dir={inputDirection}
+                placeholder="Enter client name"
+              />
+            </div>
           </div>
 
           <div>
             <label className={label}>Client Role *</label>
-
-            <input
-              dir={inputDirection}
-              className={input}
-              value={draft.role[language]}
-              onChange={(event) => updateDraft("role", event.target.value)}
-              placeholder="CEO, Founder, Manager..."
-            />
+            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+              <RichTextEditor
+                key={"draft-role-" + language}
+                value={draft.role[language]}
+                onChange={function (val) {
+                  updateDraft("role", val);
+                }}
+                dir={inputDirection}
+                placeholder="CEO, Founder, Manager..."
+              />
+            </div>
           </div>
 
           <div className="md:col-span-2">
             <label className={label}>Review Text *</label>
-
-            <textarea
-              dir={inputDirection}
-              className={input}
-              rows={4}
-              value={draft.text[language]}
-              onChange={(event) => updateDraft("text", event.target.value)}
-              placeholder="Enter client feedback"
-            />
+            <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+              <RichTextEditor
+                key={"draft-text-" + language}
+                value={draft.text[language]}
+                onChange={function (val) {
+                  updateDraft("text", val);
+                }}
+                dir={inputDirection}
+                placeholder="Enter client feedback"
+              />
+            </div>
           </div>
 
           <div className="md:col-span-2">
@@ -888,8 +873,10 @@ export default function ReviewsAdminPanel() {
             <div className="flex flex-wrap items-center gap-4">
               <button
                 type="button"
-                onClick={() => openCloudinary("draft")}
-                disabled={!cloudinaryReady || checking}
+                onClick={function () {
+                  openCloudinary("draft");
+                }}
+                disabled={!cloudinaryReady || checking || saving}
                 className={primaryButton}
               >
                 {checking ? (
@@ -927,7 +914,7 @@ export default function ReviewsAdminPanel() {
           <button
             type="button"
             onClick={handleAddReview}
-            disabled={saving}
+            disabled={busy}
             className={primaryButton}
           >
             <Plus size={18} />
@@ -946,7 +933,7 @@ export default function ReviewsAdminPanel() {
           </p>
         ) : (
           <div className="space-y-4">
-            {reviews.map((review) => {
+            {reviews.map(function (review) {
               const isOpen = openReviewId === review._id;
 
               return (
@@ -960,7 +947,7 @@ export default function ReviewsAdminPanel() {
                         {review.image ? (
                           <img
                             src={review.image}
-                            alt={review.name?.[language] || "Client"}
+                            alt={stripHtml(review.name?.[language]) || "Client"}
                             className="h-full w-full object-cover"
                           />
                         ) : (
@@ -970,11 +957,13 @@ export default function ReviewsAdminPanel() {
 
                       <div className="min-w-0">
                         <h3 className="truncate font-semibold">
-                          {review.name?.[language] || "Unnamed Client"}
+                          {stripHtml(review.name?.[language]) ||
+                            "Unnamed Client"}
                         </h3>
 
                         <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
-                          {review.role?.[language] || "No role entered"}
+                          {stripHtml(review.role?.[language]) ||
+                            "No role entered"}
                         </p>
 
                         <p className="mt-1 text-xs text-gray-400">
@@ -988,9 +977,9 @@ export default function ReviewsAdminPanel() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() =>
-                          setOpenReviewId(isOpen ? null : review._id)
-                        }
+                        onClick={function () {
+                          setOpenReviewId(isOpen ? null : review._id);
+                        }}
                         className={secondaryButton}
                       >
                         {isOpen ? "Close" : "View & Edit"}
@@ -1004,7 +993,9 @@ export default function ReviewsAdminPanel() {
 
                       <button
                         type="button"
-                        onClick={() => handleDeleteReview(review)}
+                        onClick={function () {
+                          handleDeleteReview(review);
+                        }}
                         disabled={saving}
                         className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 p-3 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-400/20 dark:bg-red-500/10 dark:text-red-300"
                         aria-label="Delete review"
@@ -1019,54 +1010,44 @@ export default function ReviewsAdminPanel() {
                       <div className="grid gap-4 md:grid-cols-2">
                         <div>
                           <label className={label}>Client Name *</label>
-
-                          <input
-                            dir={inputDirection}
-                            className={input}
-                            value={review.name?.[language] || ""}
-                            onChange={(event) =>
-                              updateReview(
-                                review._id,
-                                "name",
-                                event.target.value,
-                              )
-                            }
-                          />
+                          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+                            <RichTextEditor
+                              key={"review-name-" + review._id + "-" + language}
+                              value={review.name?.[language] || ""}
+                              onChange={function (val) {
+                                updateReview(review._id, "name", val);
+                              }}
+                              dir={inputDirection}
+                            />
+                          </div>
                         </div>
 
                         <div>
                           <label className={label}>Client Role *</label>
-
-                          <input
-                            dir={inputDirection}
-                            className={input}
-                            value={review.role?.[language] || ""}
-                            onChange={(event) =>
-                              updateReview(
-                                review._id,
-                                "role",
-                                event.target.value,
-                              )
-                            }
-                          />
+                          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+                            <RichTextEditor
+                              key={"review-role-" + review._id + "-" + language}
+                              value={review.role?.[language] || ""}
+                              onChange={function (val) {
+                                updateReview(review._id, "role", val);
+                              }}
+                              dir={inputDirection}
+                            />
+                          </div>
                         </div>
 
                         <div className="md:col-span-2">
                           <label className={label}>Review Text *</label>
-
-                          <textarea
-                            dir={inputDirection}
-                            className={input}
-                            rows={4}
-                            value={review.text?.[language] || ""}
-                            onChange={(event) =>
-                              updateReview(
-                                review._id,
-                                "text",
-                                event.target.value,
-                              )
-                            }
-                          />
+                          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
+                            <RichTextEditor
+                              key={"review-text-" + review._id + "-" + language}
+                              value={review.text?.[language] || ""}
+                              onChange={function (val) {
+                                updateReview(review._id, "text", val);
+                              }}
+                              dir={inputDirection}
+                            />
+                          </div>
                         </div>
 
                         <div className="md:col-span-2">
@@ -1075,7 +1056,9 @@ export default function ReviewsAdminPanel() {
                           <div className="flex flex-wrap items-center gap-4">
                             <button
                               type="button"
-                              onClick={() => openCloudinary(review._id)}
+                              onClick={function () {
+                                openCloudinary(review._id);
+                              }}
                               disabled={!cloudinaryReady || saving || checking}
                               className={secondaryButton}
                             >
@@ -1100,23 +1083,6 @@ export default function ReviewsAdminPanel() {
                           </div>
                         </div>
                       </div>
-
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={handleSave}
-                          disabled={saving}
-                          className={primaryButton}
-                        >
-                          {saving ? (
-                            <LoaderCircle size={18} className="animate-spin" />
-                          ) : (
-                            <Save size={18} />
-                          )}
-
-                          {saving ? "Saving..." : "Save Changes"}
-                        </button>
-                      </div>
                     </div>
                   )}
                 </div>
@@ -1126,34 +1092,15 @@ export default function ReviewsAdminPanel() {
         )}
       </section>
 
-      {/* Save all changes */}
-      <footer className="sticky bottom-4 z-10 flex flex-col justify-between gap-4 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center dark:border-white/10 dark:bg-[#111B27]/95">
-        <div>
-          <p className="text-sm font-semibold">Ready to save your changes?</p>
-
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Save section content, statistics, and all review translations.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className={primaryButton}
-        >
-          {saving ? (
-            <LoaderCircle size={18} className="animate-spin" />
-          ) : (
-            <Save size={18} />
-          )}
-
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
-      </footer>
-
-      {/* Reusable language selector */}
-      <AdminLanguageBall language={language} onLanguageChange={setLanguage} />
+      {/* Sticky footer */}
+      <AdminStickyFooter
+        onReload={loadData}
+        onSave={handleSave}
+        saving={saving}
+        busy={busy}
+        saveLabel="Save All Changes"
+        savingLabel="Saving All..."
+      />
     </div>
   );
 }

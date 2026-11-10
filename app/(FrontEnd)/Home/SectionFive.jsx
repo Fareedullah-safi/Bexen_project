@@ -1,17 +1,33 @@
 "use client";
 
+import { fixData } from "@/Lib/fixText";
 import { ArrowLeft, ArrowRight, Box } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+
+const SECTION_FIVE_STYLES = `
+  .rt-inline p { display: inline; margin: 0; }
+  .rt-desc p { margin: 0 0 0.5em 0; }
+  .rt-desc p:last-child { margin-bottom: 0; }
+  .rt-desc strong, .rt-desc b { font-weight: 700; color: inherit; }
+  .rt-desc em, .rt-desc i { font-style: italic; }
+  .rt-desc a { color: #1E8A8A; text-decoration: underline; text-underline-offset: 2px; }
+  .rt-desc ul, .rt-desc ol { margin: 0.4em 0; padding-inline-start: 1.2em; }
+  .rt-desc li { margin-bottom: 0.2em; }
+  .rt-tight p { margin: 0 !important; padding: 0 !important; }
+  .rt-inline strong, .rt-inline b { font-weight: 700; color: #1E8A8A; }
+  .rt-inline, .rt-desc, .rt-tight {
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+`;
 
 export default function SectionFive() {
   const [current, setCurrent] = useState(0);
   const [animate, setAnimate] = useState(true);
 
   const [badge, setBadge] = useState("");
-  const [headingOne, setHeadingOne] = useState("");
-  const [headingTwo, setHeadingTwo] = useState("");
-  const [highlight, setHighlight] = useState("");
+  const [title, setTitle] = useState("");
   const [solutions, setSolutions] = useState([]);
   const [language, setLanguage] = useState("en");
 
@@ -58,20 +74,13 @@ export default function SectionFive() {
           return;
         }
 
-        setBadge(getLocalizedText(result.data.badge, selectedLanguage));
+        const cleanData = fixData(result.data);
 
-        setHeadingOne(
-          getLocalizedText(result.data.headingOne, selectedLanguage),
-        );
-
-        setHeadingTwo(
-          getLocalizedText(result.data.headingTwo, selectedLanguage),
-        );
-
-        setHighlight(getLocalizedText(result.data.highlight, selectedLanguage));
+        setBadge(getLocalizedText(cleanData.badge, selectedLanguage));
+        setTitle(getLocalizedText(cleanData.title, selectedLanguage));
 
         setSolutions(
-          (Array.isArray(result.data.solutions) ? result.data.solutions : [])
+          (Array.isArray(cleanData.solutions) ? cleanData.solutions : [])
             .filter(
               (solution) =>
                 solution?.image &&
@@ -134,7 +143,6 @@ export default function SectionFive() {
 
     return () => {
       active = false;
-
       window.removeEventListener("site-language-change", handleLanguageChange);
     };
   }, []);
@@ -197,6 +205,7 @@ export default function SectionFive() {
 
   return (
     <main dir={isRTL ? "rtl" : "ltr"} className="w-full px-3 sm:px-4">
+      <style dangerouslySetInnerHTML={{ __html: SECTION_FIVE_STYLES }} />
       <section
         dir={isRTL ? "rtl" : "ltr"}
         className="relative min-h-screen w-full overflow-hidden rounded-2xl bg-slate-950"
@@ -221,26 +230,25 @@ export default function SectionFive() {
                   className="text-[#1E8A8A] transition-transform duration-500 group-hover:rotate-180"
                 />
 
-                <span className="text-xs font-semibold tracking-wide text-zinc-200">
-                  {badge}
-                </span>
+                <span
+                  className="rt-inline rt-tight text-xs font-semibold tracking-wide text-zinc-200"
+                  dangerouslySetInnerHTML={{ __html: badge }}
+                />
               </span>
             </div>
           )}
 
           {/* Heading */}
-          {(headingOne || headingTwo || highlight) && (
-            <h1
+          {title && (
+            <div
+              role="heading"
+              aria-level={1}
               dir={isRTL ? "rtl" : "ltr"}
-              className="wow animate__animated animate__fadeInUp mx-auto mt-5 max-w-3xl text-center text-3xl leading-tight font-medium text-zinc-200 sm:text-4xl md:text-5xl lg:text-[50px]"
+              className="rt-inline rt-tight wow animate__animated animate__fadeInUp mx-auto mt-5 max-w-3xl text-center text-3xl leading-tight font-medium text-zinc-200 sm:text-4xl md:text-5xl lg:text-[50px]"
               data-wow-duration="1s"
               data-wow-delay="0.2s"
-            >
-              {headingOne}
-              {headingTwo || highlight ? <br /> : null}
-              {headingTwo}{" "}
-              {highlight && <span className="text-[#1E8A8A]">{highlight}</span>}
-            </h1>
+              dangerouslySetInnerHTML={{ __html: title }}
+            />
           )}
 
           {/* Slider */}
@@ -281,7 +289,11 @@ export default function SectionFive() {
                       {/* Image */}
                       <Image
                         src={solution.image}
-                        alt={solution.title || "Service"}
+                        alt={
+                          solution.title
+                            ? solution.title.replace(/<[^>]*>?/gm, "")
+                            : "Service"
+                        }
                         fill
                         sizes="(max-width: 1023px) calc(100vw - 40px), (max-width: 1280px) 33vw, 400px"
                         className="scale-105 object-cover opacity-100 transition-all duration-700 group-hover:scale-110 lg:opacity-0 lg:group-hover:opacity-100"
@@ -301,22 +313,24 @@ export default function SectionFive() {
                         </span>
 
                         {/* Title */}
-                        <h2
+                        <div
+                          role="heading"
+                          aria-level={2}
                           dir={isRTL ? "rtl" : "ltr"}
-                          className="mt-2 max-w-75 text-xl leading-7 font-semibold text-white transition-transform duration-500 group-hover:-translate-y-1 sm:text-2xl"
-                        >
-                          {solution.title}
-                        </h2>
+                          className="rt-inline rt-tight mt-2 block max-w-75 text-xl leading-7 font-semibold text-white transition-transform duration-500 group-hover:-translate-y-1 sm:text-2xl"
+                          dangerouslySetInnerHTML={{ __html: solution.title }}
+                        />
 
                         {/* Description and Learn More */}
                         <div className="max-h-48 overflow-hidden opacity-100 transition-all duration-500 lg:max-h-0 lg:opacity-0 lg:group-hover:max-h-48 lg:group-hover:opacity-100">
                           {solution.description && (
-                            <p
+                            <div
                               dir={isRTL ? "rtl" : "ltr"}
-                              className="mt-4 text-sm leading-6 text-zinc-300"
-                            >
-                              {solution.description}
-                            </p>
+                              className="rt-desc mt-4 text-sm leading-6 text-zinc-300"
+                              dangerouslySetInnerHTML={{
+                                __html: solution.description,
+                              }}
+                            />
                           )}
 
                           <button

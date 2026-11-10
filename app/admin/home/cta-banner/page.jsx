@@ -1,13 +1,14 @@
 "use client";
 
 import AdminLanguageBall from "@/app/Components/Admin/AdminLanguageBall";
+import AdminStickyFooter from "@/app/Components/Admin/AdminStickyFooter";
 import Spinner from "@/app/Components/Admin/Spinner";
+import RichTextEditor from "@/Lib/PageBuilder/blocks/shared/RichTextEditor";
 import axios from "axios";
 import {
   Image as ImageIcon,
   Link as LinkIcon,
   Loader2,
-  Save,
   Trash2,
   Type,
   Upload,
@@ -17,15 +18,26 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const API_URL = "/api/footerandprofile/cta-banner";
+
 const LANGS = [
   { code: "en", label: "English" },
   { code: "ps", label: "پښتو" },
   { code: "fa", label: "دری" },
 ];
 
-const emptyText = () => ({ en: "", ps: "", fa: "" });
+function emptyText() {
+  return { en: "", ps: "", fa: "" };
+}
 
-// --- Theme helper for Cloudinary widget (dark / light) ---
+function stripHtml(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function cloudinaryStyles(theme) {
   const palettes = {
     dark: {
@@ -59,20 +71,43 @@ function cloudinaryStyles(theme) {
       sourceBg: "#F9FAFB",
     },
   };
-  return { palette: palettes[theme] || palettes.light };
+
+  if (palettes[theme]) {
+    return { palette: palettes[theme] };
+  }
+
+  return { palette: palettes.light };
 }
 
-// --- Permission check helper ---
 async function verifyUploadPermission() {
   try {
     const res = await fetch("/api/admin/cloudinary/verify", {
       cache: "no-store",
     });
     const data = await res.json();
-    return res.ok && data?.success === true;
-  } catch {
+    return res.ok && data && data.success === true;
+  } catch (error) {
     return false;
   }
+}
+
+function normalizeTranslation(value) {
+  const base = emptyText();
+
+  if (!value) {
+    return base;
+  }
+
+  if (typeof value === "string") {
+    base.en = value;
+    return base;
+  }
+
+  base.en = value.en || "";
+  base.ps = value.ps || "";
+  base.fa = value.fa || "";
+
+  return base;
 }
 
 export default function CtaBannerAdmin() {
@@ -82,6 +117,7 @@ export default function CtaBannerAdmin() {
   const [language, setLanguage] = useState("en");
   const [langErr, setLangErr] = useState({ en: false, ps: false, fa: false });
   const [theme, setTheme] = useState("light");
+  const [cloudinaryReady, setCloudinaryReady] = useState(false);
   const [data, setData] = useState({
     title: emptyText(),
     buttonText: emptyText(),
@@ -90,141 +126,210 @@ export default function CtaBannerAdmin() {
     imagePublicId: "",
   });
 
-  // --- Watch dark / light mode ---
-  useEffect(() => {
-    const update = () => {
+  const busy = saving || checking;
+
+  useEffect(function () {
+    function update() {
       if (document.documentElement.classList.contains("dark")) {
         setTheme("dark");
       } else {
         setTheme("light");
       }
-    };
+    }
+
     update();
+
     const observer = new MutationObserver(update);
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["class"],
     });
-    return () => observer.disconnect();
+
+    return function () {
+      observer.disconnect();
+    };
   }, []);
 
-  useEffect(() => {
-    axios
-      .get(API_URL)
-      .then((res) => {
-        const d = res.data?.data;
-        if (!d) return;
+  useEffect(function () {
+    if (typeof window !== "undefined" && window.cloudinary) {
+      setCloudinaryReady(true);
+    }
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+
+    try {
+      const res = await axios.get(API_URL);
+      const d = res.data && res.data.data;
+
+      if (d) {
         setData({
-          title: { ...emptyText(), ...d.title },
-          buttonText: { ...emptyText(), ...d.buttonText },
+          title: normalizeTranslation(d.title),
+          buttonText: normalizeTranslation(d.buttonText),
           buttonLink: d.buttonLink || "/contact",
           image: d.image || "",
           imagePublicId: d.imagePublicId || "",
         });
-      })
-      .catch(() => toast.error("Failed to load CTA Banner data."))
-      .finally(() => setLoading(false));
+        setLangErr({ en: false, ps: false, fa: false });
+      }
+    } catch (error) {
+      toast.error("Failed to load CTA Banner data.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(function () {
+    loadData();
   }, []);
 
-  // Standardized language synchronization
-  const changeLanguage = (code) => {
-    if (!LANGS.some((l) => l.code === code)) return;
+  function changeLanguage(code) {
+    let valid = false;
+
+    for (let i = 0; i < LANGS.length; i += 1) {
+      if (LANGS[i].code === code) {
+        valid = true;
+        break;
+      }
+    }
+
+    if (!valid) return;
+
     setLanguage(code);
+
     try {
       localStorage.setItem("admin-content-language", code);
-    } catch {}
+    } catch (error) {}
+
     window.dispatchEvent(
       new CustomEvent("admin-language-change", {
         detail: { languageId: code },
       }),
     );
-  };
+  }
 
-  const setField = (field, value) => {
-    setData((p) => ({
-      ...p,
-      [field]: { ...p[field], [language]: value },
-    }));
-    setLangErr((p) => ({ ...p, [language]: false }));
-  };
+  function setField(field, value) {
+    setData(function (previous) {
+      const fieldObj = previous[field] || emptyText();
 
-  const uploadImage = async () => {
-    if (!window.cloudinary) return toast.error("Cloudinary is loading...");
+      return {
+        ...previous,
+        [field]: {
+          ...fieldObj,
+          [language]: value,
+        },
+      };
+    });
+
+    setLangErr(function (previous) {
+      return {
+        ...previous,
+        [language]: false,
+      };
+    });
+  }
+
+  async function uploadImage() {
+    if (busy) return;
+
+    if (!window.cloudinary) {
+      toast.error("Cloudinary is loading...");
+      return;
+    }
+
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
-    if (!cloudName || !uploadPreset)
-      return toast.error("Cloudinary keys missing.");
 
-    // --- Permission check before opening widget ---
+    if (!cloudName || !uploadPreset) {
+      toast.error("Cloudinary keys missing.");
+      return;
+    }
+
     setChecking(true);
     const allowed = await verifyUploadPermission();
     setChecking(false);
+
     if (!allowed) {
       toast.error("You don't have permission to upload images.");
       return;
     }
 
-    window.cloudinary
-      .createUploadWidget(
-        {
-          cloudName,
-          uploadPreset,
-          // sources: ["local", "camera", "url"],
-          multiple: false,
-          folder: "bexon/cta_banner",
-          clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
-          maxFileSize: 5 * 1024 * 1024,
-          styles: cloudinaryStyles(theme),
-        },
-        async (err, result) => {
-          if (err) return toast.error("Upload failed.");
-          if (result?.event === "success") {
-            // Delete old image if it exists
-            if (data.imagePublicId) {
-              try {
-                await axios.post(API_URL, {
-                  action: "destroy_image",
-                  publicId: data.imagePublicId,
-                });
-              } catch (e) {}
-            }
-            setData((p) => ({
-              ...p,
-              image: result.info.secure_url,
-              imagePublicId: result.info.public_id,
-            }));
-            toast.success("Image uploaded successfully.");
-          }
-        },
-      )
-      .open();
-  };
+    const widget = window.cloudinary.createUploadWidget(
+      {
+        cloudName: cloudName,
+        uploadPreset: uploadPreset,
+        multiple: false,
+        folder: "bexon/cta_banner",
+        clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+        maxFileSize: 5 * 1024 * 1024,
+        styles: cloudinaryStyles(theme),
+      },
+      function (err, result) {
+        if (err) {
+          toast.error("Upload failed.");
+          return;
+        }
 
-  const removeImage = async () => {
-    if (!confirm("Remove this image?")) return;
-    if (data.imagePublicId) {
-      try {
-        await axios.post(API_URL, {
-          action: "destroy_image",
-          publicId: data.imagePublicId,
+        if (!result || result.event !== "success") return;
+
+        const imageUrl = result.info && result.info.secure_url;
+        const publicId = result.info && result.info.public_id;
+
+        if (!imageUrl || !publicId) {
+          toast.error("Cloudinary did not return a valid image.");
+          return;
+        }
+
+        // Only update references in state. Do not delete old Cloudinary assets here.
+        setData(function (previous) {
+          return {
+            ...previous,
+            image: imageUrl,
+            imagePublicId: publicId,
+          };
         });
-      } catch (e) {
-        return toast.error("Failed to remove image from cloud.");
-      }
-    }
-    setData((p) => ({ ...p, image: "", imagePublicId: "" }));
-    toast.success("Image removed.");
-  };
 
-  const handleSave = async () => {
+        toast.success("Image uploaded. Click Save All Changes to persist it.");
+      },
+    );
+
+    widget.open();
+  }
+
+  function removeImage() {
+    if (!confirm("Remove this image?")) return;
+
+    // Only clear references in state. Do not delete from Cloudinary here.
+    setData(function (previous) {
+      return {
+        ...previous,
+        image: "",
+        imagePublicId: "",
+      };
+    });
+
+    toast.success("Image removed from form. Save to persist.");
+  }
+
+  async function saveAll() {
+    if (busy) return;
+
     const errs = { en: false, ps: false, fa: false };
     let firstBad = null;
 
-    // Validate required fields across all languages
-    for (const { code } of LANGS) {
-      if (!data.title[code]?.trim() || !data.buttonText[code]?.trim()) {
+    for (let i = 0; i < LANGS.length; i += 1) {
+      const code = LANGS[i].code;
+      const titleValue = stripHtml((data.title && data.title[code]) || "");
+      const buttonValue = stripHtml(
+        (data.buttonText && data.buttonText[code]) || "",
+      );
+
+      if (!titleValue || !buttonValue) {
         errs[code] = true;
-        if (!firstBad) firstBad = code;
+        if (!firstBad) {
+          firstBad = code;
+        }
       }
     }
 
@@ -232,27 +337,57 @@ export default function CtaBannerAdmin() {
 
     if (firstBad) {
       changeLanguage(firstBad);
-      return toast.error(
-        `Please fill Title and Button Text in ${firstBad.toUpperCase()}`,
+      toast.error(
+        "Please fill Title and Button Text in " + firstBad.toUpperCase(),
       );
+      return;
     }
 
-    if (!data.buttonLink?.trim()) {
-      return toast.error("Button Link URL is required.");
+    if (!data.buttonLink || !String(data.buttonLink).trim()) {
+      toast.error("Button Link URL is required.");
+      return;
     }
 
     setSaving(true);
+
     try {
-      const res = await axios.post(API_URL, data);
-      if (!res.data?.success)
-        throw new Error(res.data?.message || "Save failed");
+      const res = await axios.post(API_URL, {
+        title: data.title,
+        buttonText: data.buttonText,
+        buttonLink: data.buttonLink,
+        image: data.image,
+        imagePublicId: data.imagePublicId,
+      });
+
+      if (!res.data || !res.data.success) {
+        throw new Error((res.data && res.data.message) || "Save failed");
+      }
+
+      const saved = res.data.data;
+      if (saved) {
+        setData({
+          title: normalizeTranslation(saved.title),
+          buttonText: normalizeTranslation(saved.buttonText),
+          buttonLink: saved.buttonLink || "/contact",
+          image: saved.image || "",
+          imagePublicId: saved.imagePublicId || "",
+        });
+      }
+
       toast.success("CTA Banner saved successfully.");
-    } catch (e) {
-      toast.error(e.response?.data?.message || e.message || "Failed to save.");
+    } catch (error) {
+      const message =
+        (error.response &&
+          error.response.data &&
+          error.response.data.message) ||
+        error.message ||
+        "Failed to save.";
+
+      toast.error(message);
     } finally {
       setSaving(false);
     }
-  };
+  }
 
   if (loading) {
     return (
@@ -267,10 +402,17 @@ export default function CtaBannerAdmin() {
     "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent)]/10";
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+    <div className="min-h-screen bg-[var(--background)] pb-28 text-[var(--foreground)]">
       <Script
         src="https://upload-widget.cloudinary.com/latest/global/all.js"
         strategy="lazyOnload"
+        onLoad={function () {
+          setCloudinaryReady(true);
+        }}
+        onError={function () {
+          setCloudinaryReady(false);
+          toast.error("Could not load the Cloudinary image uploader.");
+        }}
       />
 
       <div className="mx-auto max-w-5xl space-y-6">
@@ -288,23 +430,28 @@ export default function CtaBannerAdmin() {
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1">
-              {LANGS.map((item) => (
-                <button
-                  key={item.code}
-                  type="button"
-                  onClick={() => changeLanguage(item.code)}
-                  className={`relative rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                    language === item.code
-                      ? "bg-[var(--accent)] text-white shadow"
-                      : "text-[var(--muted)] hover:bg-[var(--accent)]/10"
-                  }`}
-                >
-                  {item.label}
-                  {langErr[item.code] && (
-                    <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
-                  )}
-                </button>
-              ))}
+              {LANGS.map(function (item) {
+                return (
+                  <button
+                    key={item.code}
+                    type="button"
+                    onClick={function () {
+                      changeLanguage(item.code);
+                    }}
+                    className={
+                      "relative rounded-lg px-3 py-2 text-xs font-semibold transition " +
+                      (language === item.code
+                        ? "bg-[var(--accent)] text-white shadow"
+                        : "text-[var(--muted)] hover:bg-[var(--accent)]/10")
+                    }
+                  >
+                    {item.label}
+                    {langErr[item.code] && (
+                      <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             <AdminLanguageBall
@@ -322,31 +469,40 @@ export default function CtaBannerAdmin() {
               Text Content ({language.toUpperCase()})
             </h2>
           </div>
+
           <div className="grid gap-5 p-4 sm:grid-cols-2 sm:p-6">
             <div className="sm:col-span-2">
               <label className="mb-1.5 block text-sm font-semibold">
                 Banner Title *
               </label>
-              <textarea
-                dir={dir}
-                rows={2}
-                value={data.title[language] || ""}
-                onChange={(e) => setField("title", e.target.value)}
-                className={`${inputClass} resize-y`}
-                placeholder="Let's Build Future Together."
-              />
+              <div className="overflow-hidden rounded-xl border border-[var(--border)]">
+                <RichTextEditor
+                  key={"title-" + language}
+                  value={(data.title && data.title[language]) || ""}
+                  onChange={function (value) {
+                    setField("title", value);
+                  }}
+                  placeholder="Let's Build Future Together."
+                  dir={dir}
+                />
+              </div>
             </div>
+
             <div>
               <label className="mb-1.5 block text-sm font-semibold">
                 Button Text *
               </label>
-              <input
-                dir={dir}
-                value={data.buttonText[language] || ""}
-                onChange={(e) => setField("buttonText", e.target.value)}
-                className={inputClass}
-                placeholder="Get Started Now"
-              />
+              <div className="overflow-hidden rounded-xl border border-[var(--border)]">
+                <RichTextEditor
+                  key={"buttonText-" + language}
+                  value={(data.buttonText && data.buttonText[language]) || ""}
+                  onChange={function (value) {
+                    setField("buttonText", value);
+                  }}
+                  placeholder="Get Started Now"
+                  dir={dir}
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -357,6 +513,7 @@ export default function CtaBannerAdmin() {
             <LinkIcon size={18} className="text-[var(--accent)]" />
             <h2 className="font-bold">Button Destination Link</h2>
           </div>
+
           <div className="p-4 sm:p-6">
             <label className="mb-1.5 block text-sm font-semibold">
               Global URL / Path *
@@ -364,9 +521,15 @@ export default function CtaBannerAdmin() {
             <input
               dir="ltr"
               value={data.buttonLink}
-              onChange={(e) =>
-                setData((p) => ({ ...p, buttonLink: e.target.value }))
-              }
+              onChange={function (e) {
+                const value = e.target.value;
+                setData(function (previous) {
+                  return {
+                    ...previous,
+                    buttonLink: value,
+                  };
+                });
+              }}
               className={inputClass}
               placeholder="/contact  or  https://example.com"
             />
@@ -379,6 +542,7 @@ export default function CtaBannerAdmin() {
             <ImageIcon size={18} className="text-[var(--accent)]" />
             <h2 className="font-bold">Feature Image</h2>
           </div>
+
           <div className="bg-[var(--surface-soft)]/50 p-4 sm:p-6">
             {data.image ? (
               <div className="flex flex-col items-start gap-4 sm:flex-row">
@@ -397,10 +561,11 @@ export default function CtaBannerAdmin() {
                     <Trash2 size={16} />
                   </button>
                 </div>
+
                 <button
                   type="button"
                   onClick={uploadImage}
-                  disabled={checking}
+                  disabled={busy || !cloudinaryReady}
                   className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
                 >
                   {checking ? (
@@ -415,7 +580,7 @@ export default function CtaBannerAdmin() {
               <button
                 type="button"
                 onClick={uploadImage}
-                disabled={checking}
+                disabled={busy || !cloudinaryReady}
                 className="flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[var(--border)] py-16 text-[var(--muted)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 hover:text-[var(--accent)] disabled:opacity-50"
               >
                 {checking ? (
@@ -430,32 +595,17 @@ export default function CtaBannerAdmin() {
             )}
           </div>
         </section>
-
-        {/* STICKY SAVE */}
-        <div className="sticky bottom-3 z-40 flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/95 p-4 shadow-2xl backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[var(--muted)]">
-            Editing:{" "}
-            <span className="font-semibold text-[var(--accent)]">
-              {LANGS.find((l) => l.code === language)?.label}
-            </span>
-            {" · "}
-            Ensure all languages are completed before saving.
-          </p>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={handleSave}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-8 py-3.5 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
-          >
-            {saving ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <Save size={18} />
-            )}
-            Save All Changes
-          </button>
-        </div>
       </div>
+
+      <AdminStickyFooter
+        onReload={loadData}
+        onSave={saveAll}
+        saving={saving}
+        busy={busy}
+        saveLabel="Save All Changes"
+        savingLabel="Saving All..."
+        reloadLabel="Reload Saved Data"
+      />
     </div>
   );
 }

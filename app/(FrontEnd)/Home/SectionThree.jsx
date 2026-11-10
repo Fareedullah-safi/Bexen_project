@@ -1,8 +1,25 @@
 "use client";
 
 import Loader from "@/app/Components/Loader";
+import { fixHtml } from "@/Lib/fixText";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+
+function stripHtml(val) {
+  return String(val || "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
+}
+
+const BRAND_TITLE_STYLES = `
+  .brand-rt p { margin: 0; padding: 0; display: block; line-height: 1.6; }
+  .brand-rt p + p { margin-top: 0.15em; }
+  .brand-rt strong, .brand-rt b { font-weight: 700; color: inherit; }
+  .brand-rt em, .brand-rt i { font-style: italic; }
+  .brand-rt u { text-decoration: underline; }
+  .brand-rt a { color: #1E8A8A; text-decoration: underline; text-underline-offset: 2px; }
+  .brand-rt span[style] { display: inline; }
+`;
 
 export default function BrandLogos() {
   const [dbLogos, setDbLogos] = useState([]);
@@ -26,9 +43,7 @@ export default function BrandLogos() {
           ),
           fetch(
             `/api/homepage/brand-logos/title?lang=${encodeURIComponent(language)}`,
-            {
-              cache: "no-store",
-            },
+            { cache: "no-store" },
           ),
         ]);
 
@@ -51,16 +66,16 @@ export default function BrandLogos() {
         }
 
         if (titleData) {
-          const title =
+          const raw =
             titleData?.data?.translations?.[language]?.title ||
             titleData?.data?.title ||
             titleData?.title ||
             "";
-          setDbTitle(typeof title === "string" ? title : "");
+          const cleaned = typeof raw === "string" ? fixHtml(raw) : "";
+          setDbTitle(cleaned);
         }
       } catch (error) {
         console.error("Failed to load brand section data:", error);
-
         if (active) {
           setDbLogos([]);
           setDbTitle("");
@@ -73,13 +88,11 @@ export default function BrandLogos() {
     };
 
     const savedLanguage = localStorage.getItem("site-language") || "en";
-
     dataLogos(savedLanguage);
 
     const handleLanguageChange = (event) => {
       const language =
         event.detail?.language || localStorage.getItem("site-language") || "en";
-
       dataLogos(language);
     };
 
@@ -87,7 +100,6 @@ export default function BrandLogos() {
 
     return () => {
       active = false;
-
       window.removeEventListener("site-language-change", handleLanguageChange);
     };
   }, []);
@@ -95,7 +107,6 @@ export default function BrandLogos() {
   useEffect(() => {
     if (dbLogos.length > 0 && trackRef.current) {
       const firstGroup = trackRef.current.firstElementChild;
-
       if (firstGroup) {
         setGroupWidth(firstGroup.offsetWidth);
       }
@@ -113,6 +124,7 @@ export default function BrandLogos() {
   if (dbLogos.length === 0) return null;
 
   const isRTL = lang === "ps" || lang === "fa";
+  const titleText = stripHtml(dbTitle);
 
   const LogoCard = ({ logo, index }) => (
     <div className="flex h-20 w-32 shrink-0 items-center justify-center rounded-xl bg-white px-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg sm:h-30 sm:w-40 sm:px-5 md:h-35 md:w-44 md:px-5 lg:h-40 lg:w-48 lg:px-6">
@@ -134,58 +146,11 @@ export default function BrandLogos() {
 
   const duration = Math.max(groupWidth / 60, 10);
 
-  // --- FIXED MULTI-LANGUAGE LINE BREAK FORMATTER ---
-  const renderFormattedTitle = (text) => {
-    if (!text) {
-      return (
-        <>
-          <span className="block">
-            Join Over{" "}
-            <span className="rounded-full bg-[#1E8A8A] px-2 py-0.5 text-white">
-              1000+
-            </span>
-          </span>
-          <span className="block">Companies with</span>
-          <span className="block">
-            <span className="text-gray-500 underline">Bexon</span> Here
-          </span>
-        </>
-      );
-    }
-
-    // 1. Converts literal '\n' string from DB to actual line breaks
-    const normalizedText = text.replace(/\\n/g, "\n");
-
-    // 2. Split by newlines so every line becomes its own block element
-    const lines = normalizedText.split("\n");
-
-    return lines.map((line, lineIdx) => (
-      <span key={lineIdx} className="block">
-        {line.split(/(\+?\d+\+?|Bexon|بکسون)/g).map((part, i) => {
-          // Numbers like 1000+ or +1000 -> Teal Pill
-          if (/^\+?\d+\+?$/.test(part)) {
-            return (
-              <span
-                key={i}
-                className="mx-1 inline-block rounded-full bg-[#1E8A8A] px-2 py-0.5 text-white"
-              >
-                {part}
-              </span>
-            );
-          }
-          // Brand name -> Underlined
-          if (part === "Bexon" || part === "بکسون") {
-            return (
-              <span key={i} className="text-gray-500 underline">
-                {part}
-              </span>
-            );
-          }
-          return part;
-        })}
-      </span>
-    ));
-  };
+  const fallbackTitle = `
+    <p>Join Over <span style="background-color:#1E8A8A;color:#fff;border-radius:9999px;padding:0.125rem 0.5rem;">1000+</span></p>
+    <p>Companies with</p>
+    <p><span style="color:#6b7280;text-decoration:underline;">Bexon</span> Here</p>
+  `;
 
   return (
     <section
@@ -197,9 +162,14 @@ export default function BrandLogos() {
           className="pointer-events-none absolute top-1/2 left-1/2 z-9 mt-6 flex h-50 w-50 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-gray-300 bg-white/20 leading-loose backdrop-blur-md lg:h-80 lg:w-80"
           dir={isRTL ? "rtl" : "ltr"}
         >
-          <h2 className="max-w-80 text-center text-lg leading-7 font-semibold text-[#102124] lg:text-xl">
-            {renderFormattedTitle(dbTitle)}
-          </h2>
+          <div
+            role="heading"
+            aria-level={2}
+            className="brand-rt max-w-80 text-center text-lg leading-7 font-semibold text-[#102124] lg:text-xl"
+            dangerouslySetInnerHTML={{
+              __html: titleText ? dbTitle : fallbackTitle,
+            }}
+          />
         </div>
 
         <div
@@ -222,7 +192,6 @@ export default function BrandLogos() {
             <div className="flex shrink-0 gap-3 pr-3 sm:gap-4 sm:pr-4 md:gap-5 md:pr-5 lg:gap-6 lg:pr-6">
               {logoSet}
             </div>
-
             <div
               className="flex shrink-0 gap-3 pr-3 sm:gap-4 sm:pr-4 md:gap-5 md:pr-5 lg:gap-6 lg:pr-6"
               aria-hidden="true"
@@ -237,7 +206,6 @@ export default function BrandLogos() {
         .logo-track {
           animation: logoScroll 20s linear infinite;
         }
-
         @keyframes logoScroll {
           from {
             transform: translate3d(0, 0, 0);
@@ -247,6 +215,8 @@ export default function BrandLogos() {
           }
         }
       `}</style>
+
+      <style dangerouslySetInnerHTML={{ __html: BRAND_TITLE_STYLES }} />
     </section>
   );
 }

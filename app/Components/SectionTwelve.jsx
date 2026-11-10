@@ -1,9 +1,58 @@
 "use client";
 
+import { fixData } from "@/Lib/fixText";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+
+const SECTION_TWELVE_STYLES = `
+  .section-twelve-rt .rt-inline p,
+  .section-twelve-rt .rt-inline h1,
+  .section-twelve-rt .rt-inline h2,
+  .section-twelve-rt .rt-inline h3,
+  .section-twelve-rt .rt-inline h4,
+  .section-twelve-rt .rt-inline h5,
+  .section-twelve-rt .rt-inline h6 {
+    display: inline;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .section-twelve-rt .rt-inline br {
+    display: none;
+  }
+  .section-twelve-rt .rt-desc p {
+    margin: 0.35em 0;
+  }
+  .section-twelve-rt .rt-desc p:first-child {
+    margin-top: 0;
+  }
+  .section-twelve-rt .rt-desc p:last-child {
+    margin-bottom: 0;
+  }
+  .section-twelve-rt .rt-tight p {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .section-twelve-rt .rt-inline,
+  .section-twelve-rt .rt-desc {
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+  .section-twelve-rt a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  .section-twelve-rt ul,
+  .section-twelve-rt ol {
+    margin: 0.25em 0;
+    padding-left: 1.25em;
+  }
+  .section-twelve-rt strong,
+  .section-twelve-rt b {
+    font-weight: 700;
+  }
+`;
 
 export default function SectionTwelve() {
   const [lang, setLang] = useState("en");
@@ -28,7 +77,7 @@ export default function SectionTwelve() {
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         const result = json?.data || json;
-        if (result) setData(result);
+        if (result) setData(fixData(result));
       })
       .catch(() => {});
 
@@ -56,18 +105,19 @@ export default function SectionTwelve() {
   return (
     <section
       dir={isRTL ? "rtl" : "ltr"}
-      className="relative z-20 flex w-full items-center justify-center px-4 py-12 md:px-6 md:py-20 lg:px-12"
+      className="section-twelve-rt relative z-20 flex w-full items-center justify-center px-4 py-12 md:px-6 md:py-20 lg:px-12"
     >
       <div className="mx-auto flex h-199 w-full max-w-7xl flex-col items-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#1a4d4d] to-[#0d3333] shadow-2xl shadow-black/60 sm:flex-col lg:h-70 lg:flex-row">
         {/* Left Content Section */}
         <div className="flex w-full flex-col justify-center px-8 py-16 lg:w-1/2 lg:px-16 lg:py-24">
-          <h1
-            className="wow animate__animated animate__fadeInUp mb-6 text-4xl leading-[1.1] font-bold tracking-tight whitespace-pre-line text-white sm:text-5xl lg:text-5xl"
+          <div
+            role="heading"
+            aria-level={1}
+            className="wow animate__animated animate__fadeInUp rt-desc mb-6 text-4xl leading-[1.1] font-bold tracking-tight text-white sm:text-5xl lg:text-5xl"
             data-wow-duration="0.9s"
             data-wow-delay="0.1s"
-          >
-            {title}
-          </h1>
+            dangerouslySetInnerHTML={{ __html: title }}
+          />
 
           {/* Dynamic Button Link */}
           <Link
@@ -77,8 +127,8 @@ export default function SectionTwelve() {
             data-wow-delay="0.35s"
           >
             <span className="overflow-hidden leading-none">
-              <span className="block text-white transition-transform duration-400 [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5">
-                {buttonText}
+              <span className="rt-inline block text-white transition-transform duration-400 [text-shadow:0_30px_0_currentColor] group-hover/button:-translate-y-7.5">
+                <span dangerouslySetInnerHTML={{ __html: buttonText }} />
               </span>
             </span>
 
@@ -120,6 +170,8 @@ export default function SectionTwelve() {
           </div>
         </div>
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: SECTION_TWELVE_STYLES }} />
     </section>
   );
 }

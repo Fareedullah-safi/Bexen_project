@@ -1,17 +1,14 @@
 import mongoose from "mongoose";
 
-// Sub-schema for language-specific fields
 const LanguageTranslationSchema = new mongoose.Schema(
   {
     topTag: { type: String, default: "CHOOSE THE BEST" },
-    mainTitle: {
+    title: {
       type: String,
       default:
-        "Driving Innovation and Excellence for Sustainable Corporate Success",
+        'Driving Innovation and Excellence for Sustainable Corporate Success <span style="color:#1E8A8A">Worldwide.</span>',
     },
-    highlightedTitle: { type: String, default: "Worldwide." },
 
-    // Mission Card
     missionTitle: { type: String, default: "Our Mission" },
     missionDesc: {
       type: String,
@@ -27,7 +24,6 @@ const LanguageTranslationSchema = new mongoose.Schema(
       ],
     },
 
-    // Vision Card
     visionTitle: { type: String, default: "Our Vision" },
     visionDesc: {
       type: String,
@@ -43,30 +39,24 @@ const LanguageTranslationSchema = new mongoose.Schema(
       ],
     },
 
-    // Progress Floating Box (Labels)
     progressTitle: { type: String, default: "Business Progress" },
     progressLabel1: { type: String, default: "Revenue" },
     progressLabel2: { type: String, default: "Satisfaction" },
 
-    // Button Text
     buttonText: { type: String, default: "Learn More About Us" },
   },
-  { _id: false }, // Prevents generating separate _id for each translation object
+  { _id: false },
 );
 
-// Main Schema
 const AboutSectionSchema = new mongoose.Schema(
   {
-    // Shared Media & Link Settings
     image: { type: String, default: "" },
     publicId: { type: String, default: "" },
     buttonLink: { type: String, default: "/about" },
 
-    // Shared Numerical Progress Values (%)
     progressValue1: { type: Number, default: 82, min: 0, max: 100 },
     progressValue2: { type: Number, default: 90, min: 0, max: 100 },
 
-    // Multilingual Content
     translations: {
       en: { type: LanguageTranslationSchema, required: true },
       ps: { type: LanguageTranslationSchema, required: true },
@@ -76,7 +66,6 @@ const AboutSectionSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Prevent re-registering model in Next.js Hot Reloading
 const AboutSection =
   mongoose.models.AboutSection ||
   mongoose.model("AboutSection", AboutSectionSchema);

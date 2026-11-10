@@ -22,20 +22,31 @@ const ArticleSchema = new mongoose.Schema({
   },
 });
 
+const TitleTranslationSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
 const BlogSectionSchema = new mongoose.Schema(
   {
     Titles: {
       en: {
-        sectionTitle: { type: String, default: "The Ultimate" },
-        highlightedTitle: { type: String, default: "Resource." },
+        type: TitleTranslationSchema,
+        default: () => ({ title: "The Ultimate <strong>Resource.</strong>" }),
       },
       ps: {
-        sectionTitle: { type: String, default: "" },
-        highlightedTitle: { type: String, default: "" },
+        type: TitleTranslationSchema,
+        default: () => ({ title: "" }),
       },
       fa: {
-        sectionTitle: { type: String, default: "" },
-        highlightedTitle: { type: String, default: "" },
+        type: TitleTranslationSchema,
+        default: () => ({ title: "" }),
       },
     },
     posts: { type: [ArticleSchema], default: [] },
