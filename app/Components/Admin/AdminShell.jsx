@@ -5,13 +5,11 @@ import axios from "axios";
 import {
   BarChart3,
   BriefcaseBusiness,
-  Check,
   ChevronDown,
   ExternalLink,
   FileText,
   ImagesIcon,
   Info,
-  Languages,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -29,7 +27,7 @@ import {
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { GiBackup } from "react-icons/gi";
 import { RiPagesFill } from "react-icons/ri";
 import { TbLayoutNavbar } from "react-icons/tb";
@@ -129,12 +127,6 @@ const navigation = [
   },
 ];
 
-const languages = [
-  { value: "en", label: "English", native: "English", direction: "ltr" },
-  { value: "ps", label: "Pashto", native: "پښتو", direction: "rtl" },
-  { value: "fa", label: "Dari", native: "دری", direction: "rtl" },
-];
-
 /* ============ COMPONENT ============ */
 
 export default function AdminShell({ children }) {
@@ -145,13 +137,6 @@ export default function AdminShell({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [openName, setOpenName] = useState(null);
-
-  const [language, setLanguage] = useState(null);
-  const [languageOpen, setLanguageOpen] = useState(false);
-  const [isLanguageSaving, setIsLanguageSaving] = useState(false);
-
-  const languageRef = useRef(null);
-  const languageRequestRef = useRef(0);
 
   const [adminUid, setAdminUid] = useState("");
   const [adminName, setAdminName] = useState("Administrator");
@@ -189,139 +174,6 @@ export default function AdminShell({ children }) {
     };
 
     loadSession();
-  }, []);
-
-  /* ============ LOAD SAVED LANGUAGE ============ */
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadLanguage = async () => {
-      try {
-        const res = await axios.get("/api/admin/adminusers/language", {
-          withCredentials: true,
-        });
-
-        if (cancelled) return;
-
-        if (!res.data.success) {
-          throw new Error(res.data.message || "Unable to load saved language.");
-        }
-
-        const savedLanguage = res.data.language;
-
-        if (!languages.some((item) => item.value === savedLanguage)) {
-          throw new Error(
-            `Invalid language returned by API: ${String(savedLanguage)}`,
-          );
-        }
-
-        setLanguage(savedLanguage);
-        localStorage.setItem("admin-language", savedLanguage);
-      } catch (error) {
-        if (cancelled) return;
-
-        console.error(
-          "Unable to load language from database:",
-          error.response?.data || error.message,
-        );
-
-        // Use the previously saved browser preference only if the API fails.
-        const localLanguage = localStorage.getItem("admin-language");
-
-        if (languages.some((item) => item.value === localLanguage)) {
-          setLanguage(localLanguage);
-        } else {
-          setLanguage("en");
-        }
-      }
-    };
-
-    loadLanguage();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  /* ============ SAVE LANGUAGE ============ */
-
-  const handleLanguageChange = async (selectedLanguage) => {
-    if (
-      isLanguageSaving ||
-      !languages.some((item) => item.value === selectedLanguage) ||
-      selectedLanguage === language
-    ) {
-      setLanguageOpen(false);
-      return;
-    }
-
-    const previousLanguage = language;
-    const requestId = ++languageRequestRef.current;
-
-    setLanguage(selectedLanguage);
-    setLanguageOpen(false);
-    setIsLanguageSaving(true);
-
-    try {
-      const res = await axios.post(
-        "/api/admin/adminusers/language",
-        { language: selectedLanguage },
-        { withCredentials: true },
-      );
-
-      if (requestId !== languageRequestRef.current) return;
-
-      if (!res.data.success) {
-        throw new Error(res.data.message || "Unable to save language.");
-      }
-
-      const savedLanguage = res.data.language;
-
-      if (!languages.some((item) => item.value === savedLanguage)) {
-        throw new Error("The server returned an invalid language.");
-      }
-
-      setLanguage(savedLanguage);
-      localStorage.setItem("admin-language", savedLanguage);
-    } catch (error) {
-      if (requestId !== languageRequestRef.current) return;
-
-      setLanguage(previousLanguage);
-
-      console.error(
-        "Unable to save language:",
-        error.response?.data?.message || error.message,
-      );
-    } finally {
-      if (requestId === languageRequestRef.current) {
-        setIsLanguageSaving(false);
-      }
-    }
-  };
-
-  /* ============ CLOSE LANGUAGE DROPDOWN ============ */
-
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (!languageRef.current?.contains(event.target)) {
-        setLanguageOpen(false);
-      }
-    };
-
-    const handleEscape = (event) => {
-      if (event.key === "Escape") {
-        setLanguageOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleOutsideClick);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-      document.removeEventListener("keydown", handleEscape);
-    };
   }, []);
 
   /* ============ SIGN OUT ============ */
@@ -432,8 +284,6 @@ export default function AdminShell({ children }) {
       .join("") || "A";
 
   const isDark = mounted && theme === "dark";
-
-  const selectedLanguage = languages.find((item) => item.value === language);
 
   const isActive = (href) => {
     if (href === "/admin") return pathname === "/admin";
@@ -699,124 +549,6 @@ export default function AdminShell({ children }) {
               <ExternalLink size={17} />
               View Site
             </Link>
-
-            {/* ANIMATED LANGUAGE SELECTOR */}
-            <div ref={languageRef} className="relative shrink-0">
-              <button
-                type="button"
-                aria-label="Select dashboard language"
-                aria-haspopup="listbox"
-                aria-expanded={languageOpen}
-                disabled={isLanguageSaving || language === null}
-                onClick={() => setLanguageOpen((open) => !open)}
-                className="group relative flex h-10 min-w-[132px] items-center gap-2 overflow-hidden rounded-xl border border-white/15 bg-gradient-to-r from-[#1E8A8A] to-[#187777] px-3 text-white shadow-md shadow-teal-900/10 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-900/20 focus-visible:ring-2 focus-visible:ring-[#35B5B5]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface)] focus-visible:outline-none active:translate-y-0 disabled:cursor-wait disabled:opacity-70"
-              >
-                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-
-                <Languages size={17} className="relative shrink-0" />
-
-                <span className="relative flex-1 text-left text-sm font-semibold">
-                  {selectedLanguage?.native || "Loading..."}
-                </span>
-
-                {isLanguageSaving ? (
-                  <span className="relative h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                ) : (
-                  <ChevronDown
-                    size={15}
-                    className={`relative shrink-0 transition-transform duration-300 ${
-                      languageOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                )}
-              </button>
-
-              <div
-                className={`absolute top-[calc(100%+10px)] right-0 z-[60] w-[190px] origin-top-right rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-xl shadow-black/10 transition-all duration-200 ease-out ${
-                  languageOpen
-                    ? "visible translate-y-0 scale-100 opacity-100"
-                    : "invisible -translate-y-2 scale-95 opacity-0"
-                }`}
-                role="listbox"
-                aria-label="Available languages"
-                aria-hidden={!languageOpen}
-              >
-                <div className="px-3 pt-2 pb-2">
-                  <p className="text-[10px] font-bold tracking-[0.16em] text-[var(--muted)] uppercase">
-                    Choose language
-                  </p>
-                </div>
-
-                {languages.map((item) => {
-                  const active = language === item.value;
-
-                  return (
-                    <button
-                      key={item.value}
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      tabIndex={languageOpen ? 0 : -1}
-                      disabled={isLanguageSaving}
-                      onClick={() => handleLanguageChange(item.value)}
-                      className={`group/option relative mb-1 flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-left transition-all duration-200 ease-out last:mb-0 hover:translate-x-0.5 focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:outline-none ${
-                        active
-                          ? "bg-[var(--accent-soft)] text-[var(--accent)]"
-                          : "text-[var(--foreground)] hover:bg-[var(--surface-soft)]"
-                      } disabled:cursor-wait disabled:opacity-60`}
-                    >
-                      <span
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-all duration-200 group-hover/option:scale-105 ${
-                          active
-                            ? "bg-[var(--accent)] text-white shadow-sm"
-                            : "bg-[var(--surface-soft)] text-[var(--muted)] group-hover/option:bg-[var(--accent-soft)] group-hover/option:text-[var(--accent)]"
-                        }`}
-                      >
-                        {item.value.toUpperCase()}
-                      </span>
-
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold">
-                          {item.native}
-                        </span>
-                        <span
-                          className={`mt-0.5 block text-[11px] ${
-                            active
-                              ? "text-[var(--accent)]/80"
-                              : "text-[var(--muted)]"
-                          }`}
-                        >
-                          {item.label}
-                        </span>
-                      </span>
-
-                      <Check
-                        size={16}
-                        className={`shrink-0 transition-all duration-200 ${
-                          active
-                            ? "scale-100 opacity-100"
-                            : "scale-75 opacity-0"
-                        }`}
-                      />
-
-                      <span
-                        className={`absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-[var(--accent)] transition-opacity duration-200 ${
-                          active
-                            ? "opacity-100"
-                            : "opacity-0 group-hover/option:opacity-50"
-                        }`}
-                      />
-                    </button>
-                  );
-                })}
-
-                <div className="mt-1 border-t border-[var(--border)] px-3 py-2">
-                  <p className="text-[10px] text-[var(--muted)]">
-                    Language preference is saved to your account.
-                  </p>
-                </div>
-              </div>
-            </div>
 
             {/* THEME TOGGLE */}
             <button
