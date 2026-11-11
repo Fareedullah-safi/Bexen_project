@@ -67,12 +67,28 @@ export default function BannerFrontendView({
           className="absolute inset-0 h-full w-full object-cover object-center"
         />
 
-        {/* Dark Overlay Gradient for Text Readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
+        {/* =====================================================
+    OPTIONAL BEXON PREMIUM DARK OVERLAY
 
-        {/* Ambient Cyan Glow */}
-        <div className="pointer-events-none absolute h-40 w-40 rounded-full bg-[#1D8B8A]/30 blur-3xl sm:h-60 sm:w-60" />
+{/* =====================================================
+    BEXON — CLOUDINARY IMAGE OVERLAY
+    Remove this block to disable the overlay.
+===================================================== */}
 
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[1] rounded-lg"
+          style={{
+            backgroundImage:
+              "url('https://res.cloudinary.com/dbz6ftcwo/image/upload/v1794373247/vsfhzkfvaf9akpzppkzl.webp')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            opacity: 0.6,
+          }}
+        />
+
+        {/* END CLOUDINARY IMAGE OVERLAY */}
         {/* Content Container */}
         <div
           className="relative z-10 flex flex-col items-center justify-center px-4 text-center"

@@ -167,6 +167,39 @@ export default function SliderFrontendView({ data, lang: propLang = "en" }) {
               sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 1280px) calc(100vw - 32px), calc(100vw - 32px)"
               className="rounded-lg object-cover"
             />
+
+            {/* =====================================================
+    OPTIONAL PREMIUM SLIDER MASK
+    Remove this entire block if you don't like the effect.
+===================================================== */}
+
+            <div
+              className="pointer-events-none absolute inset-0 z-[1] rounded-lg"
+              style={{
+                background: `
+      linear-gradient(
+        to bottom,
+        rgba(4, 20, 22, 0.18) 0%,
+        transparent 22%,
+        transparent 55%,
+        rgba(4, 20, 22, 0.35) 100%
+      ),
+      radial-gradient(
+        ellipse at center,
+        transparent 45%,
+        rgba(3, 18, 20, 0.30) 100%
+      ),
+      linear-gradient(
+        110deg,
+        rgba(10, 75, 72, 0.12),
+        transparent 45%,
+        rgba(5, 40, 43, 0.12)
+      )
+    `,
+              }}
+            />
+
+            {/* END OPTIONAL PREMIUM SLIDER MASK */}
           </div>
         )}
 

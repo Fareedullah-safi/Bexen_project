@@ -13,10 +13,15 @@ function stripHtml(val) {
 
 function getSlideImageUrl(slide) {
   if (!slide) return "";
-  if (typeof slide.image === "string") return slide.image.trim();
+
+  if (typeof slide.image === "string") {
+    return slide.image.trim();
+  }
+
   if (slide.image && typeof slide.image.url === "string") {
     return slide.image.url.trim();
   }
+
   return "";
 }
 
@@ -25,21 +30,39 @@ const SLIDER_STYLES = `
     overflow-wrap: break-word !important;
     word-break: normal !important;
   }
+
   .slider-title p { margin: 0; display: inline; }
   .slider-title p:last-child { margin-bottom: 0; }
-  .slider-title strong, .slider-title b { color: #ffffff; font-weight: 800; }
+  .slider-title strong, .slider-title b {
+    color: #ffffff;
+    font-weight: 800;
+  }
   .slider-title em, .slider-title i { font-style: italic; }
-  .slider-title a { color: #5eead4; text-decoration: underline; text-underline-offset: 2px; }
+  .slider-title a {
+    color: #5eead4;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
   .slider-title a:hover { color: #99f6e4; }
   .slider-title span { color: inherit; }
 
   .slider-desc p { margin: 0 0 0.4em 0; }
   .slider-desc p:last-child { margin-bottom: 0; }
-  .slider-desc strong, .slider-desc b { color: #ffffff; font-weight: 700; }
+  .slider-desc strong, .slider-desc b {
+    color: #ffffff;
+    font-weight: 700;
+  }
   .slider-desc em, .slider-desc i { font-style: italic; }
-  .slider-desc a { color: #5eead4; text-decoration: underline; text-underline-offset: 2px; }
+  .slider-desc a {
+    color: #5eead4;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
   .slider-desc a:hover { color: #99f6e4; }
-  .slider-desc ul, .slider-desc ol { margin: 0.3em 0; padding-inline-start: 1.2em; }
+  .slider-desc ul, .slider-desc ol {
+    margin: 0.3em 0;
+    padding-inline-start: 1.2em;
+  }
   .slider-desc li { margin-bottom: 0.2em; }
   .slider-desc span { color: inherit; }
 `;
@@ -52,7 +75,9 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
   const [currentImageIndex, setCurrentIndex] = useState(0);
   const [imageKey, setImageKey] = useState(0);
 
-  /* 1. Fetch data internally if propData is missing */
+  {
+    /* 1. Fetch data internally if propData is missing */
+  }
   useEffect(() => {
     if (propData) {
       setData(propData);
@@ -61,13 +86,16 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
     }
 
     const controller = new AbortController();
+
     async function fetchSlides() {
       try {
         const res = await fetch("/api/homepage/slides", {
           cache: "no-store",
           signal: controller.signal,
         });
+
         const result = await res.json();
+
         if (res.ok && result) {
           setData(result);
         }
@@ -83,10 +111,13 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
     }
 
     fetchSlides();
+
     return () => controller.abort();
   }, [propData]);
 
-  /* 2. Language Synchronization */
+  {
+    /* 2. Language Synchronization */
+  }
   useEffect(() => {
     if (propLang) {
       setActiveLang(propLang);
@@ -97,6 +128,7 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
     function handleLanguageChange(event) {
       const selectedLanguage =
         event?.detail?.language || event?.detail?.languageId;
+
       if (
         selectedLanguage === "en" ||
         selectedLanguage === "ps" ||
@@ -107,6 +139,7 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
     }
 
     window.addEventListener("site-language-change", handleLanguageChange);
+
     return function () {
       window.removeEventListener("site-language-change", handleLanguageChange);
     };
@@ -114,55 +147,72 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
 
   const isRtl = activeLang === "ps" || activeLang === "fa";
 
-  /* 3. Extract Valid Slides */
+  {
+    /* 3. Extract Valid Slides */
+  }
   const rawSlides = Array.isArray(data?.slides)
     ? data.slides
     : Array.isArray(data)
       ? data
       : [];
+
   const validSlides = rawSlides.filter(function (slide) {
     return getSlideImageUrl(slide).length > 0;
   });
 
   const images = validSlides.map(getSlideImageUrl);
 
-  /* 4. Auto Slide Timer */
+  {
+    /* 4. Auto Slide Timer */
+  }
   useEffect(() => {
     if (images.length <= 1) return;
 
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % images.length);
+
       setImageKey((key) => key + 1);
     }, 5000);
 
     return () => clearInterval(interval);
   }, [images.length]);
 
-  /* 5. Hide Controls Timer */
+  {
+    /* 5. Hide Controls Timer */
+  }
   useEffect(() => {
     if (!showControls) return;
+
     const timeout = setTimeout(() => setShowControls(false), 5000);
+
     return () => clearTimeout(timeout);
   }, [showControls]);
 
   function handlePrevious() {
     if (images.length <= 1) return;
+
     setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+
     setImageKey((k) => k + 1);
     setShowControls(true);
   }
 
   function handleNext() {
     if (images.length <= 1) return;
+
     setCurrentIndex((prev) => (prev + 1) % images.length);
+
     setImageKey((k) => k + 1);
     setShowControls(true);
   }
 
   const currentImage = images[currentImageIndex] || null;
+
   const currentSlide = validSlides[currentImageIndex] || null;
 
-  /* Translation resolve: current lang -> fallback English -> empty */
+  {
+    /* Translation resolve: current lang -> fallback English -> empty */
+  }
   const slideT =
     currentSlide?.translations?.[activeLang] ||
     currentSlide?.translations?.en ||
@@ -173,6 +223,7 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
 
   const titleText = stripHtml(slideTitle);
   const descText = stripHtml(slideDesc);
+
   const hasText = titleText.length > 0 || descText.length > 0;
 
   return (
@@ -188,7 +239,7 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
         {currentImage && (
           <div
             key={imageKey}
-            className="wow animate__animated animate__fadeIn relative h-full w-full"
+            className="wow animate__animated animate__fadeIn relative z-0 h-full w-full"
             data-wow-duration="1.2s"
           >
             <Image
@@ -202,14 +253,60 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
           </div>
         )}
 
+        {/* =====================================================
+            OPTIONAL BEXON PREMIUM DARK TEAL OVERLAY
+
+            - Original Cloudinary images preserved.
+            - Subtle teal ambient glow.
+            - Professional dark cinematic appearance.
+            - Improves image and text contrast.
+            - Remove this entire block to disable.
+        ===================================================== */}
+
+        {currentImage && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-[1] rounded-lg"
+            style={{
+              background: `
+                linear-gradient(
+                  110deg,
+                  rgba(8, 39, 40, 0.48) 0%,
+                  rgba(8, 30, 32, 0.44) 50%,
+                  rgba(5, 22, 25, 0.55) 100%
+                ),
+                radial-gradient(
+                  ellipse at 12% 38%,
+                  rgba(20, 105, 101, 0.20) 0%,
+                  transparent 55%
+                ),
+                radial-gradient(
+                  ellipse at 90% 100%,
+                  rgba(12, 75, 73, 0.13) 0%,
+                  transparent 55%
+                )
+              `,
+            }}
+          />
+        )}
+
+        {/* END OPTIONAL BEXON DARK TEAL OVERLAY */}
+
         {/* Text Overlay */}
         {currentImage && hasText && (
           <div
             key={`text-${imageKey}-${activeLang}`}
             className="animate__animated animate__fadeInUp absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end rounded-b-lg px-5 pt-20 pb-16 sm:px-8 sm:pt-28 sm:pb-20 md:px-12"
             style={{
-              background:
-                "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0) 100%)",
+              background: `
+                linear-gradient(
+                  to top,
+                  rgba(2, 13, 15, 0.90) 0%,
+                  rgba(3, 20, 22, 0.72) 30%,
+                  rgba(4, 25, 27, 0.35) 65%,
+                  transparent 100%
+                )
+              `,
               animationDuration: "0.8s",
             }}
             dir={isRtl ? "rtl" : "ltr"}
@@ -219,16 +316,24 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
                 role="heading"
                 aria-level={2}
                 className="slider-title mb-2 max-w-3xl text-xl leading-tight font-extrabold tracking-tight text-white drop-shadow-lg sm:text-2xl md:text-3xl lg:text-4xl"
-                style={{ textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}
-                dangerouslySetInnerHTML={{ __html: slideTitle }}
+                style={{
+                  textShadow: "0 2px 12px rgba(0,0,0,0.5)",
+                }}
+                dangerouslySetInnerHTML={{
+                  __html: slideTitle,
+                }}
               />
             )}
 
             {descText.length > 0 && (
               <div
                 className="slider-desc max-w-2xl text-sm leading-relaxed text-white/90 drop-shadow-md sm:text-base md:text-lg"
-                style={{ textShadow: "0 1px 6px rgba(0,0,0,0.4)" }}
-                dangerouslySetInnerHTML={{ __html: slideDesc }}
+                style={{
+                  textShadow: "0 1px 6px rgba(0,0,0,0.4)",
+                }}
+                dangerouslySetInnerHTML={{
+                  __html: slideDesc,
+                }}
               />
             )}
           </div>
@@ -286,6 +391,7 @@ export default function Section({ data: propData, lang: propLang = "en" }) {
         )}
       </div>
 
+      {/* Global CSS styles */}
       <style dangerouslySetInnerHTML={{ __html: SLIDER_STYLES }} />
     </main>
   );

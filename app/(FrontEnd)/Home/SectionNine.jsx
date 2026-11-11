@@ -71,6 +71,24 @@ const getText = (value, language = "en") => {
   return "";
 };
 
+const getPhoneHref = (value, phoneNumber, language = "en") => {
+  let href = "";
+
+  if (typeof value === "string") {
+    href = value;
+  } else if (value && typeof value === "object") {
+    href = getText(value, language);
+  }
+
+  if (!href) {
+    href = stripTags(phoneNumber);
+  }
+
+  const cleanNumber = href.replace(/[^\d+]/g, "");
+
+  return cleanNumber ? `tel:${cleanNumber}` : "#";
+};
+
 export default function SectionNine() {
   const [open, setOpen] = useState(null);
   const [faqData, setFaqData] = useState(null);
@@ -212,16 +230,18 @@ export default function SectionNine() {
                     </div>
 
                     <a
-                      href={
-                        faqData.phoneHref ||
-                        `tel:${stripTags(phoneNumber).replace(/[^\d+]/g, "")}`
-                      }
+                      href={getPhoneHref(
+                        faqData.phoneHref,
+                        phoneNumber,
+                        language,
+                      )}
                       className="group/phone relative w-fit text-xl font-semibold text-white"
                     >
                       <span
                         className="rt-inline"
                         dangerouslySetInnerHTML={{ __html: phoneNumber }}
                       />
+
                       <span className="absolute -bottom-1 left-0 h-0.5 w-0 bg-cyan-500 transition-all duration-300 group-hover/phone:w-full" />
                     </a>
                   </div>
