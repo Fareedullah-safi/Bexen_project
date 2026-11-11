@@ -167,7 +167,7 @@ export default function SectionTwo() {
     >
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
 
-      <div className="relative overflow-hidden rounded-2xl bg-[#dce8e8] sm:rounded-3xl">
+      <div className="relative mt-10 overflow-hidden rounded-2xl bg-[#dce8e8] sm:rounded-3xl">
         <div
           className="pointer-events-none absolute top-0 left-0 z-0 h-[55%] w-[55%] opacity-[0.09]"
           style={{
