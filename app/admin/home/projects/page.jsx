@@ -325,36 +325,20 @@ function ProjectCard({
         </div>
       </div>
 
+      {/* Tag + Image side by side */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4">
-          <div>
-            <label className={labelClass}>Tag / Category</label>
-            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-              <RichTextEditor
-                key={"tag-" + project.clientKey + "-" + language}
-                value={project.tag[language] || ""}
-                onChange={function (val) {
-                  onChange(project.clientKey, "tag", val);
-                }}
-                placeholder="e.g. Business"
-                dir={inputDirection}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>Project Title</label>
-            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-              <RichTextEditor
-                key={"title-" + project.clientKey + "-" + language}
-                value={project.title[language] || ""}
-                onChange={function (val) {
-                  onChange(project.clientKey, "title", val);
-                }}
-                placeholder="Project title in selected language"
-                dir={inputDirection}
-              />
-            </div>
+        <div>
+          <label className={labelClass}>Tag / Category</label>
+          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+            <RichTextEditor
+              key={"tag-" + project.clientKey + "-" + language}
+              value={project.tag[language] || ""}
+              onChange={function (val) {
+                onChange(project.clientKey, "tag", val);
+              }}
+              placeholder="e.g. Business"
+              dir={inputDirection}
+            />
           </div>
         </div>
 
@@ -413,6 +397,22 @@ function ProjectCard({
               Image uploaded. Save all changes to persist it.
             </p>
           )}
+        </div>
+      </div>
+
+      {/* Project Title — FULL WIDTH */}
+      <div className="mt-6">
+        <label className={labelClass}>Project Title</label>
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+          <RichTextEditor
+            key={"title-" + project.clientKey + "-" + language}
+            value={project.title[language] || ""}
+            onChange={function (val) {
+              onChange(project.clientKey, "title", val);
+            }}
+            placeholder="Project title in selected language"
+            dir={inputDirection}
+          />
         </div>
       </div>
     </div>
@@ -895,7 +895,9 @@ export default function ProjectsAdmin() {
                   <div
                     key={field.name}
                     className={
-                      field.name === "description" || field.name === "title"
+                      field.name === "description" ||
+                      field.name === "title" ||
+                      field.name === "badgeText"
                         ? "md:col-span-2"
                         : ""
                     }

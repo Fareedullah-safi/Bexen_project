@@ -143,15 +143,16 @@ export default function AboutSectionAdmin() {
   const [language, setLanguage] = useState("en");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [cloudinaryReady, setCloudinaryReady] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [theme, setTheme] = useState("light");
 
   const [errors, setErrors] = useState({ shared: {}, en: {}, ps: {}, fa: {} });
 
   const widgetRef = useRef(null);
+  const uploadLockRef = useRef(false);
   const inputDirection = language === "en" ? "ltr" : "rtl";
-  const busy = saving || checking;
+  const busy = saving || checking || uploading;
 
   useEffect(() => {
     const update = () => {
@@ -275,20 +276,26 @@ export default function AboutSectionAdmin() {
   }
 
   async function uploadImage() {
+    if (uploadLockRef.current) return;
     if (busy) return;
+    uploadLockRef.current = true;
 
     setChecking(true);
     const allowed = await verifyUploadPermission();
     setChecking(false);
     if (!allowed) {
+      uploadLockRef.current = false;
       toast.error("You don't have permission to upload images.");
       return;
     }
 
     if (!window.cloudinary) {
+      uploadLockRef.current = false;
       toast.error("Image uploader is not ready. Please try again.");
       return;
     }
+
+    setUploading(true);
 
     if (!widgetRef.current) {
       widgetRef.current = window.cloudinary.createUploadWidget(
@@ -301,7 +308,11 @@ export default function AboutSectionAdmin() {
           styles: cloudinaryStyles(theme),
         },
         (error, result) => {
-          if (error) return toast.error("Upload failed.");
+          if (error) {
+            setUploading(false);
+            uploadLockRef.current = false;
+            return toast.error("Upload failed.");
+          }
           if (result && result.event === "success") {
             setData((prev) => ({
               ...prev,
@@ -315,6 +326,15 @@ export default function AboutSectionAdmin() {
             toast.success(
               "Image uploaded. Click Save All Changes to persist it.",
             );
+          }
+          if (
+            result &&
+            (result.event === "close" ||
+              result.event === "abort" ||
+              result.event === "queues-end")
+          ) {
+            setUploading(false);
+            uploadLockRef.current = false;
           }
         },
       );
@@ -446,12 +466,15 @@ export default function AboutSectionAdmin() {
   const currentT = data.translations[language];
   const currentE = errors[language];
 
+  const uploadBtnLabel = checking
+    ? "Checking..."
+    : uploading
+      ? "Uploading..."
+      : "Replace Image";
+
   return (
     <div className="relative min-h-screen space-y-6 bg-[#f7f9fc] pb-28 text-gray-900 dark:bg-[#0b1117] dark:text-gray-100">
-      <Script
-        src="https://upload-widget.cloudinary.com/global/all.js"
-        onLoad={() => setCloudinaryReady(true)}
-      />
+      <Script src="https://upload-widget.cloudinary.com/global/all.js" />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
@@ -507,8 +530,8 @@ export default function AboutSectionAdmin() {
           <Type size={18} className="text-[#1e8a8a]" /> Media & Headings
         </h2>
 
-        <div className="grid gap-6 sm:grid-cols-12">
-          <div className="space-y-3 sm:col-span-4">
+        <div className="space-y-5">
+          <div className="space-y-3">
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
               Main Image
             </label>
@@ -516,11 +539,11 @@ export default function AboutSectionAdmin() {
               <img
                 src={data.image}
                 alt="Preview"
-                className={`h-48 w-full rounded-xl border object-cover shadow-sm ${errors.shared.image ? "border-red-400" : "border-gray-200 dark:border-gray-700"}`}
+                className={`h-64 w-full rounded-xl border object-cover shadow-sm ${errors.shared.image ? "border-red-400" : "border-gray-200 dark:border-gray-700"}`}
               />
             ) : (
               <div
-                className={`flex h-48 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed bg-gray-50 dark:bg-gray-800 ${errors.shared.image ? "border-red-400 text-red-400" : "border-gray-300 dark:border-gray-700"}`}
+                className={`flex h-64 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed bg-gray-50 dark:bg-gray-800 ${errors.shared.image ? "border-red-400 text-red-400" : "border-gray-300 dark:border-gray-700"}`}
               >
                 <ImagePlus
                   size={24}
@@ -533,97 +556,91 @@ export default function AboutSectionAdmin() {
             )}
             <FieldError message={errors.shared.image} />
             <button
+              type="button"
               onClick={uploadImage}
-              disabled={!cloudinaryReady || busy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] transition-all hover:bg-[#1e8a8a] hover:text-white disabled:opacity-50"
+              disabled={busy}
+              aria-busy={busy}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#1e8a8a] px-4 py-2.5 text-sm font-semibold text-[#1e8a8a] transition-all hover:bg-[#1e8a8a] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {checking ? (
+              {checking || uploading ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : (
                 <ImagePlus size={16} />
               )}
-              {checking ? "Checking..." : "Replace Image"}
+              {uploadBtnLabel}
             </button>
           </div>
 
-          <div className="space-y-5 sm:col-span-8">
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                Top Tagline
-              </label>
-              <div
-                className={
-                  currentE.topTag ? "rounded-md border border-red-500" : ""
-                }
-              >
-                <RichTextEditor
-                  key={"topTag-" + language}
-                  value={currentT.topTag}
-                  onChange={(val) => handleRichTextChange("topTag", val)}
-                  dir={inputDirection}
-                />
-              </div>
-              <FieldError message={currentE.topTag} />
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Top Tagline
+            </label>
+            <div
+              className={
+                currentE.topTag ? "rounded-md border border-red-500" : ""
+              }
+            >
+              <RichTextEditor
+                key={"topTag-" + language}
+                value={currentT.topTag}
+                onChange={(val) => handleRichTextChange("topTag", val)}
+                dir={inputDirection}
+              />
             </div>
+            <FieldError message={currentE.topTag} />
+          </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="sm:col-span-3">
-                <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  Main Title
-                </label>
-                <div
-                  className={
-                    currentE.title ? "rounded-md border border-red-500" : ""
-                  }
-                >
-                  <RichTextEditor
-                    key={"title-" + language}
-                    value={currentT.title}
-                    onChange={(val) => handleRichTextChange("title", val)}
-                    dir={inputDirection}
-                  />
-                </div>
-                <FieldError message={currentE.title} />
-              </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Main Title
+            </label>
+            <div
+              className={
+                currentE.title ? "rounded-md border border-red-500" : ""
+              }
+            >
+              <RichTextEditor
+                key={"title-" + language}
+                value={currentT.title}
+                onChange={(val) => handleRichTextChange("title", val)}
+                dir={inputDirection}
+              />
             </div>
+            <FieldError message={currentE.title} />
+          </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  <ChevronRight size={16} className="text-gray-400" /> Button
-                  Text
-                </label>
-                <div
-                  className={
-                    currentE.buttonText
-                      ? "rounded-md border border-red-500"
-                      : ""
-                  }
-                >
-                  <RichTextEditor
-                    key={"buttonText-" + language}
-                    value={currentT.buttonText}
-                    onChange={(val) => handleRichTextChange("buttonText", val)}
-                    dir={inputDirection}
-                  />
-                </div>
-                <FieldError message={currentE.buttonText} />
-              </div>
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  <LinkIcon size={16} className="text-gray-400" /> Button Link
-                </label>
-                <input
-                  dir="ltr"
-                  name="buttonLink"
-                  value={data.buttonLink}
-                  onChange={handleRootChange}
-                  placeholder="/about"
-                  className={getInputClass(errors.shared.buttonLink)}
-                />
-                <FieldError message={errors.shared.buttonLink} />
-              </div>
+          <div>
+            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <ChevronRight size={16} className="text-gray-400" /> Button Text
+            </label>
+            <div
+              className={
+                currentE.buttonText ? "rounded-md border border-red-500" : ""
+              }
+            >
+              <RichTextEditor
+                key={"buttonText-" + language}
+                value={currentT.buttonText}
+                onChange={(val) => handleRichTextChange("buttonText", val)}
+                dir={inputDirection}
+              />
             </div>
+            <FieldError message={currentE.buttonText} />
+          </div>
+
+          <div>
+            <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <LinkIcon size={16} className="text-gray-400" /> Button Link
+            </label>
+            <input
+              dir="ltr"
+              name="buttonLink"
+              value={data.buttonLink}
+              onChange={handleRootChange}
+              placeholder="/about"
+              className={getInputClass(errors.shared.buttonLink)}
+            />
+            <FieldError message={errors.shared.buttonLink} />
           </div>
         </div>
       </section>

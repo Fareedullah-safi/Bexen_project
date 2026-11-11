@@ -35,6 +35,57 @@ const emptyTranslation = () => ({
   description: "",
 });
 
+function cloudinaryStyles(theme) {
+  const palettes = {
+    dark: {
+      window: "#0b1117",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#35B5B5",
+      menuIcons: "#9CA3AF",
+      textDark: "#FFFFFF",
+      textLight: "#FFFFFF",
+      link: "#35B5B5",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#6B7280",
+      error: "#EF4444",
+      inProgress: "#35B5B5",
+      complete: "#10B981",
+      sourceBg: "#111a23",
+    },
+    light: {
+      window: "#FFFFFF",
+      windowBorder: "#1E8A8A",
+      tabIcon: "#1E8A8A",
+      menuIcons: "#4B5563",
+      textDark: "#000000",
+      textLight: "#FFFFFF",
+      link: "#1E8A8A",
+      action: "#1E8A8A",
+      inactiveTabIcon: "#9CA3AF",
+      error: "#EF4444",
+      inProgress: "#1E8A8A",
+      complete: "#10B981",
+      sourceBg: "#F9FAFB",
+    },
+  };
+  return { palette: palettes[theme] || palettes.light };
+}
+
+async function verifyUploadPermission() {
+  try {
+    const res = await fetch("/api/admin/cloudinary/verify", {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (res.ok && data && data.success === true) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export default function HeroSliderAdmin() {
   const [slides, setSlides] = useState([]);
   const [language, setLanguage] = useState("en");
@@ -43,11 +94,42 @@ export default function HeroSliderAdmin() {
   const [cloudinaryReady, setCloudinaryReady] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [replacingId, setReplacingId] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [theme, setTheme] = useState("light");
 
   const widgetRef = useRef(null);
   const isMountedRef = useRef(true);
 
   const inputDirection = language === "en" ? "ltr" : "rtl";
+  const busy = saving || uploading || replacingId !== null || checking;
+
+  // Theme detection
+  useEffect(() => {
+    const update = () => {
+      if (document.documentElement.classList.contains("dark")) {
+        setTheme("dark");
+      } else {
+        setTheme("light");
+      }
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  // Destroy widget on theme change so it rebuilds with new palette
+  useEffect(() => {
+    if (widgetRef.current) {
+      if (typeof widgetRef.current.destroy === "function") {
+        widgetRef.current.destroy();
+      }
+      widgetRef.current = null;
+    }
+  }, [theme]);
 
   // Load Data
   async function loadData() {
@@ -141,10 +223,25 @@ export default function HeroSliderAdmin() {
   }
 
   // Cloudinary: Add Multiple Slides
-  function handleAddSlides() {
+  async function handleAddSlides() {
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
       return toast.error("Cloudinary config missing.");
     }
+    if (busy) return;
+
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
+    if (!window.cloudinary) {
+      toast.error("Image uploader is not ready. Please try again.");
+      return;
+    }
+
     setUploading(true);
 
     try {
@@ -157,6 +254,7 @@ export default function HeroSliderAdmin() {
         uploadPreset: UPLOAD_PRESET,
         multiple: true,
         clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+        styles: cloudinaryStyles(theme),
       },
       function (err, res) {
         if (err) {
@@ -189,8 +287,23 @@ export default function HeroSliderAdmin() {
   }
 
   // Cloudinary: Replace Single Slide Image
-  function handleReplaceSlide(slideId) {
+  async function handleReplaceSlide(slideId) {
     if (!CLOUD_NAME || !UPLOAD_PRESET) return;
+    if (busy) return;
+
+    setChecking(true);
+    const allowed = await verifyUploadPermission();
+    setChecking(false);
+    if (!allowed) {
+      toast.error("You don't have permission to upload images.");
+      return;
+    }
+
+    if (!window.cloudinary) {
+      toast.error("Image uploader is not ready. Please try again.");
+      return;
+    }
+
     setReplacingId(slideId);
 
     try {
@@ -203,6 +316,7 @@ export default function HeroSliderAdmin() {
         uploadPreset: UPLOAD_PRESET,
         multiple: false,
         clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+        styles: cloudinaryStyles(theme),
       },
       function (err, res) {
         if (err) {
@@ -366,10 +480,15 @@ export default function HeroSliderAdmin() {
           <button
             type="button"
             onClick={handleAddSlides}
-            disabled={uploading || !cloudinaryReady}
+            disabled={busy || !cloudinaryReady}
             className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1e8a8a] px-6 text-sm font-semibold text-white transition hover:bg-[#167878] disabled:opacity-60"
           >
-            {uploading ? (
+            {checking ? (
+              <>
+                <LoaderCircle size={18} className="animate-spin" />
+                Checking...
+              </>
+            ) : uploading ? (
               <>
                 <LoaderCircle size={18} className="animate-spin" />
                 Uploading...
@@ -478,7 +597,7 @@ export default function HeroSliderAdmin() {
                       onClick={function () {
                         handleReplaceSlide(slide.id);
                       }}
-                      disabled={replacingId === slide.id}
+                      disabled={busy}
                       className="flex items-center gap-1.5 rounded-lg border border-[#1e8a8a]/30 px-3 py-1.5 text-xs font-semibold text-[#1e8a8a] transition hover:bg-[#1e8a8a]/10 disabled:opacity-50"
                     >
                       {replacingId === slide.id ? (
@@ -510,7 +629,7 @@ export default function HeroSliderAdmin() {
         onReload={loadData}
         onSave={handleSave}
         saving={saving}
-        busy={saving || uploading || replacingId !== null}
+        busy={busy}
       />
     </div>
   );

@@ -922,21 +922,36 @@ export default function BlogSectionAdmin() {
             </div>
           </div>
 
+          {/* Article Title — FULL WIDTH (required first) */}
+          <div className="mb-6">
+            <label className={labelClass}>Article Title</label>
+            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+              <RichTextEditor
+                key={"new-article-title-" + language}
+                value={currentTranslation.title}
+                onChange={(value) => setArticleField("title", value)}
+                placeholder="Enter article title"
+                dir={inputDirection}
+              />
+            </div>
+          </div>
+
+          {/* Category — FULL WIDTH (required) */}
+          <div className="mb-6">
+            <label className={labelClass}>Category</label>
+            <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+              <RichTextEditor
+                key={"new-article-category-" + language}
+                value={currentTranslation.category}
+                onChange={(value) => setArticleField("category", value)}
+                placeholder="ENTER CATEGORY"
+                dir={inputDirection}
+              />
+            </div>
+          </div>
+
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-5">
-              <div>
-                <label className={labelClass}>Article Title</label>
-                <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
-                  <RichTextEditor
-                    key={"new-article-title-" + language}
-                    value={currentTranslation.title}
-                    onChange={(value) => setArticleField("title", value)}
-                    placeholder="Enter article title"
-                    dir={inputDirection}
-                  />
-                </div>
-              </div>
-
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <label className={labelClass}>Day Number</label>
@@ -975,19 +990,6 @@ export default function BlogSectionAdmin() {
                       </option>
                     ))}
                   </select>
-                </div>
-              </div>
-
-              <div>
-                <label className={labelClass}>Category</label>
-                <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
-                  <RichTextEditor
-                    key={"new-article-category-" + language}
-                    value={currentTranslation.category}
-                    onChange={(value) => setArticleField("category", value)}
-                    placeholder="ENTER CATEGORY"
-                    dir={inputDirection}
-                  />
                 </div>
               </div>
 
@@ -1150,33 +1152,46 @@ export default function BlogSectionAdmin() {
 
                     {expanded && (
                       <div className="mt-6 border-t border-[var(--border)] pt-6">
+                        {/* Article Title — FULL WIDTH (required first) */}
+                        <div className="mb-6">
+                          <label className={labelClass}>Article Title</label>
+                          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+                            <RichTextEditor
+                              key={
+                                "existing-title-" + item._id + "-" + language
+                              }
+                              value={fields.title}
+                              onChange={(value) =>
+                                handleExistingChange(item._id, "title", value)
+                              }
+                              dir={inputDirection}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Category — FULL WIDTH (required) */}
+                        <div className="mb-6">
+                          <label className={labelClass}>Category</label>
+                          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
+                            <RichTextEditor
+                              key={
+                                "existing-category-" + item._id + "-" + language
+                              }
+                              value={fields.category}
+                              onChange={(value) =>
+                                handleExistingChange(
+                                  item._id,
+                                  "category",
+                                  value,
+                                )
+                              }
+                              dir={inputDirection}
+                            />
+                          </div>
+                        </div>
+
                         <div className="grid gap-6 lg:grid-cols-2">
                           <div className="space-y-5">
-                            <div>
-                              <label className={labelClass}>
-                                Article Title
-                              </label>
-                              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
-                                <RichTextEditor
-                                  key={
-                                    "existing-title-" +
-                                    item._id +
-                                    "-" +
-                                    language
-                                  }
-                                  value={fields.title}
-                                  onChange={(value) =>
-                                    handleExistingChange(
-                                      item._id,
-                                      "title",
-                                      value,
-                                    )
-                                  }
-                                  dir={inputDirection}
-                                />
-                              </div>
-                            </div>
-
                             <div className="grid gap-5 sm:grid-cols-2">
                               <div>
                                 <label className={labelClass}>Day Number</label>
@@ -1216,29 +1231,6 @@ export default function BlogSectionAdmin() {
                                     </option>
                                   ))}
                                 </select>
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className={labelClass}>Category</label>
-                              <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--background)]">
-                                <RichTextEditor
-                                  key={
-                                    "existing-category-" +
-                                    item._id +
-                                    "-" +
-                                    language
-                                  }
-                                  value={fields.category}
-                                  onChange={(value) =>
-                                    handleExistingChange(
-                                      item._id,
-                                      "category",
-                                      value,
-                                    )
-                                  }
-                                  dir={inputDirection}
-                                />
                               </div>
                             </div>
 

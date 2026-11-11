@@ -461,82 +461,7 @@ export default function CtaBannerAdmin() {
           </div>
         </header>
 
-        {/* TEXT CONTENT */}
-        <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
-          <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
-            <Type size={18} className="text-[var(--accent)]" />
-            <h2 className="font-bold">
-              Text Content ({language.toUpperCase()})
-            </h2>
-          </div>
-
-          <div className="grid gap-5 p-4 sm:grid-cols-2 sm:p-6">
-            <div className="sm:col-span-2">
-              <label className="mb-1.5 block text-sm font-semibold">
-                Banner Title *
-              </label>
-              <div className="overflow-hidden rounded-xl border border-[var(--border)]">
-                <RichTextEditor
-                  key={"title-" + language}
-                  value={(data.title && data.title[language]) || ""}
-                  onChange={function (value) {
-                    setField("title", value);
-                  }}
-                  placeholder="Let's Build Future Together."
-                  dir={dir}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold">
-                Button Text *
-              </label>
-              <div className="overflow-hidden rounded-xl border border-[var(--border)]">
-                <RichTextEditor
-                  key={"buttonText-" + language}
-                  value={(data.buttonText && data.buttonText[language]) || ""}
-                  onChange={function (value) {
-                    setField("buttonText", value);
-                  }}
-                  placeholder="Get Started Now"
-                  dir={dir}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* DESTINATION LINK */}
-        <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
-          <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
-            <LinkIcon size={18} className="text-[var(--accent)]" />
-            <h2 className="font-bold">Button Destination Link</h2>
-          </div>
-
-          <div className="p-4 sm:p-6">
-            <label className="mb-1.5 block text-sm font-semibold">
-              Global URL / Path *
-            </label>
-            <input
-              dir="ltr"
-              value={data.buttonLink}
-              onChange={function (e) {
-                const value = e.target.value;
-                setData(function (previous) {
-                  return {
-                    ...previous,
-                    buttonLink: value,
-                  };
-                });
-              }}
-              className={inputClass}
-              placeholder="/contact  or  https://example.com"
-            />
-          </div>
-        </section>
-
-        {/* IMAGE UPLOAD */}
+        {/* 1. IMAGE UPLOAD */}
         <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
           <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
             <ImageIcon size={18} className="text-[var(--accent)]" />
@@ -593,6 +518,81 @@ export default function CtaBannerAdmin() {
                 </span>
               </button>
             )}
+          </div>
+        </section>
+
+        {/* 2. TEXT CONTENT (Title + Button Text) */}
+        <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
+          <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
+            <Type size={18} className="text-[var(--accent)]" />
+            <h2 className="font-bold">
+              Text Content ({language.toUpperCase()})
+            </h2>
+          </div>
+
+          <div className="space-y-5 p-4 sm:p-6">
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold">
+                Banner Title *
+              </label>
+              <div className="w-full overflow-hidden rounded-xl border border-[var(--border)]">
+                <RichTextEditor
+                  key={"title-" + language}
+                  value={(data.title && data.title[language]) || ""}
+                  onChange={function (value) {
+                    setField("title", value);
+                  }}
+                  placeholder="Let's Build Future Together."
+                  dir={dir}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold">
+                Button Text *
+              </label>
+              <div className="w-full overflow-hidden rounded-xl border border-[var(--border)]">
+                <RichTextEditor
+                  key={"buttonText-" + language}
+                  value={(data.buttonText && data.buttonText[language]) || ""}
+                  onChange={function (value) {
+                    setField("buttonText", value);
+                  }}
+                  placeholder="Get Started Now"
+                  dir={dir}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. DESTINATION LINK */}
+        <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
+          <div className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-4 sm:px-6">
+            <LinkIcon size={18} className="text-[var(--accent)]" />
+            <h2 className="font-bold">Button Destination Link</h2>
+          </div>
+
+          <div className="p-4 sm:p-6">
+            <label className="mb-1.5 block text-sm font-semibold">
+              Global URL / Path *
+            </label>
+            <input
+              dir="ltr"
+              value={data.buttonLink}
+              onChange={function (e) {
+                const value = e.target.value;
+                setData(function (previous) {
+                  return {
+                    ...previous,
+                    buttonLink: value,
+                  };
+                });
+              }}
+              className={inputClass}
+              placeholder="/contact  or  https://example.com"
+            />
           </div>
         </section>
       </div>

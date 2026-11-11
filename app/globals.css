@@ -563,3 +563,19 @@ body {
 .rt-content li {
   margin-bottom: 0.25em;
 }
+
+
+/* Thin scrollbar for block picker */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(30, 138, 138, 0.25);
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(30, 138, 138, 0.45);
+}

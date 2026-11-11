@@ -13,6 +13,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
@@ -21,6 +22,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   useDeferredValue,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useTransition,
@@ -96,6 +98,9 @@ export default function FlatEditorPage() {
   const [showBlockPicker, setShowBlockPicker] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const [showErrors, setShowErrors] = useState(false);
+
+  // NEW: search input state for block picker
+  const [blockSearchQuery, setBlockSearchQuery] = useState("");
 
   // Language switch: keep UI fast, heavy forms update a moment later
   const [isLangPending, startLangTransition] = useTransition();
@@ -245,6 +250,7 @@ export default function FlatEditorPage() {
       blocks: [...(prev?.blocks || []), newBlock],
     }));
     setShowBlockPicker(false);
+    setBlockSearchQuery("");
   };
 
   const updateBlock = (blockId, newData) =>
@@ -366,6 +372,20 @@ export default function FlatEditorPage() {
       setLoading(false);
     }
   };
+
+  // Filter blocks based on search query (memoized for performance with 200+ templates)
+  const filteredBlocks = useMemo(() => {
+    const query = (blockSearchQuery || "").toLowerCase().trim();
+    if (!query) return BLOCKS_LIST || [];
+    return (BLOCKS_LIST || []).filter((b) => {
+      const name = (b.name || "").toLowerCase();
+      const desc = (b.description || "").toLowerCase();
+      const type = (b.type || "").toLowerCase();
+      return (
+        name.includes(query) || desc.includes(query) || type.includes(query)
+      );
+    });
+  }, [blockSearchQuery]);
 
   if (loading) {
     return (
@@ -645,13 +665,18 @@ export default function FlatEditorPage() {
         {showBlockPicker && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-            onClick={() => setShowBlockPicker(false)}
+            onClick={() => {
+              setShowBlockPicker(false);
+              setBlockSearchQuery("");
+            }}
           >
             <div
-              className={`w-full max-w-2xl rounded-2xl border p-6 shadow-2xl ${cardClass}`}
+              className={`flex w-full max-w-2xl flex-col rounded-2xl border p-6 shadow-2xl ${cardClass}`}
+              style={{ maxHeight: "85vh" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="mb-5 flex items-center justify-between">
+              {/* Header */}
+              <div className="mb-4 flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-bold">Block Library</h2>
                   <p className={`mt-1 text-xs ${mutedTextClass}`}>
@@ -659,7 +684,10 @@ export default function FlatEditorPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowBlockPicker(false)}
+                  onClick={() => {
+                    setShowBlockPicker(false);
+                    setBlockSearchQuery("");
+                  }}
                   className={`cursor-pointer rounded-full border p-1.5 transition ${
                     isDark
                       ? "border-[#263442] hover:bg-[#263442]"
@@ -670,32 +698,132 @@ export default function FlatEditorPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {(BLOCKS_LIST || []).map((b) => (
+              {/* Search Input */}
+              <div className="relative mb-4">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+                  <Search
+                    size={16}
+                    className={isDark ? "text-gray-500" : "text-gray-400"}
+                  />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search blocks by name, description, or type..."
+                  value={blockSearchQuery}
+                  onChange={(e) => setBlockSearchQuery(e.target.value)}
+                  autoFocus
+                  className={`w-full rounded-xl border py-3 pr-10 pl-10 text-sm transition-all outline-none placeholder:text-sm focus:border-[#1E8A8A]/50 focus:ring-2 focus:ring-[#1E8A8A]/30 ${
+                    isDark
+                      ? "border-[#263442] bg-[#16212c] text-gray-200 placeholder:text-gray-500"
+                      : "border-[#e4e7ec] bg-[#f8fafc] text-gray-800 placeholder:text-gray-400"
+                  }`}
+                />
+                {blockSearchQuery && (
                   <button
-                    key={b.type}
-                    onClick={() => addBlock(b.type)}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-left transition-all hover:border-[#1E8A8A] hover:shadow-md ${
+                    onClick={() => setBlockSearchQuery("")}
+                    className={`absolute inset-y-0 right-0 flex cursor-pointer items-center pr-3.5 transition ${
                       isDark
-                        ? "border-[#263442] bg-[#16212c]"
-                        : "border-[#e4e7ec] bg-[#f8fafc]"
+                        ? "text-gray-500 hover:text-gray-300"
+                        : "text-gray-400 hover:text-gray-600"
                     }`}
                   >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Results count */}
+              <div
+                className={`mb-3 flex items-center justify-between text-xs ${mutedTextClass}`}
+              >
+                <span>
+                  {filteredBlocks.length}{" "}
+                  {filteredBlocks.length === 1 ? "block" : "blocks"}
+                  {blockSearchQuery ? " found" : " available"}
+                </span>
+                {filteredBlocks.length > 6 && (
+                  <span className="flex items-center gap-1 text-[11px] opacity-75">
+                    <ChevronDown size={12} />
+                    Scroll for more
+                  </span>
+                )}
+              </div>
+
+              {/* Scrollable Template Grid */}
+              <div
+                className="flex-1 scrollbar-thin overflow-y-auto pr-1"
+                style={{ maxHeight: "calc(85vh - 220px)" }}
+              >
+                {filteredBlocks.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {filteredBlocks.map((b) => (
+                      <button
+                        key={b.type}
+                        onClick={() => addBlock(b.type)}
+                        className={`group relative flex cursor-pointer items-start gap-3.5 overflow-hidden rounded-xl border p-4 text-left transition-all duration-200 hover:border-[#1E8A8A] hover:shadow-lg hover:shadow-[#1E8A8A]/10 ${
+                          isDark
+                            ? "border-[#263442] bg-[#16212c] hover:bg-[#1a2836]"
+                            : "border-[#e4e7ec] bg-[#f8fafc] hover:bg-white"
+                        }`}
+                      >
+                        {/* Icon */}
+                        <div
+                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl transition-all duration-200 group-hover:scale-105 group-hover:border-[#1E8A8A]/40 group-hover:bg-[#1E8A8A]/10 ${
+                            isDark
+                              ? "border-[#263442] bg-[#111a23]"
+                              : "border-[#e4e7ec] bg-white"
+                          }`}
+                        >
+                          {b.icon}
+                        </div>
+
+                        {/* Text */}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-bold transition-colors group-hover:text-[#35B5B5]">
+                            {b.name}
+                          </div>
+                          <div
+                            className={`mt-0.5 line-clamp-2 text-xs leading-relaxed ${mutedTextClass}`}
+                          >
+                            {b.description}
+                          </div>
+                        </div>
+
+                        {/* Add indicator (shows on hover) */}
+                        <div
+                          className={`mt-0.5 shrink-0 rounded-md p-1 opacity-0 transition-opacity group-hover:opacity-100 ${
+                            isDark ? "text-[#35B5B5]" : "text-[#1E8A8A]"
+                          }`}
+                        >
+                          <Plus size={14} />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  /* Empty state — no matches found */
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
                     <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border text-xl ${
-                        isDark ? "border-[#263442]" : "border-[#e4e7ec]"
+                      className={`mb-3 rounded-full p-3 ${
+                        isDark ? "bg-[#263442]" : "bg-[#f0f2f5]"
                       }`}
                     >
-                      {b.icon}
+                      <Search
+                        size={24}
+                        className={isDark ? "text-gray-500" : "text-gray-400"}
+                      />
                     </div>
-                    <div>
-                      <div className="text-sm font-bold">{b.name}</div>
-                      <div className={`mt-0.5 text-xs ${mutedTextClass}`}>
-                        {b.description}
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                    <p className={`text-sm font-medium ${mutedTextClass}`}>
+                      No blocks match &ldquo;{blockSearchQuery}&rdquo;
+                    </p>
+                    <button
+                      onClick={() => setBlockSearchQuery("")}
+                      className="mt-2 cursor-pointer text-xs font-medium text-[#1E8A8A] hover:underline"
+                    >
+                      Clear search
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
