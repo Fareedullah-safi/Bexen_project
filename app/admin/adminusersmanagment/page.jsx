@@ -84,6 +84,7 @@ export default function AdminsManager() {
   const [authorized, setAuthorized] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false); // ★ NEW
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState(null); // ★ SECURITY: know who "me" is
 
   // --- Verify permission on mount ---
   useEffect(() => {
@@ -98,6 +99,17 @@ export default function AdminsManager() {
       if (canView) {
         const isSuper = await verifySuperAdmin();
         setIsSuperAdmin(isSuper);
+
+        // ★ SECURITY: fetch current user ID to prevent self-harm
+        try {
+          const sess = await fetch("/api/admin/adminusers/session", {
+            cache: "no-store",
+          });
+          const sessData = await sess.json();
+          if (sessData?.success && sessData?.admin?.uid) {
+            setCurrentUserId(sessData.admin.uid);
+          }
+        } catch {}
       }
 
       setCheckingAuth(false);
@@ -133,14 +145,39 @@ export default function AdminsManager() {
     }
   };
 
+  // ★ SECURITY FIX: Only load admins AFTER auth passes (was loading for everyone)
   useEffect(() => {
-    loadAdmins();
-  }, []);
+    if (!checkingAuth && authorized) {
+      loadAdmins();
+    }
+  }, [checkingAuth, authorized]);
 
   // ★ Only super admin can change roles
   const handleRoleChange = async (id, newRole) => {
     const allowed = await requireSuperAdmin("change roles");
     if (!allowed) return;
+
+    // ★ SECURITY: block self-demotion
+    if (currentUserId && String(id) === String(currentUserId)) {
+      toast.error("You cannot change your own role.");
+      return;
+    }
+
+    // ★ SECURITY: block demoting the last super-admin
+    if (newRole !== "super-admin") {
+      const target = admins.find((u) => u._id === id);
+      if ((target?.role || "viewer") === "super-admin") {
+        const superCount = admins.filter(
+          (u) => (u.role || "viewer") === "super-admin",
+        ).length;
+        if (superCount <= 1) {
+          toast.error(
+            "Cannot demote the last Super Admin. Assign another first.",
+          );
+          return;
+        }
+      }
+    }
 
     setSavingId(id);
     try {
@@ -166,6 +203,26 @@ export default function AdminsManager() {
   const handleDelete = async (id, name) => {
     const allowed = await requireSuperAdmin("delete admins");
     if (!allowed) return;
+
+    // ★ SECURITY: block self-deletion
+    if (currentUserId && String(id) === String(currentUserId)) {
+      toast.error("You cannot delete your own account.");
+      return;
+    }
+
+    // ★ SECURITY: block deleting the last super-admin
+    const target = admins.find((u) => u._id === id);
+    if ((target?.role || "viewer") === "super-admin") {
+      const superCount = admins.filter(
+        (u) => (u.role || "viewer") === "super-admin",
+      ).length;
+      if (superCount <= 1) {
+        toast.error(
+          "Cannot delete the last Super Admin. Assign another first.",
+        );
+        return;
+      }
+    }
 
     setDeletingId(id);
     try {
